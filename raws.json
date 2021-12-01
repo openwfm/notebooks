@@ -21,7 +21,7 @@
                 "MNET_ID": "2",
                 "PERIOD_OF_RECORD": {
                     "start": "1997-01-01T00:00:00Z",
-                    "end": "2021-11-30T23:27:00Z"
+                    "end": "2021-12-01T00:27:00Z"
                 },
                 "ELEVATION": "6493",
                 "NAME": "BLACK CEDAR",
@@ -18423,12 +18423,12 @@
             }
         ],
         "SUMMARY": {
-            "DATA_QUERY_TIME": "118.291139603 ms",
+            "DATA_QUERY_TIME": "116.744995117 ms",
             "RESPONSE_CODE": 1,
             "RESPONSE_MESSAGE": "OK",
-            "METADATA_RESPONSE_TIME": "129.899024963 ms",
-            "DATA_PARSING_TIME": "239.589929581 ms",
-            "TOTAL_DATA_TIME": "357.883214951 ms",
+            "METADATA_RESPONSE_TIME": "106.017827988 ms",
+            "DATA_PARSING_TIME": "130.743026733 ms",
+            "TOTAL_DATA_TIME": "247.488975525 ms",
             "NUMBER_OF_OBJECTS": 1,
             "FUNCTION_USED": "time_data_parser"
         }
