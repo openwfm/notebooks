@@ -57,14 +57,26 @@ Note that the probability density at $u$ is maximal when $\left\Vert
 d_{k}-Hu\right\Vert _{R^{-1}}^{2}+\left\Vert u-u_{k}\right\Vert _{{P_{k}^{f}}^{-1}}^{2}$
  is minimal, which quantifies the statement that $d_{k}\approx
 Hu_{k}$ and $u\approx u_{k}^{f}$.  By a direct computation completing the
-square and using the Sherman-Morrison-Woodbury formula, $$p_{k}\left(
-u\right) \propto e^{-\frac{\left\Vert u-u_{k}\right\Vert
-_{P_{k}^{-1}}^{2}{2},$$ which is the density of the normal distribution with the mean%
+square and using the Sherman-Morrison-Woodbury formula, 
+$$p_{k}\left(
+		u
+	   \right) \propto 
+e^{-\frac{
+	\left\Vert u-u_{k
+	         }
+	\right\Vert_
+		{P_{k
+		      }^{-1}
+		}^{2}
+	}
+	{2}},
+$$ 
+which is the density of the normal distribution with the mean
 $$
 u_{k}^{f}=u_{k}^{f}+K_{k}(d-Hu_{k}^{f}),\ \text{where }K_{k}=P_{k}%
 ^{f}H^{\mathrm{T}}(HP_{k}^{f}H^{\mathrm{T}}+R)^{-1}%
 $$
-and covariance%
+and covariance
 $$
 P_{k}=\left(  \left(  P_{k}^{f}\right)  ^{-1}+H^{\mathrm{T}}R^{-1}H\right)
 ^{-1}=(I-KH)P_{k}^{f}.
