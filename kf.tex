@@ -21,13 +21,11 @@ propagates to the uncertainty of the forecast $u_{k}^{f}$. So, assume that the
 model is differentiable and quantify the uncertainty of the state by a
 covariance matrix. That is,  assume that at step $k-1$, the state has
 (approximately) normal distribution with mean $u_{k-1}$ and covariance
-$P_{k-1}$ , with the probability density at $u$ proportional to
-$e^{-\left\Vert u-u_{k-1}\right\Vert _{\left(  P_{k-1}^{{}}\right)  ^{-1}}%
-^{2}/2}$. Using the Taylor expansion of order $1$ of the model operator at
+$P_{k-1}$. Using the Taylor expansion of order $1$ of the model operator at
 $u_{k-1}$, $\mathcal{M}\left(  u\right)  \approx\mathcal{M}\left(
 u_{k-1}\right)  +\mathcal{M}^{\prime}\left(  u_{k-1}\right)  \left(
 u-u_{k-1}\right)  $, where $\mathcal{M}^{\prime}\left(  u_{k-1}\right)  $ is
-the Jacobian matrix of $\mathcal{M}$ at $u_{k-1}$. It can be can show that the
+the Jacobian matrix of $\mathcal{M}$ at $u_{k-1}$. It can be shown that the
 forecast has then (approximately)\ normal distribution with mean and
 covariance
 $$
@@ -46,22 +44,22 @@ proportional to $e^{-\left\Vert d_{k}-Hu\right\Vert _{R^{-1}}^{2}/2}$, where
 we used the notation for the norm $\left\Vert v\right\Vert _{A}%
 =\left(v^{\top}Av\right)^{1/2}$ induced by a positive definite matrix $A$. Similarly, we quantify the
 uncertainty of the state by a covariance matrix $P_{k}$. That is, the forecast
-state has normal distribution with mean $u_{k}^{f}$  and covariance
-$P_{k}^{f}$ , with the probability density at $u$ proportional to
-$e^{-\left\Vert u-u_{k}\right\Vert _{{P_{k}^{f}}^{-1}}^{2}/2}$. From the Bayes theorem of statistics, the probability distribution
+state has (approximately) normal distribution with mean $u_{k}^{f}$  and covariance
+$P_{k}^{f}$. From the Bayes theorem of statistics, the probability distribution
 of the state after taking the data into account has density%
 $$
-p_{k}\left(  u\right)  \text{ proportional to }e^\frac{-\left\Vert d_{k}
+p_{k}\left(  u\right) \propto e^\frac{-\left\Vert d_{k}
 -Hu\right\Vert_{R^{-1}}^{2}}{2}e^\frac{-\left\Vert u-u_{k}^{f}\right\Vert _{
 {P_{k}^f}^{-1}  }^{2}}{2}%
 $$
+where $\propto$ means proportional.
 Note that the probability density at $u$ is maximal when $\left\Vert
 d_{k}-Hu\right\Vert _{R^{-1}}^{2}+\left\Vert u-u_{k}\right\Vert _{{P_{k}^{f}}^{-1}}^{2}$
  is minimal, which quantifies the statement that $d_{k}\approx
 Hu_{k}$ and $u\approx u_{k}^{f}$.  By a direct computation completing the
-square and using the Sherman-Morrison-Woodbury formula, $p_{k}\left(
-u\right)  $ is proportional to the density $e^{-\left\Vert u-u_{k}\right\Vert
-_{P_{k}^{-1}}^{2}/2}$ of the normal distribution with the mean%
+square and using the Sherman-Morrison-Woodbury formula, $$p_{k}\left(
+u\right) \propto e^{-\frac{\left\Vert u-u_{k}\right\Vert
+_{P_{k}^{-1}}^{2}{2},$$ which is the density of the normal distribution with the mean%
 $$
 u_{k}^{f}=u_{k}^{f}+K_{k}(d-Hu_{k}^{f}),\ \text{where }K_{k}=P_{k}%
 ^{f}H^{\mathrm{T}}(HP_{k}^{f}H^{\mathrm{T}}+R)^{-1}%
@@ -71,5 +69,10 @@ $$
 P_{k}=\left(  \left(  P_{k}^{f}\right)  ^{-1}+H^{\mathrm{T}}R^{-1}H\right)
 ^{-1}=(I-KH)P_{k}^{f}.
 $$
+
+These are the equations of the extended Kalman filter. The original Kalman (1960) filter was
+formulated for a linear process. The extension to the
+nonlinear case made broad array of applications possible, including the Apollo spacecraft naviation (McGee and Schmidt, 1966),  and is
+still a de-facto standard in navigation and GPS.
 
 \end{document}
