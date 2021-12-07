@@ -1,0 +1,167 @@
+\documentclass{article}%
+\usepackage{amsmath}%
+\setcounter{MaxMatrixCols}{30}%
+\usepackage{amsfonts}%
+\usepackage{amssymb}%
+\usepackage{graphicx}
+%TCIDATA{OutputFilter=latex2.dll}
+%TCIDATA{Version=5.50.0.2960}
+%TCIDATA{CSTFile=40 LaTeX article.cst}
+%TCIDATA{Created=Thursday, December 02, 2021 19:07:13}
+%TCIDATA{LastRevised=Monday, December 06, 2021 21:59:38}
+%TCIDATA{<META NAME="GraphicsSave" CONTENT="32">}
+%TCIDATA{<META NAME="SaveForMode" CONTENT="1">}
+%TCIDATA{BibliographyScheme=Manual}
+%TCIDATA{<META NAME="DocumentShell" CONTENT="Standard LaTeX\Blank - Standard LaTeX Article">}
+%BeginMSIPreambleData
+\providecommand{\U}[1]{\protect\rule{.1in}{.1in}}
+%EndMSIPreambleData
+\newtheorem{theorem}{Theorem}
+\newtheorem{acknowledgement}[theorem]{Acknowledgement}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{case}[theorem]{Case}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{condition}[theorem]{Condition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{criterion}[theorem]{Criterion}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{exercise}[theorem]{Exercise}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{problem}[theorem]{Problem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{solution}[theorem]{Solution}
+\newtheorem{summary}[theorem]{Summary}
+\newenvironment{proof}[1][Proof]{\noindent\textbf{#1.} }{\ \rule{0.5em}{0.5em}}
+\begin{document}
+Write the equation of an ellipse with horizontal axis $a$ and vertical axis
+$b$ in parametric form%
+\[
+\left[
+\begin{array}
+[c]{c}%
+x\\
+y
+\end{array}
+\right]  =\left[
+\begin{array}
+[c]{c}%
+a\cos s\\
+b\sin s
+\end{array}
+\right]  ..
+\]
+Notable points:%
+\[%
+\begin{tabular}
+[c]{ccc}%
+$s$ & $\left(  x,y\right)  $ & vertex\\
+$-\frac{1}{2}$ & $\left(  0,-b\right)  $ & bottom\\
+$0$ & $\left(  a,0\right)  $ & right\\
+$\frac{\pi}{2}$ & $\left(  0,b\right)  $ & top\\
+$\pi$ & $\left(  -a,0\right)  $ & left
+\end{tabular}
+\]
+Rotate by angle $\theta\in(-\pi,\pi]$ clockwise:%
+\[
+\left[
+\begin{array}
+[c]{c}%
+x\\
+y
+\end{array}
+\right]  =\left[
+\begin{array}
+[c]{cc}%
+\cos\theta & \sin\theta\\
+-\sin\theta & \cos\theta
+\end{array}
+\right]  \left[
+\begin{array}
+[c]{c}%
+a\cos s\\
+b\sin s
+\end{array}
+\right]  ,\quad s\in(-\pi,\pi]
+\]
+Multiplying out we get%
+\[
+\left[
+\begin{array}
+[c]{c}%
+x\\
+y
+\end{array}
+\right]  =\left[
+\begin{array}
+[c]{c}%
+a\cos\theta\cos s+b\sin\theta\sin s\\
+-a\sin\theta\cos s+b\cos\theta\sin s
+\end{array}
+\right]  ,\quad s\in(-\pi,\pi]
+\]
+and move the center vertically so that the point distance $c$ from the bottom
+vertex on the $b$ axis is at $y=0$,%
+
+\[
+\left[
+\begin{array}
+[c]{c}%
+x\\
+y
+\end{array}
+\right]  =\left[
+\begin{array}
+[c]{c}%
+a\cos\theta\cos s+b\sin\theta\sin s\\
+-a\sin\theta\cos s+b\cos\theta\sin s+(b-c)\cos\theta
+\end{array}
+\right]
+\]
+This is the equation of the ellipse from the figure, and the rate of spread in
+the direction normal to the fireline is%
+\[
+R=\max_{s}-a\sin\theta\cos s+b\cos\theta\sin s+(b-c)\cos\theta
+\]
+The find the highest point, set%
+\[
+y^{\prime}\left(  s\right)  =\frac{\partial}{\partial s}\left(  -a\sin
+\theta\cos s+b\cos\theta\sin s+(b-c)\cos\theta\right)  =0
+\]
+which gives%
+\[
+a\sin\theta\sin s+b\cos\theta\cos s=0
+\]
+We can either divide by $\sin\theta\neq0$,
+\[
+\frac{\sin s}{\cos s}+\frac{b}{a}\frac{\cos\theta}{\sin\theta}=0,
+\]
+and compute $s$ from%
+\[
+s=-\arctan\left(  \frac{b\cos\theta}{a\sin\theta}\right)
+\]
+Using the arctan2 function in numpy%
+\[
+s=-\text{arctan2}\left(  b\cos\theta,a\sin\theta\right)
+\]
+correct result even for $\sin\theta=0.$ In any case, we get two solutions, $s$
+and $s+\pi$,  substitute in the equation of the ellipse%
+\[
+y=-a\sin\theta\cos s+b\cos\theta\sin s+\left(  b-c\right)  \cos\theta
+\]
+and take the larger value:%
+\[
+R=\max\left\{  u,-u\right\}  +c\cos\theta,\quad u=-a\sin\theta\cos
+s+b\cos\theta\sin s
+\]
+
+
+
+
+
+\end{document}
