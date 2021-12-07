@@ -1,9 +1,9 @@
 \documentclass{article}
-\usepackage{amsmath}
-\setcounter{MaxMatrixCols}{30}
+\usepackage{ametsoc}
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{graphicx}
+\bibliographystyle{ametsoc}
 \begin{document}
 Write the equation of an ellipse with horizontal axis $a$ and vertical axis
 $b$ in parametric form
@@ -103,7 +103,7 @@ s=-\arctan\left(  \frac{b\cos\theta}{a\sin\theta}\right)
 $$
 Using the arctan2 function in numpy
 $$
-s=-\text{arctan2}\left(  b\cos\theta,a\sin\theta\right)
+s=-\mathop{arctan2}\left(  b\cos\theta,a\sin\theta\right)
 $$
 gives the correct result even for $\sin\theta=0.$ In any case, we get two solutions, $s$
 and $s+\pi$,  substitute in the equation of the ellipse
@@ -117,7 +117,19 @@ s+b\cos\theta\sin s.
 $$
 
 
-
-
+\nocite{Mandel-2009-DAW}
+\bibliography{
+/Users/jmandel/daseminar/references/bigdata.bib,
+/Users/jmandel/daseminar/references/by_Aime.bib,
+/Users/jmandel/daseminar/references/epi.bib,
+/Users/jmandel/daseminar/references/extra.bib,
+/Users/jmandel/daseminar/references/geo.bib,
+/Users/jmandel/daseminar/references/jm.bib,
+/Users/jmandel/daseminar/references/ml.bib,
+/Users/jmandel/daseminar/references/other.bib,
+/Users/jmandel/daseminar/references/quad-jm.bib,
+/Users/jmandel/daseminar/references/slides.bib,
+/Users/jmandel/daseminar/references/spdes.bib
+}
 
 \end{document}
