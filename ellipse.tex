@@ -5,6 +5,16 @@
 \usepackage{graphicx}
 \bibliographystyle{ametsoc}
 \begin{document}
+\section{Background}
+Richards (1990) and FARSITE (Finney, 2000) assume that fire spreads to an ellipsoid with axes $a$ and $b$, with the fire starting from a point at distance $c$ on the $b$-axis from the center of the ellipse. The $b$ axis is the direction of the maximal Rate of Spread (ROS), which equals to $b+c$, and is computed from the Rothermel formula. Richards (1990) considers only the wind and zero slope, then the direction of the maximal rate of spread is the wind direction. FARSITE computes a ``resultant'' vector from the slope and wind vectors, which it then substitutes into the Rothermel formula. To find and reproducw how is the computation of the slope and of the resultant vector done is the heart of the project.
+
+When the fire propagates from a fireline, the ellipsoid method considers it as starting from starting points on the fireline, and the new fireline is then the envelope of the ellipsoids on the side in the propagation direction.
+
+WRF-SFIRE works with ROS in the direction of the normal of the fireline, and substitutes in the Rothermel formula the wind speed projected on the normal (i.e., multiplied by the cosine of the wind vector and the normal vector), and the slope (i.e, slope of the gradient of the terrain height) also projected on the normal (i.e., multiplied by the cosine of the slope direction in the horizontal plane and the normal vector).
+
+To compare the fire propagation in WRF-SFIRE and FARSITE, we will find the ROS in the direction normal to the fireline, which is equivalent to what FARSITE does. 
+\section{Methods}
+\subsection{Computing ROS in the normal direction from the ellipsoid method}
 Write the equation of an ellipse with horizontal axis $a$ and vertical axis
 $b$ in parametric form
 $$
