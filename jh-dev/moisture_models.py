@@ -40,36 +40,82 @@ def ext_kf(u,P,F,Q=0,d=None,H=None,R=None):
   Pa = Pf - K @ d2(H @ P)        # analysis covariance
   return ua, d2(Pa)
 
+### Define model function with drying, wetting, and rain equilibria
+
+# Parameters
+r0 = 0.05                                   # threshold rainfall [mm/h]
+rs = 8.0                                    # saturation rain intensity [mm/h]
+Tr = 14.0                                   # time constant for rain wetting model [h]
+S = 250                                     # saturation intensity [dimensionless]
+T = 10.0                                    # time constant for wetting/drying
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def run_augmented_kf(d,Ed,Ew,rain,h2,hours):
-  u = np.zeros((2,hours))
-  u[:,0]=[0.1,0.0]       # initialize,background state  
-  P = np.zeros((2,2,hours))
-  P[:,:,0] = np.array([[1e-3, 0.],
-                      [0.,  1e-3]]) # background state covariance
-  Q = np.array([[1e-3, 0.],
-                [0,  1e-3]]) # process noise covariance
-  H = np.array([[1., 0.]])  # first component observed
-  R = np.array([1e-3]) # data variance
+def model_moisture(m0,Eqd,Eqw,r,t,partials=0,T=10.0,tlen=1.0):
+    # arguments:
+    # m0         starting fuel moistureb (%s
+    # Eqd        drying equilibrium      (%) 
+    # Eqw        wetting equilibrium     (%)
+    # r          rain intensity          (mm/h)
+    # t          time
+    # partials = 0, 1, 2
+    # returns: same as model_decay
+    #   if partials==0: m1 = fuel moisture contents after time 1 hour
+    #              ==1: m1, dm1/dm0 
+    #              ==2: m1, dm1/dm0, dm1/dE  
+    
+    if r > r0:
+        # print('raining')
+        E = S
+        T1 =  (1.0 - np.exp(- (r - r0) / rs)) / Tr
+    elif m0 <= Eqw: 
+        # print('wetting')
+        E=Eqw
+        T1 = 1.0/T
+    elif m0 >= Eqd:
+        # print('drying')
+        E=Eqd
+        T1 = 1.0/T
+    else: # no change'
+        E = m0
+        T1=0.0
+    exp_t = np.exp(-tlen*T1)
+    m1 = E + (m0 - E)*exp_t  
+    dm1_dm0 = exp_t
+    dm1_dE = 1 - exp_t
+    #if t>=933 and t < 940:
+    #  print('t,Eqw,Eqd,r,T1,E,m0,m1,dm1_dm0,dm1_dE',
+    #        t,Eqw,Eqd,r,T1,E,m0,m1,dm1_dm0,dm1_dE)   
+    if partials==0: 
+        return m1
+    if partials==1:
+        return m1, dm1_dm0
+    if partials==2:
+        return m1, dm1_dm0, dm1_dE
+    raise('bad partials')
 
-  # ext_kf(u,P,F,Q=0,d=None,H=None,R=None) returns ua, Pa
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  # print('initial u=',u,'P=',P)
-  # print('Q=',Q,'H=',H,'R=',R)
-
-  for t in range(1,h2):
-      # use lambda construction to pass additional arguments to the model 
-      u[:,t],P[:,:,t] = ext_kf(u[:,t-1],P[:,:,t-1],
-                                  lambda uu: model_augmented(uu,Ed[t],Ew[t],rain[t],t),
-                                  Q,d[t],H=H,R=R)
-      # print('time',t,'data',d[t],'filtered',u[0,t],'Ec',u[1,t])
-  for t in range(h2,hours):
-      u[:,t],P[:,:,t] = ext_kf(u[:,t-1],P[:,:,t-1],
-                                  lambda uu: model_augmented(uu,Ed[t],Ew[t],rain[t],t),
-                                  Q*0.0)
-      # print('time',t,'data',d[t],'forecast',u[0,t],'Ec',u[1,t])
-  return u
+def model_augmented(u0,Ed,Ew,r,t):
+    # state u is the vector [m,dE] with dE correction to equilibria Ed and Ew at t
+    # 
+    m0, Ec = u0  # decompose state u0
+    # reuse model_moisture(m0,Eqd,Eqw,r,partials=0):
+    # arguments:
+    # m0         starting fuel moistureb (1)
+    # Ed         drying equilibrium      (1) 
+    # Ew         wetting equilibrium     (1)
+    # r          rain intensity          (mm/h)
+    # partials = 0, 1, 2
+    # returns: same as model_decay
+    #   if partials==0: m1 = fuel moisture contents after time 1 hour
+    #              ==1: m1, dm0/dm0 
+    #              ==2: m1, dm1/dm0, dm1/dE 
+    m1, dm1_dm0, dm1_dE  = model_moisture(m0,Ed + Ec, Ew + Ec, r, t, partials=2)
+    u1 = np.array([m1,Ec])   # dE is just copied
+    J =  np.array([[dm1_dm0, dm1_dE],
+                   [0.     ,     1.]])
+    return u1, J
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -153,6 +199,8 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False):
 
   return x_train, y_train
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def seq2batches(x,y,timesteps,trainsteps):
   # x [trainsteps+forecaststeps,features]    all inputs
   # y [trainsteps,outputs]
@@ -178,6 +226,7 @@ def seq2batches(x,y,timesteps,trainsteps):
         y_train[i,k,j] = y[i+k,j]  # return sequences
   return x_train, y_train
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def create_RNN_2(hidden_units, dense_units, activation, stateful=False, 
                  batch_shape=None, input_shape=None, dense_layers=1,
