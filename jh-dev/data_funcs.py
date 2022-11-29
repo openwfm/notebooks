@@ -33,7 +33,7 @@ def format_raws(stn):
 def format_precip(precipa):
     rain=np.array(precipa, dtype = 'float64')
     rain = np.diff(rain) # first difference to convert accumulated to hourly
-    rain = np.insert(rain, np.NaN, [0]) # add NaN entry to account for diff
+    rain = np.insert(rain, 0, [np.NaN]) # add NaN entry to account for diff
     rain[rain > 1000] = np.NaN # filter out erroneously high
     rain[rain < 0] = np.NaN # filter out negative, results from diff function after precipa goes to zero
     return rain
