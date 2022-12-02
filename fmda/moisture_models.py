@@ -1,5 +1,33 @@
 import numpy as np
 
+def model_decay(m0,E,partials=0,T1=0.1,tlen=1):  
+  # Arguments: 
+  #   m0          fuel moisture content at start dimensionless, unit (1)
+  #   E           fuel moisture eqilibrium (1)
+  #   partials=0: return m1 = fuel moisture contents after time tlen (1)
+  #           =1: return m1, dm0/dm0 
+  #           =2: return m1, dm1/dm0, dm1/dE
+  #           =3: return m1, dm1/dm0, dm1/dE dm1/dT1   
+  #   T1          1/T, where T is the time constant approaching the equilibrium
+  #               default 0.1/hour
+  #   tlen        the time interval length, default 1 hour
+
+  exp_t = np.exp(-tlen*T1)                  # compute this subexpression only once
+  m1 = E + (m0 - E)*exp_t                   # the solution at end
+  if partials==0:
+    return m1
+  dm1_dm0 = exp_t
+  if partials==1:
+    return m1, dm1_dm0          # return value and Jacobian
+  dm1_dE = 1 - exp_t      
+  if partials==2:
+     return m1, dm1_dm0, dm1_dE 
+  dm1_dT1 = -(m0 - E)*tlen*exp_t            # partial derivative dm1 / dT1
+  if partials==3:
+    return m1, dm1_dm0, dm1_dE, dm1_dT1       # return value and all partial derivatives wrt m1 and parameters
+  raise('Bad arg partials')
+
+
 def ext_kf(u,P,F,Q=0,d=None,H=None,R=None):
   """
   One step of the extended Kalman filter. 
