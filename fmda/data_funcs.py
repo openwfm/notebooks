@@ -4,6 +4,8 @@
 import numpy as np, random
 from moisture_models import model_decay
 
+
+# Function to simulate moisture data and equilibrium for model testing
 def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
     hours = days*24
     h2 = int(hours/2)
@@ -70,3 +72,5 @@ def fixnan(a,n):
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
