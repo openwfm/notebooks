@@ -4,6 +4,13 @@
 import numpy as np, random
 from moisture_models import model_decay
 
+# Helper Functions
+verbose = False ## Must be declared in environment
+def vprint(*args):
+    if verbose: 
+        for s in args[:(len(args)-1)]:
+            print(s, end=' ')
+        print(args[-1])
 
 # Function to simulate moisture data and equilibrium for model testing
 def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
@@ -29,29 +36,52 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
 
 ## RAWS Data Functions
 
-def format_raws(stn):
-    # Extract Data
-    raws_dat = {
-        'time' : np.array(stn['OBSERVATIONS']["date_time"]),
-        'temp' : np.array(stn['OBSERVATIONS']["air_temp_set_1"], dtype = 'float64')+273.15,
-        'rh' : np.array(stn['OBSERVATIONS']["relative_humidity_set_1"], dtype = 'float64'),
-        'fm' : np.array(stn['OBSERVATIONS']["fuel_moisture_set_1"], dtype = 'float64'),
-        'rain' : format_precip(stn['OBSERVATIONS']["precip_accum_set_1"])
-    }
+def format_raws(stn, fixnames = True):
+    raws_dat = stn['OBSERVATIONS']
+    
+    # Convert to Numpy arrays, check data type for floats
+    for key in [*stn['OBSERVATIONS'].keys()]:
+        if type(stn['OBSERVATIONS'][key][0]) is float:
+            raws_dat[key] = np.array(stn['OBSERVATIONS'][key], dtype = 'float64')
+        else:
+            raws_dat[key] = np.array(stn['OBSERVATIONS'][key])
+    
+    # Transform Data
+    raws_dat['air_temp_set_1'] = raws_dat['air_temp_set_1'] + 273.15 ## convert C to K
+    if 'precip_accum_set_1' in raws_dat.keys():
+        raws_dat['precip_accum_set_1'] = format_precip(raws_dat['precip_accum_set_1']) ## format precip data, accumulated to hourly
+    
     
     # Calculate Equilibrium Temps
-    raws_dat['Ed'] = 0.924*raws_dat['rh']**0.679 + 0.000499*np.exp(0.1*raws_dat['rh']) + 0.18*(21.1 + 273.15 - raws_dat['temp'])*(1 - np.exp(-0.115*raws_dat['rh']))
-    raws_dat['Ew'] = 0.618*raws_dat['rh']**0.753 + 0.000454*np.exp(0.1*raws_dat['rh']) + 0.18*(21.1 + 273.15 - raws_dat['temp'])*(1 - np.exp(-0.115*raws_dat['rh']))
+    raws_dat['Ed'] = 0.924*raws_dat['relative_humidity_set_1']**0.679 + 0.000499*np.exp(0.1*raws_dat['relative_humidity_set_1']) + 0.18*(21.1 + 273.15 - raws_dat['air_temp_set_1'])*(1 - np.exp(-0.115*raws_dat['relative_humidity_set_1']))
+    raws_dat['Ew'] = 0.618*raws_dat['relative_humidity_set_1']**0.753 + 0.000454*np.exp(0.1*raws_dat['relative_humidity_set_1']) + 0.18*(21.1 + 273.15 - raws_dat['air_temp_set_1'])*(1 - np.exp(-0.115*raws_dat['relative_humidity_set_1']))
     
     # Fix nan values
-    raws_dat['rain']=fixnan(raws_dat['rain'],2)
-    raws_dat['temp']=fixnan(raws_dat['temp'],2)
-    raws_dat['rh']=fixnan(raws_dat['rh'],2)
-    raws_dat['fm']=fixnan(raws_dat['fm'],2)
-    raws_dat['Ed']=fixnan(raws_dat['Ed'],2)
-    raws_dat['Ew']=fixnan(raws_dat['Ew'],2)
+    for key in [*raws_dat.keys()]:
+        if type(raws_dat[key][0]) is float:
+            raws_dat[key] = fixnan(raws_dat[key], 2)
     
-    return raws_dat
+    # Simplify names 
+    if fixnames:
+        var_mapping = {
+            'date_time': 'time', 'precip_accum': 'rain', 
+            'fuel_moisture': 'fm', 'relative_humidity': 'rh',
+            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew'
+            }
+        old_keys = [*raws_dat.keys()]
+        old_keys = [k.replace("_set_1", "") for k in old_keys]
+        new_keys = []
+        for key in old_keys:
+            new_keys.append(var_mapping.get(key, key))
+        old_keys = [*raws_dat.keys()]
+        old_keys = [k.replace("_set_1", "") for k in old_keys]
+        new_keys = []
+        for key in old_keys:
+            new_keys.append(var_mapping.get(key, key))
+        raws_dat2 = dict(zip(new_keys, list(raws_dat.values())))
+        return raws_dat2
+    
+    else: return raws_dat
 
 def format_precip(precipa):
     rain=np.array(precipa, dtype = 'float64')
@@ -70,6 +100,14 @@ def fixnan(a,n):
             break
     return a
 
+def retrieve_raws(mes, stid, raws_vars, time1, time2):
+    meso_ts = mes.timeseries(time1, time2, 
+                       stid=stid, vars=raws_vars)
+    station = meso_ts['STATION'][0]
+    
+    raws_dat = format_raws(station)
+    
+    return station, raws_dat
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
