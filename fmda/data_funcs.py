@@ -38,19 +38,19 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,
     hour = np.array(range(hours))
     day = np.array(range(hours))/24.
     # artificial equilibrium data
-    E = np.power(np.sin(np.pi*day),4) # diurnal curve
+    E = np.power(np.sin(np.pi*day),power) # diurnal curve
     E = Emin+(Emax - Emin)*E
     # FMC free run
     m_f = np.zeros(hours)
     m_f[0] = 0.1         # initial FMC
-    process_noise=0.
+    # process_noise=0.
     for t in range(hours-1):
         m_f[t+1] = max(0.,model_decay(m_f[t],E[t])  + random.gauss(0,process_noise) )
     data = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
     E = E + DeltaE    
     Ed=E+1.0
     Ew=np.maximum(E-1.0,0)
-    return {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hour':hour,'h2':h2,'DeltaE'=DeltaE}
+    return {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hour':hour,'h2':h2,'DeltaE':DeltaE}
 
 
 
