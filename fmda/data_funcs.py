@@ -149,6 +149,7 @@ def check_data(dat,h2=None,hours=None):
         h2 = dat['h2']
     if hours is None:
         hours = dat['hours']
+    check_data_array(dat,hours,'E','drying equilibrium (%)')
     check_data_array(dat,hours,'Ed','drying equilibrium (%)')
     check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
     check_data_array(dat,hours,'rain','rain intensity (mm/h)')
