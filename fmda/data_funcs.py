@@ -12,6 +12,27 @@ def vprint(*args):
             print(s, end=' ')
         print(args[-1])
 
+def check_data_array(dat,h,a,s):
+    if a in dat:
+        ar = dat[a]
+        print("array %s %s length %i min %s max %s" % (a,s,len(ar),min(ar),max(ar)))
+        if len(ar) < h:
+            print('Warning: len(%a) < %i' % (a,ho))
+            exit(1)
+    else:
+        print('no array ' + a)
+
+def check_data(dat,h2=None,hours=None):
+    if h2 is None:
+        h2 = dat['h2']
+    if hours is None:
+        hours = dat['hours']
+    check_data_array(dat,hours,'E','drying equilibrium (%)')
+    check_data_array(dat,hours,'Ed','drying equilibrium (%)')
+    check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
+    check_data_array(dat,hours,'rain','rain intensity (mm/h)')
+    check_data_array(dat,hours,'fm','RAWS fuel moisture (%)')
+
 # Function to simulate moisture data and equilibrium for model testing
 def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
     hours = days*24
@@ -20,7 +41,7 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     day = np.array(range(hours))/24.
 
     # artificial equilibrium data
-    E = np.power(np.sin(np.pi*day),4) # diurnal curve
+    E = 100.0*np.power(np.sin(np.pi*day),4) # diurnal curve
     E = 0.05+0.25*E
     # FMC free run
     m_f = np.zeros(hours)
@@ -32,13 +53,13 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     E = E + DeltaE    
     return E,m_f,data,hour,h2,DeltaE
 
-def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,Emin=0.5,Emax=0.3):
+def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,Emin=5,Emax=30):
     hours = days*24
     h2 = int(hours/2)
     hour = np.array(range(hours))
     day = np.array(range(hours))/24.
     # artificial equilibrium data
-    E = np.power(np.sin(np.pi*day),power) # diurnal curve
+    E = np.power(np.sin(np.pi*day),power) # diurnal curve betwen 0 and 1
     E = Emin+(Emax - Emin)*E
     # FMC free run
     m_f = np.zeros(hours)
@@ -50,7 +71,9 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,
     E = E + DeltaE    
     Ed=E+1.0
     Ew=np.maximum(E-1.0,0)
-    return {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hours':hours,'h2':h2,'DeltaE':DeltaE}
+    dat = {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hours':hours,'h2':h2,'DeltaE':DeltaE}
+    check_data(dat)
+    return dat
 
 
 
@@ -132,25 +155,3 @@ def retrieve_raws(mes, stid, raws_vars, time1, time2):
     return station, raws_dat
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-def check_data_array(dat,h,a,s):
-    if a in dat:
-        ar = dat[a]
-        print("array %s %s length %i min %s max %s" % (a,s,len(ar),min(ar),max(ar)))
-        if len(ar) < h:
-            print('Warning: len(%a) < %i' % (a,ho))
-            exit(1)
-    else:
-        print('warning: no array ' + a)
-
-def check_data(dat,h2=None,hours=None):
-    if h2 is None:
-        h2 = dat['h2']
-    if hours is None:
-        hours = dat['hours']
-    check_data_array(dat,hours,'E','drying equilibrium (%)')
-    check_data_array(dat,hours,'Ed','drying equilibrium (%)')
-    check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
-    check_data_array(dat,hours,'rain','rain intensity (mm/h)')
-    check_data_array(dat,hours,'fm','RAWS fuel moisture (%)')
