@@ -2,7 +2,9 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import numpy as np, random
+import matplotlib.pyplot as plt
 from moisture_models import model_decay
+
 
 # Helper Functions
 verbose = False ## Must be declared in environment
@@ -11,6 +13,28 @@ def vprint(*args):
         for s in args[:(len(args)-1)]:
             print(s, end=' ')
         print(args[-1])
+
+# Function to simulate moisture data and equilibrium for model testing
+def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
+    hours = days*24
+    h2 = int(hours/2)
+    hour = np.array(range(hours))
+    day = np.array(range(hours))/24.
+
+    # artificial equilibrium data
+    E = 100.0*np.power(np.sin(np.pi*day),4) # diurnal curve
+    E = 0.05+0.25*E
+    # FMC free run
+    m_f = np.zeros(hours)
+    m_f[0] = 0.1         # initial FMC
+    process_noise=0.
+    for t in range(hours-1):
+        m_f[t+1] = max(0.,model_decay(m_f[t],E[t])  + random.gauss(0,process_noise) )
+    data = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
+    E = E + DeltaE    
+    return E,m_f,data,hour,h2,DeltaE
+    
+# the following input or output dictionary with all model data and variables
 
 def check_data_array(dat,h,a,s):
     if a in dat:
@@ -32,26 +56,6 @@ def check_data(dat,h2=None,hours=None):
     check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
     check_data_array(dat,hours,'rain','rain intensity (mm/h)')
     check_data_array(dat,hours,'fm','RAWS fuel moisture (%)')
-
-# Function to simulate moisture data and equilibrium for model testing
-def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
-    hours = days*24
-    h2 = int(hours/2)
-    hour = np.array(range(hours))
-    day = np.array(range(hours))/24.
-
-    # artificial equilibrium data
-    E = 100.0*np.power(np.sin(np.pi*day),4) # diurnal curve
-    E = 0.05+0.25*E
-    # FMC free run
-    m_f = np.zeros(hours)
-    m_f[0] = 0.1         # initial FMC
-    process_noise=0.
-    for t in range(hours-1):
-        m_f[t+1] = max(0.,model_decay(m_f[t],E[t])  + random.gauss(0,process_noise) )
-    data = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
-    E = E + DeltaE    
-    return E,m_f,data,hour,h2,DeltaE
 
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,Emin=5,Emax=30):
     hours = days*24
@@ -75,7 +79,36 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,
     check_data(dat)
     return dat
 
-
+def plot_one(hours,dat,name,linestyle,c,label,type='plot'):
+# helper foer plot_data
+    if name in dat:
+        h = len(dat[name])
+        if hours is not None:
+            h = min(h,hours)
+        hour = np.array(range(h))
+        if type=='plot':
+            plt.plot(hour,dat[name][:h],linestyle=linestyle,c=c,label=label)
+        elif type=='scatter':
+            plt.scatter(dat[name],linestyle=linestyle,c=c,label=label)
+            
+def plot_data(dat,title=None,hours=None):
+    plt.figure(figsize=(16,4))
+    plot_one(hours,dat,'E',linestyle='--',c='r',label='equilibrium')
+    plot_one(hours,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
+    plot_one(hours,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
+    plot_one(hours,dat,'m_f',linestyle='-',c='b',label='truth')
+    plot_one(hours,dat,'data',linestyle='-',c='b',label='observation')
+    plot_one(hours,dat,'m',linestyle='-',c='k',label='estimated')
+    plot_one(hours,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
+    plot_one(hours,dat,'rain',linestyle='-',c='b',label='rain')
+    if title is not None:
+        plt.title(title)
+    plt.xlabel('Time (hours)')
+    if 'rain' in dat:
+        plt.ylabel('FMC (%) / Rain mm/h')
+    else:
+        plt.ylabel('Fuel moisture content (%)')
+    plt.legend()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
