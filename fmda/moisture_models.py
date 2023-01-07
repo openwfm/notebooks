@@ -98,7 +98,7 @@ T = 10.0                                    # time constant for wetting/drying
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def model_moisture(m0,Eqd,Eqw,r,t,partials=0,T=10.0,tlen=1.0):
+def model_moisture(m0,Eqd,Eqw,r,t=None,partials=0,T=10.0,tlen=1.0):
     # arguments:
     # m0         starting fuel moistureb (%s
     # Eqd        drying equilibrium      (%) 
@@ -140,6 +140,19 @@ def model_moisture(m0,Eqd,Eqw,r,t,partials=0,T=10.0,tlen=1.0):
     if partials==2:
         return m1, dm1_dm0, dm1_dE
     raise('bad partials')
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+##  NOT TESTED
+def model_moisture_run(Eqd,Eqw,r,hours=None,T=10.0,tlen=1.0):
+# for arrays of FMC model input run the fuel moisture model
+    if hours is None:
+        hours = min(len(Eqd),len(Eqw),len(r))
+    m = np.zeros(hours)
+    m[0]=(Eqd[0]+Eqw[0])/2
+    for k in range(hours-1):
+        m[k+1]=model_moisture(m[k],Eqd[k],Eqw[k],r[k],T=T,tlen=tlen)
+    return m
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
