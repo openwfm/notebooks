@@ -50,7 +50,7 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,
     E = E + DeltaE    
     Ed=E+1.0
     Ew=np.maximum(E-1.0,0)
-    return {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hour':hour,'h2':h2,'DeltaE':DeltaE}
+    return {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hours':hours,'h2':h2,'DeltaE':DeltaE}
 
 
 
@@ -135,17 +135,20 @@ def retrieve_raws(mes, stid, raws_vars, time1, time2):
 
 
 def check_data_array(dat,h,a,s):
-    try:
+    if a in dat:
         ar = dat[a]
-    except:
-        print('cannot find array ' + a)
-        exit(1)
-    print("array %s %s length %i min %s max %s\n" % (a,s,len(ar),min(ar),max(ar)))
-    if len(ar) < h:
-        print('Error: array length less than %i' % hours)
-        exit(1)
+        print("array %s %s length %i min %s max %s" % (a,s,len(ar),min(ar),max(ar)))
+        if len(ar) < h:
+            print('Warning: len(%a) < %i' % (a,ho))
+            exit(1)
+    else:
+        print('warning: no array ' + a)
 
-def check_data(dat,h2,hours):
+def check_data(dat,h2=None,hours=None):
+    if h2 is None:
+        h2 = dat['h2']
+    if hours is None:
+        hours = dat['hours']
     check_data_array(dat,hours,'Ed','drying equilibrium (%)')
     check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
     check_data_array(dat,hours,'rain','rain intensity (mm/h)')
