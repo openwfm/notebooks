@@ -89,38 +89,59 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     
     return dat
 
-def plot_one(hours,dat,name,linestyle,c,label,type='plot'):
+def plot_one(hmin,hmax,dat,name,linestyle,c,label,type='plot'):
 # helper foer plot_data
     if name in dat:
         h = len(dat[name])
-        if hours is not None:
-            h = min(h,hours)
-        hour = np.array(range(h))
+        if hmin is None:
+            hmin=0
+        if hmax is None:
+            hmax=len(dat[name])
+        hour = np.array(range(hmin,hmax))
         if type=='plot':
-            plt.plot(hour,dat[name][:h],linestyle=linestyle,c=c,label=label)
+            plt.plot(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label)
         elif type=='scatter':
-            plt.scatter(dat[name],linestyle=linestyle,c=c,label=label)
+            plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label)
             
-def plot_data(dat,title=None,hours=None):
+def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plt.figure(figsize=(16,4))
-    plot_one(hours,dat,'E',linestyle='--',c='r',label='equilibrium')
-    plot_one(hours,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
-    plot_one(hours,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
-    plot_one(hours,dat,'m_f',linestyle='-',c='g',label='FMC truth')
-    plot_one(hours,dat,'fm',linestyle='-',c='b',label='FMC observation')
-    plot_one(hours,dat,'m',linestyle='-',c='k',label='FMC estimate')
-    plot_one(hours,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
-    plot_one(hours,dat,'rain',linestyle='-',c='b',label='rain intensity')
+    plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='equilibrium')
+    plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
+    plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
+    plot_one(hmin,hmax,dat,'m_f',linestyle='-',c='g',label='FMC truth')
+    plot_one(hmin,hmax,dat,'fm',linestyle=':',c='b',label='FMC observation')
+    plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FMC estimate')
+    plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
+    plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='rain intensity')
     if title is not None:
-        plt.title(title)
+        t = title
     else:
-        plt.title(dat['title'])
+        t=dat['title']
+    if title2 is not None:
+        t = t + ' ' + title2
+    plt.title(t)
     plt.xlabel('Time (hours)')
     if 'rain' in dat:
         plt.ylabel('FMC (%) / Rain mm/h')
     else:
         plt.ylabel('Fuel moisture content (%)')
     plt.legend()
+    
+# Calculate mean squared error
+def mse(a, b):
+    return ((a - b)**2).mean()
+    
+# Calculate mean absolute error
+def mape(a, b):
+    return ((a - b).__abs__()).mean()
+    
+def mse_data(dat):
+    h2 = dat['h2']
+    hours = dat['hours']
+    m = dat['m']
+    fm = dat['fm']
+    print('Training MSE:   ' + str(np.round(mse(m[:h2], fm[:h2]), 4)))
+    print('Prediction MSE: ' + str(np.round(mse(m[h2:hours], fm[h2:hours]), 4)))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

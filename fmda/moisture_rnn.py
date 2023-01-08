@@ -81,12 +81,16 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, hours, h2, scale = False, verbose = False):
+def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['hours']
     Ew = dat['Ew']
     Ed = dat['Ed']
     rain = dat['rain']
     fm = dat['fm']
-    temp = dat['temp']
+    # temp = dat['temp']
     
     # Average Equilibrium
     E = (Ed + Ew)/2
@@ -117,18 +121,24 @@ def create_rnn_data(dat, hours, h2, scale = False, verbose = False):
     # Set up return dictionary
     
     rnn_dat = {
+        'hours': hours,
         'x_train': x_train,
         'y_train': y_train,
         'Et': Et,
         'samples': samples,
         'timesteps': timesteps,
         'features': features,
-        'h0': h0
+        'h0': h0,
+        'hours':hours,
+        'h2':h2
     }
     
     return rnn_dat
 
 def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, verbose = False):
+    
+    if hours is None:
+        hours = rnn_dat['hours']
     
     samples = rnn_dat['samples']
     features = rnn_dat['features']
