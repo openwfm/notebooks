@@ -184,7 +184,15 @@ Q = np.array([[1e-3, 0.],
 H = np.array([[1., 0.]])  # first component observed
 R = np.array([1e-3]) # data variance
 
-def run_augmented_kf(d,Ed,Ew,rain,h2,hours, H=H, Q=Q, R=R):
+def run_augmented_kf(dat,h2=None,hours=None, H=H, Q=Q, R=R):
+    d = dat['fm']
+    Ed = dat['Ed']
+    Ew = dat['Ew']
+    rain = dat['rain']
+    if h2 is None:
+        h2 = dat['h2']
+    if hours is None:
+        hours = dat['hours']
     u = np.zeros((2,hours))
     u[:,0]=[0.1,0.0]       # initialize,background state  
     P = np.zeros((2,2,hours))

@@ -3,9 +3,11 @@
 
 import numpy as np, random
 from numpy.random import rand
+from MesoPy import Meso
+
 import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
-
+from datetime import datetime, timedelta
 
 # Helper Functions
 verbose = False ## Must be declared in environment
@@ -38,19 +40,23 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
 # the following input or output dictionary with all model data and variables
 
 def check_data_array(dat,h,a,s):
-# inout
     if a in dat:
         ar = dat[a]
         print("array %s %s length %i min %s max %s" % (a,s,len(ar),min(ar),max(ar)))
-        if len(ar) < h:
-            print('Warning: len(%a) < %i' % (a,ho))
-            exit(1)
+        if h is not None:
+            if len(ar) < h:
+                print('Warning: len(%a) < %i' % (a,ho))
+                exit(1)
     else:
-        print('no array ' + a)
+        print(a + ' not present')
+        
+def check_data_scalar(dat,a):
+    if a in dat:
+        print('%s = %s' % (a,dat[a]))
+    else:
+        print(a + ' not present' )
 
-def check_data(dat,h2=None,hours=None):
-    if h2 is None:
-        h2 = dat['h2']
+def check_data(dat,hours=None):
     if hours is None:
         hours = dat['hours']
     check_data_array(dat,hours,'E','drying equilibrium (%)')
@@ -79,8 +85,8 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     for t in range(hours-1):
         m_f[t+1] = max(0.,model_moisture(m_f[t],Ed[t-1],Ew[t-1],rain[t-1])  + random.gauss(0,process_noise))
     m_f = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
-    dat = {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hours':hours,'h2':h2,'DeltaE':DeltaE,'rain':rain}
-    check_data(dat)
+    dat = {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hours':hours,'h2':h2,'DeltaE':DeltaE,'rain':rain,'title':'Synthetic data'}
+    
     return dat
 
 def plot_one(hours,dat,name,linestyle,c,label,type='plot'):
@@ -100,13 +106,15 @@ def plot_data(dat,title=None,hours=None):
     plot_one(hours,dat,'E',linestyle='--',c='r',label='equilibrium')
     plot_one(hours,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
     plot_one(hours,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
-    plot_one(hours,dat,'m_f',linestyle='-',c='b',label='truth')
-    plot_one(hours,dat,'data',linestyle='-',c='b',label='observation')
-    plot_one(hours,dat,'m',linestyle='-',c='k',label='estimated')
+    plot_one(hours,dat,'m_f',linestyle='-',c='g',label='FMC truth')
+    plot_one(hours,dat,'fm',linestyle='-',c='b',label='FMC observation')
+    plot_one(hours,dat,'m',linestyle='-',c='k',label='FMC estimate')
     plot_one(hours,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
-    plot_one(hours,dat,'rain',linestyle='-',c='b',label='rain')
+    plot_one(hours,dat,'rain',linestyle='-',c='b',label='rain intensity')
     if title is not None:
         plt.title(title)
+    else:
+        plt.title(dat['title'])
     plt.xlabel('Time (hours)')
     if 'rain' in dat:
         plt.ylabel('FMC (%) / Rain mm/h')
@@ -190,5 +198,35 @@ def retrieve_raws(mes, stid, raws_vars, time1, time2):
     raws_dat = format_raws(station)
     
     return station, raws_dat
-
+    
+def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
+    # input:
+    #   start YYYYMMDDhhmm
+    #   hours legth of the period
+    #   h2 (optional) length of the training period
+    #   stid  the station id
+    time_start=start
+    time_end = datetime.strptime(start, "%Y%m%d%H%M") + timedelta(hours = hours+1) # end time, plus a buffer to control for time shift
+    time_end = str(int(time_end.strftime("%Y%m%d%H%M")))
+    print('data_raws: Time Parameters:')
+    print('-'*50)
+    print('Time Start:', datetime.strptime(time_start, "%Y%m%d%H%M").strftime("%Y/%M/%d %H:%M"))
+    print('Time End:', datetime.strptime(time_end, "%Y%m%d%H%M").strftime("%Y/%M/%d %H:%M"))
+    print('Total Runtime:', hours, 'hours')
+    print('Training Time:', h2, 'hours')
+    print('-'*50)
+    raws_vars='air_temp,relative_humidity,precip_accum,fuel_moisture'
+    m=Meso(meso_token)
+    station, raws_dat = retrieve_raws(m, stid, raws_vars, time_start, time_end)
+    raws_dat['title']='RAWS data station ' + stid
+    raws_dat.update({'hours':hours,'h2':h2,'station':station})
+    print('Data Read:')
+    print('-'*50)
+    print('Station ID:', station['STID'])
+    print('Lat / Lon:', station['LATITUDE'],', ',station['LONGITUDE'])
+    if(station['QC_FLAGGED']): print('WARNING: station flagged for QC')
+    print('-'*50)
+    raws_dat.update({'hours':hours,'h2':h2})
+    return raws_dat
+    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
