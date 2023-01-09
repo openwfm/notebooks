@@ -62,8 +62,13 @@ def check_data(dat,hours=None):
     check_data_array(dat,hours,'E','drying equilibrium (%)')
     check_data_array(dat,hours,'Ed','drying equilibrium (%)')
     check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
+    check_data_array(dat,hours,'Ec','equilibrium equilibrium (%)')
     check_data_array(dat,hours,'rain','rain intensity (mm/h)')
-    check_data_array(dat,hours,'fm','RAWS fuel moisture (%)')
+    check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
+    check_data_array(dat,hours,'m','fuel moisture estimate (%)')
+    check_data_array(dat,hours,'m_rnn','RNN fuel moisture estimate (%)')
+    check_data_array(dat,hours,'m_kf','KF fuel moisture estimate (%)')
+
 
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
