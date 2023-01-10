@@ -8,6 +8,7 @@ from MesoPy import Meso
 import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
 from datetime import datetime, timedelta
+import json
 
 # Helper Functions
 verbose = False ## Must be declared in environment
@@ -16,6 +17,31 @@ def vprint(*args):
         for s in args[:(len(args)-1)]:
             print(s, end=' ')
         print(args[-1])
+
+def to_json(dic,filename):
+    print('writing ',filename)
+    check_data(dic)
+    new={}
+    type_nparray=type(np.array([]))
+    for i in dic:
+        if type(dic[i]) == type_nparray:
+            new[i]=dic[i].tolist()  # because numpy.ndarray is not serializable
+        else:
+            new[i]=dic[i]
+        # print('i',type(new[i]))
+    json.dump(new,open(filename,'w'),indent=4)
+
+def from_json(filename):
+    print('reading ',filename)
+    dic=json.load(open(filename,'r'))
+    new={}
+    for i in dic:
+        if type(dic[i]) is list:
+            new[i]=np.array(dic[i])  # because ndarray is not serializable
+        else:
+            new[i]=dic[i]
+    check_data(new)
+    return new
 
 # Function to simulate moisture data and equilibrium for model testing
 def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
@@ -42,7 +68,7 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
 def check_data_array(dat,h,a,s):
     if a in dat:
         ar = dat[a]
-        print("array %s %s length %i min %s max %s" % (a,s,len(ar),min(ar),max(ar)))
+        print("array %s %s length %i min %s max %s %s" % (a,s,len(ar),min(ar),max(ar),type(ar)))
         if h is not None:
             if len(ar) < h:
                 print('Warning: len(%a) < %i' % (a,ho))
@@ -52,13 +78,17 @@ def check_data_array(dat,h,a,s):
         
 def check_data_scalar(dat,a):
     if a in dat:
-        print('%s = %s' % (a,dat[a]))
+        print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
     else:
         print(a + ' not present' )
 
 def check_data(dat,hours=None):
+    check_data_scalar(dat,'hours')
+    check_data_scalar(dat,'h2')
     if hours is None:
         hours = dat['hours']
+    else:
+        print('specified hours=%s for check_data' % hours)
     check_data_array(dat,hours,'E','drying equilibrium (%)')
     check_data_array(dat,hours,'Ed','drying equilibrium (%)')
     check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
@@ -95,7 +125,7 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     return dat
 
 def plot_one(hmin,hmax,dat,name,linestyle,c,label,type='plot'):
-# helper foer plot_data
+# helper for plot_data
     if name in dat:
         h = len(dat[name])
         if hmin is None:
@@ -109,6 +139,11 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label,type='plot'):
             plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label)
             
 def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
+    if 'hours' in dat:
+        if hmax is None:
+            hmax = dat['hours']
+        else:
+            hmax = max(hmax, dat['hours'])
     plt.figure(figsize=(16,4))
     plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='equilibrium')
     plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
@@ -122,6 +157,7 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
         t = title
     else:
         t=dat['title']
+        # print('title',type(t),t)
     if title2 is not None:
         t = t + ' ' + title2
     plt.title(t)

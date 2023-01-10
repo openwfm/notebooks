@@ -190,9 +190,9 @@ def run_augmented_kf(dat,h2=None,hours=None, H=H, Q=Q, R=R):
     Ew = dat['Ew']
     rain = dat['rain']
     if h2 is None:
-        h2 = dat['h2']
+        h2 = int(dat['h2'])
     if hours is None:
-        hours = dat['hours']
+        hours = int(dat['hours'])
     u = np.zeros((2,hours))
     u[:,0]=[0.1,0.0]       # initialize,background state  
     P = np.zeros((2,2,hours))
