@@ -85,7 +85,9 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
     if hours is None:
         hours = dat['hours']
     if h2 is None:
-        h2 = dat['hours']
+        h2 = dat['h2']
+    print('create_rnn_data: hours=',hours,' h2=',h2)
+    # extract inputs the windown of interest
     Ew = dat['Ew']
     Ed = dat['Ed']
     rain = dat['rain']
@@ -93,7 +95,7 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
     # temp = dat['temp']
     
     # Average Equilibrium
-    E = (Ed + Ew)/2
+    E = (Ed + Ew)/2         # why?
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
     Et = np.reshape(E,[E.shape[0],1])

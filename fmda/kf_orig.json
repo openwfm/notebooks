@@ -39972,5 +39972,7 @@
         5.535677246840264,
         5.535677246840264,
         5.573373271163917
-    ]
+    ],
+    "note": "RAWS and RTMA data + m from augmented KF in fmda_kf_rnn_orig",
+    "filename": "kf_orig.json"
 }

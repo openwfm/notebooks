@@ -22,13 +22,13 @@ def to_json(dic,filename):
     print('writing ',filename)
     check_data(dic)
     new={}
-    type_nparray=type(np.array([]))
     for i in dic:
-        if type(dic[i]) == type_nparray:
+        if type(dic[i]) is np.ndarray:
             new[i]=dic[i].tolist()  # because numpy.ndarray is not serializable
         else:
             new[i]=dic[i]
         # print('i',type(new[i]))
+    new['filename']=filename
     json.dump(new,open(filename,'w'),indent=4)
 
 def from_json(filename):
@@ -65,13 +65,13 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     
 # the following input or output dictionary with all model data and variables
 
-def check_data_array(dat,h,a,s):
+def check_data_array(dat,hours,a,s):
     if a in dat:
         ar = dat[a]
         print("array %s %s length %i min %s max %s %s" % (a,s,len(ar),min(ar),max(ar),type(ar)))
-        if h is not None:
-            if len(ar) < h:
-                print('Warning: len(%a) < %i' % (a,ho))
+        if hours is not None:
+            if len(ar) < hours:
+                print('len(%a) = %i does not equal to hours = %i' % (a,len(ar),hours))
                 exit(1)
     else:
         print(a + ' not present')
@@ -82,13 +82,16 @@ def check_data_scalar(dat,a):
     else:
         print(a + ' not present' )
 
-def check_data(dat,hours=None):
+def check_data(dat):
+    check_data_scalar(dat,'filename')
+    check_data_scalar(dat,'title')
+    check_data_scalar(dat,'note')
     check_data_scalar(dat,'hours')
     check_data_scalar(dat,'h2')
-    if hours is None:
+    if 'hours' in dat:
         hours = dat['hours']
     else:
-        print('specified hours=%s for check_data' % hours)
+        hours = None
     check_data_array(dat,hours,'E','drying equilibrium (%)')
     check_data_array(dat,hours,'Ed','drying equilibrium (%)')
     check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
@@ -96,9 +99,6 @@ def check_data(dat,hours=None):
     check_data_array(dat,hours,'rain','rain intensity (mm/h)')
     check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
     check_data_array(dat,hours,'m','fuel moisture estimate (%)')
-    check_data_array(dat,hours,'m_rnn','RNN fuel moisture estimate (%)')
-    check_data_array(dat,hours,'m_kf','KF fuel moisture estimate (%)')
-
 
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
@@ -143,7 +143,7 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
         if hmax is None:
             hmax = dat['hours']
         else:
-            hmax = max(hmax, dat['hours'])
+            hmax = min(hmax, dat['hours'])
     plt.figure(figsize=(16,4))
     plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='equilibrium')
     plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
