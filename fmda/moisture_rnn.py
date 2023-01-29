@@ -95,10 +95,12 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
     # temp = dat['temp']
     
     # Average Equilibrium
-    E = (Ed + Ew)/2         # why?
+    # E = (Ed + Ew)/2         # why?
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
-    Et = np.reshape(E,[E.shape[0],1])
+    # Et = np.reshape(E,[E.shape[0],1])
+    Et = np.vstack((Ed, Ew)).T
+    
     datat = np.reshape(fm,[fm.shape[0],1])
     
     # Scale Data if required
@@ -161,7 +163,7 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
                             return_sequences=True,
                             activation=activation,dense_layers=dense_layers)
 
-    vprint('model_predict input shape',Et.shape,'output shape',model_predict(Et).shape)
+    vprint('model_predict input shape',Et.shape,'output shape',model_predict(np.reshape(Et,(1, hours, features))).shape)
     if verbose: print(model_predict.summary())
     
     x_train = rnn_dat['x_train']
@@ -192,9 +194,9 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
 
 
 def rnn_predict(model, rnn_dat, hours, scale = False, verbose = False):
-    scale = False
+    features = rnn_dat['features']
     # model.set_weights(w_fitted)
-    x_input=np.reshape(rnn_dat['Et'],(1, hours, 1))
+    x_input=np.reshape(rnn_dat['Et'],(1, hours, features))
     y_output = model.predict(x_input, verbose = verbose)
     
     vprint('x_input.shape=',x_input.shape,'y_output.shape=',y_output.shape)
