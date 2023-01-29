@@ -10,15 +10,8 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
+from utils import vprint
 
-verbose = False ## Must be declared in environment
-def vprint(*args):
-    if verbose: 
-        for s in args[:(len(args)-1)]:
-            print(s, end=' ')
-        print(args[-1])
-
-## RNN Model Funcs
 
 def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
     # x [trainsteps+forecaststeps,features]    all inputs
@@ -86,7 +79,7 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
         hours = dat['hours']
     if h2 is None:
         h2 = dat['h2']
-    print('create_rnn_data: hours=',hours,' h2=',h2)
+    vprint('create_rnn_data: hours=',hours,' h2=',h2)
     # extract inputs the windown of interest
     Ew = dat['Ew']
     Ed = dat['Ed']
@@ -170,8 +163,9 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     y_train = rnn_dat['y_train']
 
     # fitting
-    DeltaE = 0
+    DeltaE = 0.0  
     w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.*DeltaE])]
+    
     w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.0])]
     w=model_fit.get_weights()
     for i in range(len(w)):

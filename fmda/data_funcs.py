@@ -10,14 +10,6 @@ from moisture_models import model_decay, model_moisture
 from datetime import datetime, timedelta
 import json
 
-# Helper Functions
-verbose = False ## Must be declared in environment
-def vprint(*args):
-    if verbose: 
-        for s in args[:(len(args)-1)]:
-            print(s, end=' ')
-        print(args[-1])
-
 def to_json(dic,filename):
     print('writing ',filename)
     check_data(dic)

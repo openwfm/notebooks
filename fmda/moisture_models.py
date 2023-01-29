@@ -10,13 +10,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
-
-verbose = False ## Must be declared in environment
-def vprint(*args):
-    if verbose: 
-        for s in args[:(len(args)-1)]:
-            print(s, end=' ')
-        print(args[-1])
+from utils import vprint
 
 
 def model_decay(m0,E,partials=0,T1=0.1,tlen=1):  
