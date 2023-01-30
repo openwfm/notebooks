@@ -1,3 +1,7 @@
+import numpy as np
+from functools import singledispatch
+import pandas as pd
+
 def vprint(*args):
     import inspect
     
@@ -15,8 +19,6 @@ def vprint(*args):
         
 ## Generic function to hash dictionary of various types
 
-from functools import singledispatch
-import pandas as pd
 @singledispatch
 ## Top level hash function with built-in hash function for str, float, int, tuple, etc
 def hash2(x):
