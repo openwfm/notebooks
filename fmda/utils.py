@@ -20,14 +20,15 @@ def vprint(*args):
 ## Generic function to hash dictionary of various types
 
 @singledispatch
-## Top level hash function with built-in hash function for str, float, int, tuple, etc
+## Top level hash function with built-in hash function for str, float, int, etc
 def hash2(x):
     return hash(x)
 
 @hash2.register(np.ndarray)
 ## Hash numpy array, hash array with pandas and return integer sum
 def _(x):
-    return hash(x.tobytes())
+    # return hash(x.tobytes())
+    return np.sum(pd.util.hash_array(x))
 
 @hash2.register(list)
 ## Hash list, convert to tuple
@@ -47,6 +48,7 @@ def _(x, keys = None, verbose = False):
     r = 0 # return value integer
     if keys is None: # allow user input of keys to hash, otherwise hash them all
         keys = [*x.keys()]
+    keys.sort()
     for key in keys:
         if (verbose): print('Hashing', key)
         r += hash2(x[key])

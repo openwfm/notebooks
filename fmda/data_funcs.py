@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
 from datetime import datetime, timedelta
 import json
+from utils import hash2
 
 def to_json(dic,filename):
     print('writing ',filename)
@@ -21,6 +22,7 @@ def to_json(dic,filename):
             new[i]=dic[i]
         # print('i',type(new[i]))
     new['filename']=filename
+    print('Hash: ', hash2(new))
     json.dump(new,open(filename,'w'),indent=4)
 
 def from_json(filename):
@@ -33,6 +35,7 @@ def from_json(filename):
         else:
             new[i]=dic[i]
     check_data(new)
+    print('Hash: ', hash2(new))
     return new
 
 # Function to simulate moisture data and equilibrium for model testing
