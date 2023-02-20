@@ -50,12 +50,17 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
 
     return x_train, y_train
 
-
-def create_RNN_2(hidden_units, dense_units, activation, stateful=False, 
+def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
                  batch_shape=None, input_shape=None, dense_layers=1,
                  rnn_layers=1,return_sequences=False,
                  initial_state=None, verbose = True):
-    print('moisture_rnn.create_RNN_2 called')
+    if verbose:
+        print("Function: moisture_rnn.create_RNN_2")
+        print("Arguments:")
+        arg_dict = locals().copy()
+        for arg in arg_dict:
+            if arg != "self":
+                print(f"  {arg} = {arg_dict[arg]}")
     if stateful:
         inputs = tf.keras.Input(batch_shape=batch_shape)
     else:
