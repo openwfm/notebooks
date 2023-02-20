@@ -53,3 +53,19 @@ def _(x, keys = None, verbose = False):
         if (verbose): print('Hashing', key)
         r += hash2(x[key])
     return hash(r)
+
+def print_args(func, *args, **kwargs):
+# wrapper to trace function call and arguments
+    print(f"Called: {func.__name__}")
+    print("Arguments:")
+    for arg in args:
+        print(f"  {arg}")
+    for key, value in kwargs.items():
+        print(f"  {key}={value}")
+    return func(*args, **kwargs)
+
+def print_args_test():
+    def my_function(a, b):
+        # some code here
+        return a + b
+    print_args(my_function, a=1, b=2)
