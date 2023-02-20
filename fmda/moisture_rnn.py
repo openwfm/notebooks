@@ -55,6 +55,7 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
                  batch_shape=None, input_shape=None, dense_layers=1,
                  rnn_layers=1,return_sequences=False,
                  initial_state=None, verbose = True):
+    print('moisture_rnn.create_RNN_2 called')
     if stateful:
         inputs = tf.keras.Input(batch_shape=batch_shape)
     else:
