@@ -171,9 +171,12 @@ def mse(a, b):
 def mape(a, b):
     return ((a - b).__abs__()).mean()
     
-def mse_data(dat):
-    h2 = dat['h2']
-    hours = dat['hours']
+def mse_data(dat, hours = None, h2 = None):
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['h2']
+    
     m = dat['m']
     fm = dat['fm']
     print('Training MSE:   ' + str(np.round(mse(m[:h2], fm[:h2]), 4)))
@@ -208,12 +211,15 @@ def format_raws(stn, fixnames = True):
         if type(raws_dat[key][0]) is float:
             raws_dat[key] = fixnan(raws_dat[key], 2)
     
+    # Add station id
+    raws_dat['STID'] = stn['STID']
+    
     # Simplify names 
     if fixnames:
         var_mapping = {
             'date_time': 'time', 'precip_accum': 'rain', 
             'fuel_moisture': 'fm', 'relative_humidity': 'rh',
-            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew'
+            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew', 'STID': 'STID'
             }
         old_keys = [*raws_dat.keys()]
         old_keys = [k.replace("_set_1", "") for k in old_keys]
