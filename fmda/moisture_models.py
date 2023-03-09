@@ -10,13 +10,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
-
-verbose = False ## Must be declared in environment
-def vprint(*args):
-    if verbose: 
-        for s in args[:(len(args)-1)]:
-            print(s, end=' ')
-        print(args[-1])
+from utils import vprint
 
 
 def model_decay(m0,E,partials=0,T1=0.1,tlen=1):  
@@ -98,7 +92,7 @@ T = 10.0                                    # time constant for wetting/drying
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def model_moisture(m0,Eqd,Eqw,r,t,partials=0,T=10.0,tlen=1.0):
+def model_moisture(m0,Eqd,Eqw,r,t=None,partials=0,T=10.0,tlen=1.0):
     # arguments:
     # m0         starting fuel moistureb (%s
     # Eqd        drying equilibrium      (%) 
@@ -143,6 +137,19 @@ def model_moisture(m0,Eqd,Eqw,r,t,partials=0,T=10.0,tlen=1.0):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+##  NOT TESTED
+def model_moisture_run(Eqd,Eqw,r,hours=None,T=10.0,tlen=1.0):
+# for arrays of FMC model input run the fuel moisture model
+    if hours is None:
+        hours = min(len(Eqd),len(Eqw),len(r))
+    m = np.zeros(hours)
+    m[0]=(Eqd[0]+Eqw[0])/2
+    for k in range(hours-1):
+        m[k+1]=model_moisture(m[k],Eqd[k],Eqw[k],r[k],T=T,tlen=tlen)
+    return m
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def model_augmented(u0,Ed,Ew,r,t):
     # state u is the vector [m,dE] with dE correction to equilibria Ed and Ew at t
     # 
@@ -171,7 +178,17 @@ Q = np.array([[1e-3, 0.],
 H = np.array([[1., 0.]])  # first component observed
 R = np.array([1e-3]) # data variance
 
-def run_augmented_kf(d,Ed,Ew,rain,h2,hours, H=H, Q=Q, R=R):
+def run_augmented_kf(dat,h2=None,hours=None, H=H, Q=Q, R=R):
+    if h2 is None:
+        h2 = int(dat['h2'])
+    if hours is None:
+        hours = int(dat['hours'])
+    
+    d = dat['fm']
+    Ed = dat['Ed']
+    Ew = dat['Ew']
+    rain = dat['rain']
+    
     u = np.zeros((2,hours))
     u[:,0]=[0.1,0.0]       # initialize,background state  
     P = np.zeros((2,2,hours))

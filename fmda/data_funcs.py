@@ -2,15 +2,41 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import numpy as np, random
-from moisture_models import model_decay
+from numpy.random import rand
+from MesoPy import Meso
 
-# Helper Functions
-verbose = False ## Must be declared in environment
-def vprint(*args):
-    if verbose: 
-        for s in args[:(len(args)-1)]:
-            print(s, end=' ')
-        print(args[-1])
+import matplotlib.pyplot as plt
+from moisture_models import model_decay, model_moisture
+from datetime import datetime, timedelta
+import json
+from utils import hash2
+
+def to_json(dic,filename):
+    print('writing ',filename)
+    check_data(dic)
+    new={}
+    for i in dic:
+        if type(dic[i]) is np.ndarray:
+            new[i]=dic[i].tolist()  # because numpy.ndarray is not serializable
+        else:
+            new[i]=dic[i]
+        # print('i',type(new[i]))
+    new['filename']=filename
+    print('Hash: ', hash2(new))
+    json.dump(new,open(filename,'w'),indent=4)
+
+def from_json(filename):
+    print('reading ',filename)
+    dic=json.load(open(filename,'r'))
+    new={}
+    for i in dic:
+        if type(dic[i]) is list:
+            new[i]=np.array(dic[i])  # because ndarray is not serializable
+        else:
+            new[i]=dic[i]
+    check_data(new)
+    print('Hash: ', hash2(new))
+    return new
 
 # Function to simulate moisture data and equilibrium for model testing
 def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
@@ -20,7 +46,7 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     day = np.array(range(hours))/24.
 
     # artificial equilibrium data
-    E = np.power(np.sin(np.pi*day),4) # diurnal curve
+    E = 100.0*np.power(np.sin(np.pi*day),4) # diurnal curve
     E = 0.05+0.25*E
     # FMC free run
     m_f = np.zeros(hours)
@@ -31,28 +57,130 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     data = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
     E = E + DeltaE    
     return E,m_f,data,hour,h2,DeltaE
+    
+# the following input or output dictionary with all model data and variables
 
-def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0,Emin=0.5,Emax=0.3):
+def check_data_array(dat,hours,a,s):
+    if a in dat:
+        ar = dat[a]
+        print("array %s %s length %i min %s max %s %s" % (a,s,len(ar),min(ar),max(ar),type(ar)))
+        if hours is not None:
+            if len(ar) < hours:
+                print('len(%a) = %i does not equal to hours = %i' % (a,len(ar),hours))
+                exit(1)
+    else:
+        print(a + ' not present')
+        
+def check_data_scalar(dat,a):
+    if a in dat:
+        print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
+    else:
+        print(a + ' not present' )
+
+def check_data(dat):
+    check_data_scalar(dat,'filename')
+    check_data_scalar(dat,'title')
+    check_data_scalar(dat,'note')
+    check_data_scalar(dat,'hours')
+    check_data_scalar(dat,'h2')
+    if 'hours' in dat:
+        hours = dat['hours']
+    else:
+        hours = None
+    check_data_array(dat,hours,'E','drying equilibrium (%)')
+    check_data_array(dat,hours,'Ed','drying equilibrium (%)')
+    check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
+    check_data_array(dat,hours,'Ec','equilibrium equilibrium (%)')
+    check_data_array(dat,hours,'rain','rain intensity (mm/h)')
+    check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
+    check_data_array(dat,hours,'m','fuel moisture estimate (%)')
+
+def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
+    DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
     hours = days*24
     h2 = int(hours/2)
     hour = np.array(range(hours))
     day = np.array(range(hours))/24.
     # artificial equilibrium data
-    E = np.power(np.sin(np.pi*day),power) # diurnal curve
+    E = np.power(np.sin(np.pi*day),power) # diurnal curve betwen 0 and 1
     E = Emin+(Emax - Emin)*E
+    E = E + DeltaE
+    Ed=E+0.5
+    Ew=np.maximum(E-0.5,0)
+    rain = np.multiply(rand(hours) < p_rain, rand(hours)*max_rain)
     # FMC free run
     m_f = np.zeros(hours)
     m_f[0] = 0.1         # initial FMC
     # process_noise=0.
     for t in range(hours-1):
-        m_f[t+1] = max(0.,model_decay(m_f[t],E[t])  + random.gauss(0,process_noise) )
-    data = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
-    E = E + DeltaE    
-    Ed=E+1.0
-    Ew=np.maximum(E-1.0,0)
-    return {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hour':hour,'h2':h2,'DeltaE':DeltaE}
+        m_f[t+1] = max(0.,model_moisture(m_f[t],Ed[t-1],Ew[t-1],rain[t-1])  + random.gauss(0,process_noise))
+    m_f = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
+    dat = {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hours':hours,'h2':h2,'DeltaE':DeltaE,'rain':rain,'title':'Synthetic data'}
+    
+    return dat
 
-
+def plot_one(hmin,hmax,dat,name,linestyle,c,label,type='plot'):
+# helper for plot_data
+    if name in dat:
+        h = len(dat[name])
+        if hmin is None:
+            hmin=0
+        if hmax is None:
+            hmax=len(dat[name])
+        hour = np.array(range(hmin,hmax))
+        if type=='plot':
+            plt.plot(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label)
+        elif type=='scatter':
+            plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label)
+            
+def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
+    if 'hours' in dat:
+        if hmax is None:
+            hmax = dat['hours']
+        else:
+            hmax = min(hmax, dat['hours'])
+    plt.figure(figsize=(16,4))
+    plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='equilibrium')
+    plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
+    plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
+    plot_one(hmin,hmax,dat,'m_f',linestyle='-',c='g',label='FMC truth')
+    plot_one(hmin,hmax,dat,'fm',linestyle=':',c='b',label='FMC observation')
+    plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FMC estimate')
+    plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
+    plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='rain intensity')
+    if title is not None:
+        t = title
+    else:
+        t=dat['title']
+        # print('title',type(t),t)
+    if title2 is not None:
+        t = t + ' ' + title2
+    plt.title(t)
+    plt.xlabel('Time (hours)')
+    if 'rain' in dat:
+        plt.ylabel('FMC (%) / Rain mm/h')
+    else:
+        plt.ylabel('Fuel moisture content (%)')
+    plt.legend()
+    
+# Calculate mean squared error
+def mse(a, b):
+    return ((a - b)**2).mean()
+    
+# Calculate mean absolute error
+def mape(a, b):
+    return ((a - b).__abs__()).mean()
+    
+def mse_data(dat, hours = None, h2 = None):
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['h2']
+    
+    m = dat['m']
+    fm = dat['fm']
+    print('Training MSE:   ' + str(np.round(mse(m[:h2], fm[:h2]), 4)))
+    print('Prediction MSE: ' + str(np.round(mse(m[h2:hours], fm[h2:hours]), 4)))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -83,12 +211,15 @@ def format_raws(stn, fixnames = True):
         if type(raws_dat[key][0]) is float:
             raws_dat[key] = fixnan(raws_dat[key], 2)
     
+    # Add station id
+    raws_dat['STID'] = stn['STID']
+    
     # Simplify names 
     if fixnames:
         var_mapping = {
             'date_time': 'time', 'precip_accum': 'rain', 
             'fuel_moisture': 'fm', 'relative_humidity': 'rh',
-            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew'
+            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew', 'STID': 'STID'
             }
         old_keys = [*raws_dat.keys()]
         old_keys = [k.replace("_set_1", "") for k in old_keys]
@@ -130,23 +261,35 @@ def retrieve_raws(mes, stid, raws_vars, time1, time2):
     raws_dat = format_raws(station)
     
     return station, raws_dat
-
+    
+def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
+    # input:
+    #   start YYYYMMDDhhmm
+    #   hours legth of the period
+    #   h2 (optional) length of the training period
+    #   stid  the station id
+    time_start=start
+    time_end = datetime.strptime(start, "%Y%m%d%H%M") + timedelta(hours = hours+1) # end time, plus a buffer to control for time shift
+    time_end = str(int(time_end.strftime("%Y%m%d%H%M")))
+    print('data_raws: Time Parameters:')
+    print('-'*50)
+    print('Time Start:', datetime.strptime(time_start, "%Y%m%d%H%M").strftime("%Y/%M/%d %H:%M"))
+    print('Time End:', datetime.strptime(time_end, "%Y%m%d%H%M").strftime("%Y/%M/%d %H:%M"))
+    print('Total Runtime:', hours, 'hours')
+    print('Training Time:', h2, 'hours')
+    print('-'*50)
+    raws_vars='air_temp,relative_humidity,precip_accum,fuel_moisture'
+    m=Meso(meso_token)
+    station, raws_dat = retrieve_raws(m, stid, raws_vars, time_start, time_end)
+    raws_dat['title']='RAWS data station ' + stid
+    raws_dat.update({'hours':hours,'h2':h2,'station':station})
+    print('Data Read:')
+    print('-'*50)
+    print('Station ID:', station['STID'])
+    print('Lat / Lon:', station['LATITUDE'],', ',station['LONGITUDE'])
+    if(station['QC_FLAGGED']): print('WARNING: station flagged for QC')
+    print('-'*50)
+    raws_dat.update({'hours':hours,'h2':h2})
+    return raws_dat
+    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-def check_data_array(dat,h,a,s):
-    try:
-        ar = dat[a]
-    except:
-        print('cannot find array ' + a)
-        exit(1)
-    print("array %s %s length %i min %s max %s\n" % (a,s,len(ar),min(ar),max(ar)))
-    if len(ar) < h:
-        print('Error: array length less than %i' % hours)
-        exit(1)
-
-def check_data(dat,h2,hours):
-    check_data_array(dat,hours,'Ed','drying equilibrium (%)')
-    check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
-    check_data_array(dat,hours,'rain','rain intensity (mm/h)')
-    check_data_array(dat,hours,'fm','RAWS fuel moisture (%)')
