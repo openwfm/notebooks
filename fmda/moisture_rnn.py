@@ -10,8 +10,15 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
-from utils import vprint
 
+verbose = False ## Must be declared in environment
+def vprint(*args):
+    if verbose: 
+        for s in args[:(len(args)-1)]:
+            print(s, end=' ')
+        print(args[-1])
+
+## RNN Model Funcs
 
 def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
     # x [trainsteps+forecaststeps,features]    all inputs
@@ -80,26 +87,18 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
-    if hours is None:
-        hours = dat['hours']
-    if h2 is None:
-        h2 = dat['h2']
-    vprint('create_rnn_data: hours=',hours,' h2=',h2)
-    # extract inputs the windown of interest
+def create_rnn_data(dat, hours, h2, scale = False, verbose = False):
     Ew = dat['Ew']
     Ed = dat['Ed']
     rain = dat['rain']
     fm = dat['fm']
-    # temp = dat['temp']
+    temp = dat['temp']
     
     # Average Equilibrium
-    # E = (Ed + Ew)/2         # why?
+    E = (Ed + Ew)/2
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
-    # Et = np.reshape(E,[E.shape[0],1])
-    Et = np.vstack((Ed, Ew)).T
-    
+    Et = np.reshape(E,[E.shape[0],1])
     datat = np.reshape(fm,[fm.shape[0],1])
     
     # Scale Data if required
@@ -124,24 +123,18 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
     # Set up return dictionary
     
     rnn_dat = {
-        'hours': hours,
         'x_train': x_train,
         'y_train': y_train,
         'Et': Et,
         'samples': samples,
         'timesteps': timesteps,
         'features': features,
-        'h0': h0,
-        'hours':hours,
-        'h2':h2
+        'h0': h0
     }
     
     return rnn_dat
 
 def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, verbose = False):
-    
-    if hours is None:
-        hours = rnn_dat['hours']
     
     samples = rnn_dat['samples']
     features = rnn_dat['features']
@@ -162,16 +155,15 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
                             return_sequences=True,
                             activation=activation,dense_layers=dense_layers)
 
-    vprint('model_predict input shape',Et.shape,'output shape',model_predict(np.reshape(Et,(1, hours, features))).shape)
+    vprint('model_predict input shape',Et.shape,'output shape',model_predict(Et).shape)
     if verbose: print(model_predict.summary())
     
     x_train = rnn_dat['x_train']
     y_train = rnn_dat['y_train']
 
     # fitting
-    DeltaE = 0.0  
+    DeltaE = 0
     w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.*DeltaE])]
-    
     w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.0])]
     w=model_fit.get_weights()
     for i in range(len(w)):
@@ -194,9 +186,9 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
 
 
 def rnn_predict(model, rnn_dat, hours, scale = False, verbose = False):
-    features = rnn_dat['features']
+    scale = False
     # model.set_weights(w_fitted)
-    x_input=np.reshape(rnn_dat['Et'],(1, hours, features))
+    x_input=np.reshape(rnn_dat['Et'],(1, hours, 1))
     y_output = model.predict(x_input, verbose = verbose)
     
     vprint('x_input.shape=',x_input.shape,'y_output.shape=',y_output.shape)

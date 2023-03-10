@@ -109,13 +109,13 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     Ew=np.maximum(E-0.5,0)
     rain = np.multiply(rand(hours) < p_rain, rand(hours)*max_rain)
     # FMC free run
-    m_f = np.zeros(hours)
-    m_f[0] = 0.1         # initial FMC
+    fm = np.zeros(hours)
+    fm[0] = 0.1         # initial FMC
     # process_noise=0.
     for t in range(hours-1):
-        m_f[t+1] = max(0.,model_moisture(m_f[t],Ed[t-1],Ew[t-1],rain[t-1])  + random.gauss(0,process_noise))
-    m_f = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
-    dat = {'E':E,'Ew':Ew,'Ed':Ed,'m_f':m_f,'hours':hours,'h2':h2,'DeltaE':DeltaE,'rain':rain,'title':'Synthetic data'}
+        fm[t+1] = max(0.,model_moisture(fm[t],Ed[t-1],Ew[t-1],rain[t-1])  + random.gauss(0,process_noise))
+    fm = fm + np.random.normal(loc=0,scale=data_noise,size=hours)
+    dat = {'E':E,'Ew':Ew,'Ed':Ed,'fm':fm,'hours':hours,'h2':h2,'DeltaE':DeltaE,'rain':rain,'title':'Synthetic data'}
     
     return dat
 
@@ -143,7 +143,7 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='equilibrium')
     plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
     plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
-    plot_one(hmin,hmax,dat,'m_f',linestyle='-',c='g',label='FMC truth')
+    plot_one(hmin,hmax,dat,'fm',linestyle='-',c='g',label='FMC truth')
     plot_one(hmin,hmax,dat,'fm',linestyle=':',c='b',label='FMC observation')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FMC estimate')
     plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
