@@ -20,6 +20,17 @@ def vprint(*args):
 
 ## RNN Model Funcs
 
+def create_RNN(hidden_units, dense_units, input_shape, activation):
+    inputs = tf.keras.Input(shape=input_shape)
+    # https://stackoverflow.com/questions/43448029/how-can-i-print-the-values-of-keras-tensors
+    # inputs2 = K.print_tensor(inputs, message='inputs = ')  # change allso inputs to inputs2 below, must be used
+    x = tf.keras.layers.SimpleRNN(hidden_units, input_shape=input_shape,
+                        activation=activation[0])(inputs)
+    outputs = tf.keras.layers.Dense(dense_units, activation=activation[1])(x)
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss='mean_squared_error', optimizer='adam')
+    return model
+
 def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
     # x [trainsteps+forecaststeps,features]    all inputs
     # y [trainsteps,outputs]
@@ -57,7 +68,32 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
 
     return x_train, y_train
 
-def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
+def seq2batches(x,y,timesteps,trainsteps):
+    # x [trainsteps+forecaststeps,features]    all inputs
+    # y [trainsteps,outputs]
+    # timesteps: split x and y into samples length timesteps, shifted by 1
+    # trainsteps: number of timesteps to use for training, no more than y.shape[0]
+    print('shape x = ',x.shape)
+    print('shape y = ',y.shape)
+    print('timesteps=',timesteps)
+    print('trainsteps=',trainsteps)
+    outputs = y.shape[1]
+    features = x.shape[1]
+    samples= trainsteps - timesteps + 1
+    print('samples=',samples)
+    x_train = np.empty([samples, timesteps, features])
+    y_train = np.empty([samples, timesteps, outputs])  # only the last
+    print('samples=',samples,' timesteps=',timesteps,
+        ' features=',features,' outputs=',outputs)
+    for i in range(samples):
+        for k in range(timesteps):
+            for j in range(features):
+                x_train[i,k,j] = x[i+k,j]
+            for j in range(outputs):
+                y_train[i,k,j] = y[i+k,j]  # return sequences
+    return x_train, y_train
+
+def create_RNN_2(hidden_units, dense_units, activation, stateful=False, 
                  batch_shape=None, input_shape=None, dense_layers=1,
                  rnn_layers=1,return_sequences=False,
                  initial_state=None, verbose = True):
