@@ -36,6 +36,7 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
     # y [trainsteps,outputs]
     # timesteps: split x and y into samples length timesteps, shifted by 1
     # trainsteps: number of timesteps to use for training, no more than y.shape[0]
+    
     vprint('shape x = ',x.shape)
     vprint('shape y = ',y.shape)
     vprint('timesteps=',timesteps)
@@ -123,12 +124,15 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, hours, h2, scale = False, verbose = False):
+def create_rnn_data(dat, scale = False, verbose = False):
+    
+    hours = dat['hours']
+    h2 = dat['h2']
     Ew = dat['Ew']
     Ed = dat['Ed']
     rain = dat['rain']
     fm = dat['fm']
-    temp = dat['temp']
+
     
     # Average Equilibrium
     E = (Ed + Ew)/2
@@ -165,7 +169,9 @@ def create_rnn_data(dat, hours, h2, scale = False, verbose = False):
         'samples': samples,
         'timesteps': timesteps,
         'features': features,
-        'h0': h0
+        'h0': h0,
+        'hours': hours,
+        'h2': h2
     }
     
     return rnn_dat
