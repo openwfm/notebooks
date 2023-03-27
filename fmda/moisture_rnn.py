@@ -10,33 +10,15 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
+from utils import vprint
 
-verbose = False ## Must be declared in environment
-def vprint(*args):
-    if verbose: 
-        for s in args[:(len(args)-1)]:
-            print(s, end=' ')
-        print(args[-1])
 
-## RNN Model Funcs
-
-def create_RNN(hidden_units, dense_units, input_shape, activation):
-    inputs = tf.keras.Input(shape=input_shape)
-    # https://stackoverflow.com/questions/43448029/how-can-i-print-the-values-of-keras-tensors
-    # inputs2 = K.print_tensor(inputs, message='inputs = ')  # change allso inputs to inputs2 below, must be used
-    x = tf.keras.layers.SimpleRNN(hidden_units, input_shape=input_shape,
-                        activation=activation[0])(inputs)
-    outputs = tf.keras.layers.Dense(dense_units, activation=activation[1])(x)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss='mean_squared_error', optimizer='adam')
-    return model
 
 def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
     # x [trainsteps+forecaststeps,features]    all inputs
     # y [trainsteps,outputs]
     # timesteps: split x and y into samples length timesteps, shifted by 1
     # trainsteps: number of timesteps to use for training, no more than y.shape[0]
-    
     vprint('shape x = ',x.shape)
     vprint('shape y = ',y.shape)
     vprint('timesteps=',timesteps)
@@ -69,32 +51,7 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
 
     return x_train, y_train
 
-def seq2batches(x,y,timesteps,trainsteps):
-    # x [trainsteps+forecaststeps,features]    all inputs
-    # y [trainsteps,outputs]
-    # timesteps: split x and y into samples length timesteps, shifted by 1
-    # trainsteps: number of timesteps to use for training, no more than y.shape[0]
-    print('shape x = ',x.shape)
-    print('shape y = ',y.shape)
-    print('timesteps=',timesteps)
-    print('trainsteps=',trainsteps)
-    outputs = y.shape[1]
-    features = x.shape[1]
-    samples= trainsteps - timesteps + 1
-    print('samples=',samples)
-    x_train = np.empty([samples, timesteps, features])
-    y_train = np.empty([samples, timesteps, outputs])  # only the last
-    print('samples=',samples,' timesteps=',timesteps,
-        ' features=',features,' outputs=',outputs)
-    for i in range(samples):
-        for k in range(timesteps):
-            for j in range(features):
-                x_train[i,k,j] = x[i+k,j]
-            for j in range(outputs):
-                y_train[i,k,j] = y[i+k,j]  # return sequences
-    return x_train, y_train
-
-def create_RNN_2(hidden_units, dense_units, activation, stateful=False, 
+def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
                  batch_shape=None, input_shape=None, dense_layers=1,
                  rnn_layers=1,return_sequences=False,
                  initial_state=None, verbose = True):
@@ -124,21 +81,26 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, scale = False, verbose = False):
-    
-    hours = dat['hours']
-    h2 = dat['h2']
+def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['h2']
+    vprint('create_rnn_data: hours=',hours,' h2=',h2)
+    # extract inputs the windown of interest
     Ew = dat['Ew']
     Ed = dat['Ed']
     rain = dat['rain']
     fm = dat['fm']
-
+    # temp = dat['temp']
     
     # Average Equilibrium
-    E = (Ed + Ew)/2
+    # E = (Ed + Ew)/2         # why?
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
-    Et = np.reshape(E,[E.shape[0],1])
+    # Et = np.reshape(E,[E.shape[0],1])
+    Et = np.vstack((Ed, Ew)).T
+    
     datat = np.reshape(fm,[fm.shape[0],1])
     
     # Scale Data if required
@@ -163,6 +125,7 @@ def create_rnn_data(dat, scale = False, verbose = False):
     # Set up return dictionary
     
     rnn_dat = {
+        'hours': hours,
         'x_train': x_train,
         'y_train': y_train,
         'Et': Et,
@@ -170,13 +133,16 @@ def create_rnn_data(dat, scale = False, verbose = False):
         'timesteps': timesteps,
         'features': features,
         'h0': h0,
-        'hours': hours,
-        'h2': h2
+        'hours':hours,
+        'h2':h2
     }
     
     return rnn_dat
 
 def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, verbose = False):
+    
+    if hours is None:
+        hours = rnn_dat['hours']
     
     samples = rnn_dat['samples']
     features = rnn_dat['features']
@@ -197,15 +163,17 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
                             return_sequences=True,
                             activation=activation,dense_layers=dense_layers)
 
-    vprint('model_predict input shape',Et.shape,'output shape',model_predict(Et).shape)
+    ## Note: this line executes an in-place operation that changes object. Keeping comment in for tracking purposes
+    # vprint('model_predict input shape',Et.shape,'output shape',model_predict(np.reshape(Et,(1, hours, features))).shape)
     if verbose: print(model_predict.summary())
     
     x_train = rnn_dat['x_train']
     y_train = rnn_dat['y_train']
 
     # fitting
-    DeltaE = 0
+    DeltaE = 0.0  
     w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.*DeltaE])]
+    
     w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.0])]
     w=model_fit.get_weights()
     for i in range(len(w)):
@@ -218,6 +186,7 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
                 w[i][j]=w_initial[i][0]
     model_fit.set_weights(w)
     model_fit.fit(x_train, y_train, epochs=5000,batch_size=samples, verbose=0)
+
     w_fitted=model_fit.get_weights()
     for i in range(len(w)):
         vprint('weight',i,' exact:',w_exact[i],':  initial:',w_initial[i],' fitted:',w_fitted[i])
@@ -228,9 +197,9 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
 
 
 def rnn_predict(model, rnn_dat, hours, scale = False, verbose = False):
-    scale = False
+    features = rnn_dat['features']
     # model.set_weights(w_fitted)
-    x_input=np.reshape(rnn_dat['Et'],(1, hours, 1))
+    x_input=np.reshape(rnn_dat['Et'],(1, hours, features))
     y_output = model.predict(x_input, verbose = verbose)
     
     vprint('x_input.shape=',x_input.shape,'y_output.shape=',y_output.shape)
