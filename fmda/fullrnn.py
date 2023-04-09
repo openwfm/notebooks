@@ -45,7 +45,7 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
     return output
 
-def test_full_simple_rnn_layer():
+def test_full_simple_rnn_functional_model():
     units = 3
     timesteps = 1
     input_dim = 2
@@ -85,5 +85,6 @@ def test_full_simple_rnn_dims():
     output, _ = layer(inputs, initial_state)
     print(output.shape)
 
-test_full_simple_rnn_dims()
-test_full_simple_rnn_layer()
+if __name__ == "__main__":
+    # test_full_simple_rnn_dims()
+    test_full_simple_rnn_functional_model()
