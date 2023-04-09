@@ -1,3 +1,5 @@
+# This code is partially based on a conversation with ChatGPT, 
+# an AI language model trained by OpenAI. 
 
 import numpy as np
 import tensorflow as tf
