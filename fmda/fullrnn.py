@@ -88,5 +88,5 @@ def test_full_simple_rnn_dims():
     print(output.shape)
 
 if __name__ == "__main__":
-    # test_full_simple_rnn_dims()
+    test_full_simple_rnn_dims()
     test_full_simple_rnn_functional_model()
