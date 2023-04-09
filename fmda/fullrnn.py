@@ -3,46 +3,28 @@ import tensorflow as tf
 from tensorflow.keras.layers import Layer
 
 
-class FullSimpleRNN(Layer):
-    def __init__(self, units, activation='tanh', use_bias=True, **kwargs):
-        super(FullSimpleRNN, self).__init__(**kwargs)
+class FullSimpleRNN(tf.keras.layers.Layer):
+    def __init__(self, units, **kwargs):
+        super().__init__(**kwargs)
         self.units = units
-        self.activation = tf.keras.activations.get(activation)
-        self.use_bias = use_bias
 
     def build(self, input_shape):
         self.input_dim = input_shape[-1]
-        self.W = self.add_weight(name='W',
-                                 shape=(self.input_dim, self.units),
-                                 initializer='glorot_uniform',
-                                 trainable=True)
-        self.U = self.add_weight(name='U',
-                                 shape=(self.units, self.units),
-                                 initializer='orthogonal',
-                                 trainable=True)
-        if self.use_bias:
-            self.b = self.add_weight(name='b',
-                                     shape=(self.units,),
-                                     initializer='zeros',
-                                     trainable=True)
-        else:
-            self.b = None
-        self.built = True
+        self.W = self.add_weight(shape=(self.input_dim, self.units),
+                                 initializer="glorot_uniform",
+                                 dtype=tf.float32)  # Cast to float32
+        self.U = self.add_weight(shape=(self.units, self.units),
+                                 initializer="orthogonal",
+                                 dtype=tf.float32)  # Cast to float32
+        self.b = self.add_weight(shape=(self.units,),
+                                 initializer="zeros",
+                                 dtype=tf.float32)  # Cast to float32
 
     def call(self, inputs, states):
-        prev_output = states[0]
+        prev_output = states[0] if isinstance(states, list) else states
         h = tf.matmul(inputs, self.W) + tf.matmul(prev_output, self.U)
-        if self.use_bias:
-            h = h + self.b
-        output = self.activation(h)
+        output = tf.tanh(h + self.b)
         return output, [output]
-
-    def get_config(self):
-        config = super(FullSimpleRNN, self).get_config()
-        config.update({'units': self.units,
-                       'activation': tf.keras.activations.serialize(self.activation),
-                       'use_bias': self.use_bias})
-        return config
 
 def FullSimpleRnn_test():
     
