@@ -45,7 +45,7 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
     return output
 
-def test_full_simple_rnn():
+def test_full_simple_rnn_layer():
     units = 3
     timesteps = 1
     input_dim = 2
@@ -68,29 +68,8 @@ def test_full_simple_rnn():
     plain_python_output = plain_python_full_simple_rnn(x, initial_state, kernel, bias)
     # print("Output from plain Python code:\n", plain_python_output)
 
-    difference = np.abs(rnn_output - plain_python_output)
+    difference = np.max(np.abs(rnn_output - plain_python_output))
     print("Difference between model.predict and plain Python code output: ", difference)
-
-test_full_simple_rnn()
-
-
-def test_full_simple_rnn_layer():
-
-    units = 3
-    timesteps = 1
-    input_dim = 2
-
-    x = np.random.random((32, timesteps, input_dim))
-    initial_state = np.random.random((32, units))
-
-    inputs = Input(shape=(timesteps, input_dim), name="input_1")
-    initial_state_input = Input(shape=(units,), name="input_2")
-    rnn_layer = FullSimpleRNN(units, activation="tanh")
-    rnn_output, _ = rnn_layer(inputs, initial_state_input)
-    model = Model([inputs, initial_state_input], rnn_output)
-
-    rnn_output = model.predict({"input_1": x, "input_2": initial_state})
-    print(rnn_output.shape)
 
 def test_full_simple_rnn_dims():
     # Test the initialization and build methods of the FullSimpleRNN class
