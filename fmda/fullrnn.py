@@ -1,3 +1,4 @@
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -73,7 +74,7 @@ def test_full_simple_rnn():
 test_full_simple_rnn()
 
 
-def test_full_simple_rnn():
+def test_full_simple_rnn_layer():
 
     units = 3
     timesteps = 1
@@ -91,17 +92,19 @@ def test_full_simple_rnn():
     rnn_output = model.predict({"input_1": x, "input_2": initial_state})
     print(rnn_output.shape)
 
-# Test the initialization and build methods of the FullSimpleRNN class
-layer = FullSimpleRNN(units=3)
-input_shape = (None, 1, 2)
-layer.build(input_shape)
-print(layer.kernel)
-print(layer.bias)
+def test_full_simple_rnn_dims():
+    # Test the initialization and build methods of the FullSimpleRNN class
+    layer = FullSimpleRNN(units=3)
+    input_shape = (None, 1, 2)
+    layer.build(input_shape)
+    print(layer.kernel)
+    print(layer.bias)
+    
+    # Test the call method with some sample inputs
+    inputs = tf.random.normal((32, 1, 2))
+    initial_state = tf.random.normal((32, 3))
+    output, _ = layer(inputs, initial_state)
+    print(output.shape)
 
-# Test the call method with some sample inputs
-inputs = tf.random.normal((32, 1, 2))
-initial_state = tf.random.normal((32, 3))
-output, _ = layer(inputs, initial_state)
-print(output.shape)
-
-test_full_simple_rnn()
+test_full_simple_rnn_dims()
+test_full_simple_rnn_layer()
