@@ -3,9 +3,8 @@
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
+from tensorflow.keras import layers, Model, Sequential
 from tensorflow.keras.layers import Input
-from tensorflow.keras import Model
 
 class FullSimpleRNN(layers.Layer):
     def __init__(self, units, activation="tanh", **kwargs):
@@ -48,6 +47,14 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
     print('output.shape=(units,):',output.shape)
     return output
+
+def create_rnn_model(units, input_shape):
+    model = Sequential([
+        Input(input_shape),
+        FullSimpleRNN(units),
+    ])
+    return model
+
 
 def test_full_simple_rnn_functional_model():
     units = 60
