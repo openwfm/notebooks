@@ -51,3 +51,4 @@ def FullSimpleRnn_test():
                                     rnn.get_weights()[2])
         np.testing.assert_allclose(output[t].numpy(), expected_output_t, rtol=1e-5)
      
+FullSimpleRnn_test()
