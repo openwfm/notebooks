@@ -9,7 +9,7 @@ from tensorflow.keras import Model
 
 class FullSimpleRNN(layers.Layer):
     def __init__(self, units, activation="tanh", **kwargs):
-        super(FullSimpleRNN, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.units = units
         self.activation = activation
 
@@ -21,7 +21,7 @@ class FullSimpleRNN(layers.Layer):
         self.bias = self.add_weight(shape=(self.units,),
                                     initializer='zeros',
                                     name='bias')
-        super(FullSimpleRNN, self).build(input_shape)
+        super().build(input_shape)
 
     def call(self, inputs, initial_state=None):
         if initial_state is None:
@@ -40,15 +40,17 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     # (batch_size, timesteps, units). Finally, we add a bias term bias that has 
     # dimensions (units,) to the result element-wise resulting in an array with
     # dimensions (batch_size, timesteps, units). 
+
     print('inputs.shape=(batch_size, timesteps, input_dim):',inputs.shape)
     print('initial_state.shape=(batch_size, input_dim):',initial_state.shape)
     print('kernel.shape=(input_dim + units, units):',kernel.shape)
     print('bias.shape=(units,):',bias.shape)
     output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
+    print('output.shape=(units,):',output.shape)
     return output
 
 def test_full_simple_rnn_functional_model():
-    units = 3
+    units = 60
     timesteps = 1
     input_dim = 2
 
@@ -88,5 +90,5 @@ def test_full_simple_rnn_dims():
     print(output.shape)
 
 if __name__ == "__main__":
-    test_full_simple_rnn_dims()
+    #test_full_simple_rnn_dims()
     test_full_simple_rnn_functional_model()
