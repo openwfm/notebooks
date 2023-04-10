@@ -116,29 +116,34 @@ def create_and_test_model():
     time_steps = 10
     input_dim = 8
     rnn_units = 32
-    output_units = 3
+    output_units = 1
+    batch_size = 5
 
+    # Create model
     model = rnn_model_sequential(time_steps, input_dim, rnn_units, output_units)
+    model.summary()
 
-    # Generate random input data for testing
-    input_data = np.random.rand(1, time_steps, input_dim)
+    # Generate random input data
+    x = np.random.random((batch_size, time_steps, input_dim))
 
-    # Get the weights and biases from the model
-    rnn_weights, rnn_bias = model.layers[1].get_weights()
-    dense_weights, dense_bias = model.layers[2].get_weights()
+    # Predict using the model
+    model_output = model.predict(x)
 
-    # Compute the output using the model.predict method
-    model_output = model.predict(input_data)
+    # Manually calculate the output
+    initial_state = np.zeros((batch_size, rnn_units))
+    kernel = model.get_layer('full_simple_rnn').kernel.numpy()
+    bias = model.get_layer('full_simple_rnn').bias.numpy()
 
-    # Compute the output using the manual_rnn_output function
-    manual_output = manual_rnn_output(input_data, rnn_weights, rnn_bias, dense_weights, dense_bias)
+    # Manually calculate the output for each time step
+    for t in range(time_steps):
+        input_t = x[:, t, :]
+        output_t, initial_state = plain_python_full_simple_rnn(input_t, initial_state, kernel, bias)
 
-    # Compare the outputs
-    print("Model output:\n", model_output)
-    print("Manual output:\n", manual_output)
-    print("Outputs are close:", np.allclose(model_output, manual_output))
+    manual_output = output_t[:, np.newaxis, :]
 
-
+    # Compare outputs
+    difference = np.max(np.abs(model_output - manual_output))
+    print("Difference between model.predict and manual output:", difference)
 
 if __name__ == "__main__":
     #test_full_simple_rnn_dims()
