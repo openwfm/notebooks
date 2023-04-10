@@ -24,7 +24,7 @@ class FullSimpleRNN(layers.Layer):
 
     def call(self, inputs, initial_state=None):
         if initial_state is None:
-            initial_state = tf.zeros((inputs.shape[0], self.units))
+            initial_state = tf.zeros((tf.shape(inputs)[0], self.units))
 
         output = tf.tanh(tf.matmul(tf.concat([inputs, tf.expand_dims(initial_state, 1)], axis=-1), self.kernel) + self.bias)
         return output, initial_state
