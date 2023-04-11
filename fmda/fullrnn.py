@@ -46,10 +46,10 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     print('bias.shape=(units,):',bias.shape)
     initial_state_expanded = np.expand_dims(initial_state, 1)
     print('initial_state_expanded.shape=(batch_size, 1, input_dim):',initial_state_expanded.shape)
-    #output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
     inputs_and_initial_state_expanded = np.concatenate([inputs,initial_state_expanded], axis=-1)
     print('inputs_and_initial_state_expanded.shape=(batch_size,timesteps+1,batch_size)',inputs_and_initial_state_expanded.shape)
-    output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
+    #output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
+    output = np.tanh(np.matmul(inputs_and_initial_state_expanded, kernel) + bias)
     print('output.shape=(units,):',output.shape)
     return output
 
