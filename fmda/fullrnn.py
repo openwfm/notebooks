@@ -41,9 +41,14 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     # dimensions (batch_size, timesteps, units). 
 
     print('inputs.shape=(batch_size, timesteps, input_dim):',inputs.shape)
-    print('initial_state.shape=(batch_size, input_dim):',initial_state.shape)
+    print('initial_state.shape=(batch_size, units):',initial_state.shape)
     print('kernel.shape=(input_dim + units, units):',kernel.shape)
     print('bias.shape=(units,):',bias.shape)
+    initial_state_expanded = np.expand_dims(initial_state, 1)
+    print('initial_state_expanded.shape=(batch_size, 1, input_dim):',initial_state_expanded.shape)
+    #output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
+    inputs_and_initial_state_expanded = np.concatenate([inputs,initial_state_expanded], axis=-1)
+    print('inputs_and_initial_state_expanded.shape=(batch_size,timesteps+1,batch_size)',inputs_and_initial_state_expanded.shape)
     output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
     print('output.shape=(units,):',output.shape)
     return output
@@ -148,4 +153,4 @@ def create_and_test_model():
 if __name__ == "__main__":
     #test_full_simple_rnn_dims()
     test_full_simple_rnn_functional_model()
-    create_and_test_model()
+    #create_and_test_model()
