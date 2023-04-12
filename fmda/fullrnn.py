@@ -18,6 +18,7 @@ def create_RNN(hidden_units, dense_units, input_shape, activation):
 
 def SimpleRNN_test():
     # Demo example
+    print('SimpleRNN_test')
     hidden=5
     features=2
     timesteps=3
@@ -34,11 +35,12 @@ def SimpleRNN_test():
     
     # Reshape the input to sample_size x time_steps x features 
     samples=4   # number of samples
-    x = tf.reshape(tf.range(samples*timesteps*features),[samples,timesteps,features]) 
-    print('test input x=',x)
-    print('model.predict start')
+    x = tf.reshape(tf.range(samples*timesteps*features),
+        [samples,timesteps,features])
+    #print('test input x=',x)
+    #print('model.predict start')
     y_pred_model = demo_model.predict(x)
-    print('model.predict end')
+    #print('model.predict end')
     
     o3=np.zeros([samples,1])
     for i in range(samples):
@@ -49,8 +51,10 @@ def SimpleRNN_test():
       o3[i,0] = np.dot(h_3, wy) + by
     #print('h1 = ', h_1,'h2 = ', h_2,'h3 = ', h_3)
     
-    print("Prediction from network ", y_pred_model)
-    print("Prediction from our computation ", o3)
+    #print("Prediction from network ", y_pred_model)
+    #print("Prediction from our computation ", o3)
+    difference = np.max(np.abs(y_pred_model - o3))
+    print("Difference between model.predict and manual output:", difference)
 
 
 # The following code is partially based on a conversation with ChatGPT, 
@@ -104,6 +108,7 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     return output
 
 def test_full_simple_rnn_functional_model():
+    print('test_full_simple_rnn_functional_model')
     units = 60
     timesteps = 1
     input_dim = 2
