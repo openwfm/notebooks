@@ -201,6 +201,7 @@ def create_and_test_model():
     print("Difference between model.predict and manual output:", difference)
 
 if __name__ == "__main__":
+    SimpleRNN_test()
     #test_full_simple_rnn_dims()
     test_full_simple_rnn_functional_model()
     #create_and_test_model()
