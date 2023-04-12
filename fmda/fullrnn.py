@@ -3,6 +3,56 @@ import tensorflow as tf
 from tensorflow.keras import layers, Model, Sequential
 from tensorflow.keras.layers import Input
 
+# The following code is partially based on 
+# https://machinelearningmastery.com/understanding-simple-recurrent-neural-networks-in-keras/
+# modified from fmda_kf_rnn_orig.ipynb 
+
+def create_RNN(hidden_units, dense_units, input_shape, activation):
+    inputs = tf.keras.Input(shape=input_shape)
+    x = tf.keras.layers.SimpleRNN(hidden_units, input_shape=input_shape,
+                        activation=activation[0])(inputs)
+    outputs = tf.keras.layers.Dense(dense_units, activation=activation[1])(x)
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss='mean_squared_error', optimizer='adam')
+    return model
+
+def SimpleRNN_test():
+    # Demo example
+    hidden=5
+    features=2
+    timesteps=3
+    demo_model = create_RNN(hidden_units=hidden, dense_units=1, 
+                            input_shape=(timesteps,features), 
+                            activation=['linear', 'linear'])
+    print(demo_model.summary())
+    w = demo_model.get_weights()
+    #print(len(w),' weight arrays:',w)
+    wname=('wx','wh','bh','wy','by','wz','bz')
+    for i in range(len(w)):
+      print(i,':',wname[i],'shape=',w[i].shape)
+    wx, wh, bh, wy, by = w
+    
+    # Reshape the input to sample_size x time_steps x features 
+    samples=4   # number of samples
+    x = tf.reshape(tf.range(samples*timesteps*features),[samples,timesteps,features]) 
+    print('test input x=',x)
+    print('model.predict start')
+    y_pred_model = demo_model.predict(x)
+    print('model.predict end')
+    
+    o3=np.zeros([samples,1])
+    for i in range(samples):
+      h_0 = np.zeros(hidden)
+      h_1 = np.dot(x[i,0,:], wx) + np.dot(h_0,wh) + bh
+      h_2 = np.dot(x[i,1,:], wx) + np.dot(h_1,wh) + bh
+      h_3 = np.dot(x[i,2,:], wx) + np.dot(h_2,wh) + bh
+      o3[i,0] = np.dot(h_3, wy) + by
+    #print('h1 = ', h_1,'h2 = ', h_2,'h3 = ', h_3)
+    
+    print("Prediction from network ", y_pred_model)
+    print("Prediction from our computation ", o3)
+
+
 # The following code is partially based on a conversation with ChatGPT, 
 # an AI language model trained by OpenAI. 
 
