@@ -121,6 +121,7 @@ def test_full_simple_rnn_functional_model():
     rnn_layer = FullSimpleRNN(units, activation="tanh")
     rnn_output, _ = rnn_layer(inputs, initial_state_input)
     model = Model([inputs, initial_state_input], rnn_output)
+    print(model.summary())
 
     rnn_output = model.predict({"input_1": x, "input_2": initial_state})
     # print("Output from model.predict:\n", rnn_output)
@@ -181,7 +182,6 @@ def create_and_test_model():
 
     # Create model
     model = rnn_model_sequential(time_steps, input_dim, rnn_units, output_units)
-    model.summary()
 
     # Generate random input data
     x = np.random.random((batch_size, time_steps, input_dim))
