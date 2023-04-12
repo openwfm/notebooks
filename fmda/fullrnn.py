@@ -1,10 +1,10 @@
-# This code is partially based on a conversation with ChatGPT, 
-# an AI language model trained by OpenAI. 
-
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, Model, Sequential
 from tensorflow.keras.layers import Input
+
+# The following code is partially based on a conversation with ChatGPT, 
+# an AI language model trained by OpenAI. 
 
 class FullSimpleRNN(layers.Layer):
     def __init__(self, units, activation="tanh", **kwargs):
