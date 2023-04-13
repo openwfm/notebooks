@@ -8,6 +8,8 @@ from tensorflow.keras.layers import Input
 # modified from fmda_kf_rnn_orig.ipynb 
 
 def create_RNN(hidden_units, dense_units, input_shape, activation):
+    print('create_RNN: hidden_units=',hidden_units,'dense_units=',dense_units,
+        'input_shape=',input_shape,'activation=',activation)
     inputs = tf.keras.Input(shape=input_shape)
     x = tf.keras.layers.SimpleRNN(hidden_units, input_shape=input_shape,
                         activation=activation[0])(inputs)
@@ -22,7 +24,7 @@ def SimpleRNN_test():
     hidden=5
     features=2
     timesteps=3
-    samples=4   # number of samples
+    batch_size=4   # number of samples
 
     demo_model = create_RNN(hidden_units=hidden, dense_units=1, 
                             input_shape=(timesteps,features), 
@@ -35,16 +37,16 @@ def SimpleRNN_test():
       print(i,':',wname[i],'shape=',w[i].shape)
     wx, wh, bh, wy, by = w
     
-    #  input samples x timesteps x features 
-    x = tf.reshape(tf.range(samples*timesteps*features),
-        [samples,timesteps,features])
+    #  input batch_size x timesteps x features 
+    x = tf.reshape(tf.range(batch_size*timesteps*features),
+        [batch_size,timesteps,features])
     print('input x.shape=(hidden_units,timesteps,features):',x.shape)
     #print('model.predict start')
     y_pred_model = demo_model.predict(x)
     #print('model.predict end')
     
-    o=np.zeros([samples,1])
-    for i in range(samples):
+    o=np.zeros([batch_size,1])
+    for i in range(batch_size):
       h = np.zeros(hidden)
       for j in range(timesteps):
           h = np.dot(x[i,j,:], wx) + np.dot(h,wh) + bh
@@ -106,7 +108,7 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
 
 def test_full_simple_rnn_functional_model():
     print('test_full_simple_rnn_functional_model')
-    units = 60
+    units = 5
     timesteps = 1
     input_dim = 2
     batch_size = 32
