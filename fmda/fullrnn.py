@@ -38,7 +38,7 @@ def SimpleRNN_test():
     #  input samples x timesteps x features 
     x = tf.reshape(tf.range(samples*timesteps*features),
         [samples,timesteps,features])
-    #print('test input x=',x)
+    print('input x.shape=(hidden_units,timesteps,features):',x.shape)
     #print('model.predict start')
     y_pred_model = demo_model.predict(x)
     #print('model.predict end')
