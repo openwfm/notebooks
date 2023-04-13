@@ -5,6 +5,7 @@ from tensorflow.keras.layers import Input
 
 batch_size=4   # number of samples
 hidden_units=5
+features=2
 
 # The following code is partially based on 
 # https://machinelearningmastery.com/understanding-simple-recurrent-neural-networks-in-keras/
@@ -24,7 +25,6 @@ def create_RNN(hidden_units, dense_units, input_shape, activation):
 def SimpleRNN_test():
     # Demo example
     print('SimpleRNN_test')
-    features=2
     timesteps=3
 
     demo_model = create_RNN(hidden_units=hidden_units, dense_units=1, 
@@ -95,9 +95,9 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
     # dimensions (batch_size, timesteps, units). 
 
     print('inputs.shape=(batch_size, timesteps, input_dim):',inputs.shape)
-    print('initial_state.shape=(batch_size, units):',initial_state.shape)
-    print('kernel.shape=(input_dim + units, units):',kernel.shape)
-    print('bias.shape=(units,):',bias.shape)
+    print('initial_state.shape=(batch_size, hidden_units):',initial_state.shape)
+    print('kernel.shape=(input_dim + hidden_units, hidden_units):',kernel.shape)
+    print('bias.shape=(hidden_units,):',bias.shape)
     initial_state_expanded = np.expand_dims(initial_state, 1)
     print('initial_state_expanded.shape=(batch_size, 1, input_dim):',initial_state_expanded.shape)
     inputs_and_initial_state_expanded = np.concatenate([inputs,initial_state_expanded], axis=-1)
@@ -110,12 +110,11 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
 def test_full_simple_rnn_functional_model():
     print('test_full_simple_rnn_functional_model')
     timesteps = 1
-    input_dim = 2
 
-    x = np.random.random((batch_size, timesteps, input_dim))
+    x = np.random.random((batch_size, timesteps, features))
     initial_state = np.random.random((batch_size, hidden_units))
 
-    inputs = Input(shape=(timesteps, input_dim), name="input_1")
+    inputs = Input(shape=(timesteps, features), name="input_1")
     initial_state_input = Input(shape=(hidden_units,), name="input_2")
     rnn_layer = FullSimpleRNN(hidden_units, activation="tanh")
     rnn_output, _ = rnn_layer(inputs, initial_state_input)
