@@ -42,18 +42,16 @@ def SimpleRNN_test():
     y_pred_model = demo_model.predict(x)
     #print('model.predict end')
     
-    o3=np.zeros([samples,1])
+    o=np.zeros([samples,1])
     for i in range(samples):
-      h_0 = np.zeros(hidden)
-      h_1 = np.dot(x[i,0,:], wx) + np.dot(h_0,wh) + bh
-      h_2 = np.dot(x[i,1,:], wx) + np.dot(h_1,wh) + bh
-      h_3 = np.dot(x[i,2,:], wx) + np.dot(h_2,wh) + bh
-      o3[i,0] = np.dot(h_3, wy) + by
-    #print('h1 = ', h_1,'h2 = ', h_2,'h3 = ', h_3)
+      h = np.zeros(hidden)
+      h = np.dot(x[i,0,:], wx) + np.dot(h,wh) + bh
+      h = np.dot(x[i,1,:], wx) + np.dot(h,wh) + bh
+      h = np.dot(x[i,2,:], wx) + np.dot(h,wh) + bh
+      o[i,0] = np.dot(h, wy) + by
+    #print('h = ', h_3)
     
-    #print("Prediction from network ", y_pred_model)
-    #print("Prediction from our computation ", o3)
-    difference = np.max(np.abs(y_pred_model - o3))
+    difference = np.max(np.abs(y_pred_model - o))
     print("Difference between model.predict and manual output:", difference)
 
 
