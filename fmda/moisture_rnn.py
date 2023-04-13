@@ -157,9 +157,6 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
                         activation=activation,
                         dense_layers=dense_layers)
     
-    # print('model_fit input shape',x_train.shape,'output shape',model_fit(x_train).shape) 
-    model_fit(x_train) ## In-place operation to replace print statement above
-    
     Et = rnn_dat['Et']
     model_predict=create_RNN_2(hidden_units=hidden_units, dense_units=dense_units,  
                             input_shape=(hours,features),stateful = False,
@@ -173,6 +170,10 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     x_train = rnn_dat['x_train']
     y_train = rnn_dat['y_train']
 
+    # print('model_fit input shape',x_train.shape,'output shape',model_fit(x_train).shape) 
+    model_fit(x_train) ## In-place operation to replace print statement above
+    
+    
     # fitting
     DeltaE = 0.0  
     w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.*DeltaE])]
