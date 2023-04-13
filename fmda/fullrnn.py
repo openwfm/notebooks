@@ -1,3 +1,4 @@
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, Model, Sequential
@@ -6,6 +7,7 @@ from tensorflow.keras.layers import Input
 batch_size=4   # number of samples
 hidden_units=5
 features=2
+timesteps=3
 
 # The following code is partially based on 
 # https://machinelearningmastery.com/understanding-simple-recurrent-neural-networks-in-keras/
@@ -25,7 +27,6 @@ def create_RNN(hidden_units, dense_units, input_shape, activation):
 def SimpleRNN_test():
     # Demo example
     print('SimpleRNN_test')
-    timesteps=3
 
     demo_model = create_RNN(hidden_units=hidden_units, dense_units=1, 
                             input_shape=(timesteps,features), 
@@ -60,6 +61,9 @@ def SimpleRNN_test():
 # The following code is partially based on a conversation with ChatGPT, 
 # an AI language model trained by OpenAI. 
 
+import tensorflow as tf
+from tensorflow.keras import layers
+
 class FullSimpleRNN(layers.Layer):
     def __init__(self, units, activation="tanh", **kwargs):
         super().__init__(**kwargs)
@@ -74,42 +78,40 @@ class FullSimpleRNN(layers.Layer):
         self.bias = self.add_weight(shape=(self.units,),
                                     initializer='zeros',
                                     name='bias')
+        self.activation_fn = tf.keras.activations.get(self.activation)
         super().build(input_shape)
+
+    def step(self, state, inputs_t):
+        output = self.activation_fn(tf.matmul(tf.concat([inputs_t, state], axis=-1), self.kernel) + self.bias)
+        return output
 
     def call(self, inputs, initial_state=None):
         if initial_state is None:
             initial_state = tf.zeros((tf.shape(inputs)[0], self.units))
 
-        output = tf.tanh(tf.matmul(tf.concat([inputs, tf.expand_dims(initial_state, 1)], axis=-1), self.kernel) + self.bias)
-        return output, initial_state
+        inputs_t = tf.transpose(inputs, perm=[1, 0, 2])
+        outputs = tf.scan(self.step, elems=inputs_t, initializer=initial_state)
+        outputs = tf.transpose(outputs, perm=[1, 0, 2])
 
-def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
-    # assume that inputs has dimensions (batch_size, timesteps, input_dim) 
-    # and initial_state has dimensions (batch_size, units).
-    # We first concatenate inputs and initial_state along the last axis, 
-    # resulting in an array with dimensions (batch_size, timesteps, input_dim + units). 
-    # Next, we multiply this arrats by a weight matrix kernel that has dimensions
-    # (input_dim + units, units) which results in an array with dimensions
-    # (batch_size, timesteps, units). Finally, we add a bias term bias that has 
-    # dimensions (units,) to the result element-wise resulting in an array with
-    # dimensions (batch_size, timesteps, units). 
+        return outputs, outputs[:, -1, :]
 
-    print('inputs.shape=(batch_size, timesteps, input_dim):',inputs.shape)
-    print('initial_state.shape=(batch_size, hidden_units):',initial_state.shape)
-    print('kernel.shape=(input_dim + hidden_units, hidden_units):',kernel.shape)
-    print('bias.shape=(hidden_units,):',bias.shape)
-    initial_state_expanded = np.expand_dims(initial_state, 1)
-    print('initial_state_expanded.shape=(batch_size, 1, input_dim):',initial_state_expanded.shape)
-    inputs_and_initial_state_expanded = np.concatenate([inputs,initial_state_expanded], axis=-1)
-    print('inputs_and_initial_state_expanded.shape=(batch_size,timesteps+1,batch_size)',inputs_and_initial_state_expanded.shape)
-    #output = np.tanh(np.matmul(np.concatenate([inputs, np.expand_dims(initial_state, 1)], axis=-1), kernel) + bias)
-    output = np.tanh(np.matmul(inputs_and_initial_state_expanded, kernel) + bias)
-    print('output.shape=(units,):',output.shape)
-    return output
+
+def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias, activation_fn=np.tanh):
+    batch_size, timesteps, features = inputs.shape
+    units = initial_state.shape[1]
+
+    outputs = []
+    state = initial_state
+    for t in range(timesteps):
+        output = activation_fn(np.matmul(np.concatenate([inputs[:, t, :], state], axis=-1), kernel) + bias)
+        outputs.append(output)
+        state = output
+
+    outputs = np.stack(outputs, axis=1)
+    return outputs, state
 
 def test_full_simple_rnn_functional_model():
     print('test_full_simple_rnn_functional_model')
-    timesteps = 1
 
     x = np.random.random((batch_size, timesteps, features))
     initial_state = np.random.random((batch_size, hidden_units))
@@ -127,7 +129,7 @@ def test_full_simple_rnn_functional_model():
     kernel = rnn_layer.kernel.numpy()
     bias = rnn_layer.bias.numpy()
 
-    plain_python_output = plain_python_full_simple_rnn(x, initial_state, kernel, bias)
+    plain_python_output, _  = plain_python_full_simple_rnn(x, initial_state, kernel, bias)
     # print("Output from plain Python code:\n", plain_python_output)
 
     difference = np.max(np.abs(rnn_output - plain_python_output))
