@@ -45,11 +45,9 @@ def SimpleRNN_test():
     o=np.zeros([samples,1])
     for i in range(samples):
       h = np.zeros(hidden)
-      h = np.dot(x[i,0,:], wx) + np.dot(h,wh) + bh
-      h = np.dot(x[i,1,:], wx) + np.dot(h,wh) + bh
-      h = np.dot(x[i,2,:], wx) + np.dot(h,wh) + bh
+      for j in range(timesteps):
+          h = np.dot(x[i,j,:], wx) + np.dot(h,wh) + bh
       o[i,0] = np.dot(h, wy) + by
-    #print('h = ', h_3)
     
     difference = np.max(np.abs(y_pred_model - o))
     print("Difference between model.predict and manual output:", difference)
