@@ -22,6 +22,8 @@ def SimpleRNN_test():
     hidden=5
     features=2
     timesteps=3
+    samples=4   # number of samples
+
     demo_model = create_RNN(hidden_units=hidden, dense_units=1, 
                             input_shape=(timesteps,features), 
                             activation=['linear', 'linear'])
@@ -33,8 +35,7 @@ def SimpleRNN_test():
       print(i,':',wname[i],'shape=',w[i].shape)
     wx, wh, bh, wy, by = w
     
-    # Reshape the input to sample_size x time_steps x features 
-    samples=4   # number of samples
+    #  input samples x timesteps x features 
     x = tf.reshape(tf.range(samples*timesteps*features),
         [samples,timesteps,features])
     #print('test input x=',x)
