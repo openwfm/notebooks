@@ -111,7 +111,7 @@ def test_full_simple_rnn_functional_model():
     units = 5
     timesteps = 1
     input_dim = 2
-    batch_size = 32
+    batch_size = 4 
 
     x = np.random.random((batch_size, timesteps, input_dim))
     initial_state = np.random.random((batch_size, units))
