@@ -3,6 +3,9 @@ import tensorflow as tf
 from tensorflow.keras import layers, Model, Sequential
 from tensorflow.keras.layers import Input
 
+batch_size=4   # number of samples
+hidden_units=5
+
 # The following code is partially based on 
 # https://machinelearningmastery.com/understanding-simple-recurrent-neural-networks-in-keras/
 # modified from fmda_kf_rnn_orig.ipynb 
@@ -21,12 +24,10 @@ def create_RNN(hidden_units, dense_units, input_shape, activation):
 def SimpleRNN_test():
     # Demo example
     print('SimpleRNN_test')
-    hidden=5
     features=2
     timesteps=3
-    batch_size=4   # number of samples
 
-    demo_model = create_RNN(hidden_units=hidden, dense_units=1, 
+    demo_model = create_RNN(hidden_units=hidden_units, dense_units=1, 
                             input_shape=(timesteps,features), 
                             activation=['linear', 'linear'])
     print(demo_model.summary())
@@ -47,13 +48,13 @@ def SimpleRNN_test():
     
     o=np.zeros([batch_size,1])
     for i in range(batch_size):
-      h = np.zeros(hidden)
+      h = np.zeros(hidden_units)
       for j in range(timesteps):
           h = np.dot(x[i,j,:], wx) + np.dot(h,wh) + bh
       o[i,0] = np.dot(h, wy) + by
     
     difference = np.max(np.abs(y_pred_model - o))
-    print("Difference between model.predict and manual output:", difference)
+    print("SimpleRNN model difference between model.predict and manual output:", difference)
 
 
 # The following code is partially based on a conversation with ChatGPT, 
@@ -108,17 +109,15 @@ def plain_python_full_simple_rnn(inputs, initial_state, kernel, bias):
 
 def test_full_simple_rnn_functional_model():
     print('test_full_simple_rnn_functional_model')
-    units = 5
     timesteps = 1
     input_dim = 2
-    batch_size = 4 
 
     x = np.random.random((batch_size, timesteps, input_dim))
-    initial_state = np.random.random((batch_size, units))
+    initial_state = np.random.random((batch_size, hidden_units))
 
     inputs = Input(shape=(timesteps, input_dim), name="input_1")
-    initial_state_input = Input(shape=(units,), name="input_2")
-    rnn_layer = FullSimpleRNN(units, activation="tanh")
+    initial_state_input = Input(shape=(hidden_units,), name="input_2")
+    rnn_layer = FullSimpleRNN(hidden_units, activation="tanh")
     rnn_output, _ = rnn_layer(inputs, initial_state_input)
     model = Model([inputs, initial_state_input], rnn_output)
     print(model.summary())
@@ -134,20 +133,6 @@ def test_full_simple_rnn_functional_model():
 
     difference = np.max(np.abs(rnn_output - plain_python_output))
     print("Difference between model.predict and plain Python code output: ", difference)
-
-def test_full_simple_rnn_dims():
-    # Test the initialization and build methods of the FullSimpleRNN class
-    layer = FullSimpleRNN(units=3)
-    input_shape = (None, 1, 2)
-    layer.build(input_shape)
-    print(layer.kernel)
-    print(layer.bias)
-    
-    # Test the call method with some sample inputs
-    inputs = tf.random.normal((32, 1, 2))
-    initial_state = tf.random.normal((32, 3))
-    output, _ = layer(inputs, initial_state)
-    print(output.shape)
 
 if __name__ == "__main__":
     SimpleRNN_test()
