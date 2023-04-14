@@ -12,15 +12,17 @@ timesteps=3
 # The following code is partially based on 
 # https://machinelearningmastery.com/understanding-simple-recurrent-neural-networks-in-keras/
 # modified from fmda_kf_rnn_orig.ipynb 
+ 
 
 def create_RNN(hidden_units, dense_units, input_shape, activation):
     print('create_RNN: hidden_units=',hidden_units,'dense_units=',dense_units,
         'input_shape=',input_shape,'activation=',activation)
     inputs = tf.keras.Input(shape=input_shape)
-    x = tf.keras.layers.SimpleRNN(hidden_units, input_shape=input_shape,
-                        activation=activation[0])(inputs)
+    initial_state = tf.keras.Input(shape=(hidden_units,))
+    x, state = tf.keras.layers.SimpleRNN(hidden_units, input_shape=input_shape,
+         activation=activation[0], return_state=True)(inputs, initial_state=initial_state)
     outputs = tf.keras.layers.Dense(dense_units, activation=activation[1])(x)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    model = tf.keras.Model(inputs=[inputs, initial_state], outputs=outputs)
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
@@ -42,9 +44,11 @@ def SimpleRNN_test():
     #  input batch_size x timesteps x features 
     x = tf.reshape(tf.range(batch_size*timesteps*features),
         [batch_size,timesteps,features])
-    print('input x.shape=(hidden_units,timesteps,features):',x.shape)
+    print('input x.shape=(batch_size,timesteps,features):',x.shape)
     #print('model.predict start')
-    y_pred_model = demo_model.predict(x)
+    initial_state = np.zeros((batch_size, hidden_units))
+    y_pred_model = demo_model.predict([x,initial_state])
+
     #print('model.predict end')
     
     o=np.zeros([batch_size,1])
@@ -61,7 +65,6 @@ def SimpleRNN_test():
 # The following code is partially based on a conversation with ChatGPT, 
 # an AI language model trained by OpenAI. 
 
-import tensorflow as tf
 from tensorflow.keras import layers
 
 class FullSimpleRNN(layers.Layer):
