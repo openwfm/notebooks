@@ -55,7 +55,11 @@ def SimpleRNN_test():
     for i in range(batch_size):
       h = np.zeros(hidden_units)
       for j in range(timesteps):
-          h = np.dot(x[i,j,:], wx) + np.dot(h,wh) + bh
+          # h = np.dot(x[i,j,:], wx) + np.dot(h,wh) + bh
+          s = np.zeros(hidden_units)
+          for k in range(hidden_units):
+              s[k] = np.dot(x[i,j,:], wx[:,k]) + np.dot(h,wh[:,k]) + bh[k]
+          h = s.copy()
       o[i,0] = np.dot(h, wy) + by
     
     difference = np.max(np.abs(y_pred_model - o))
