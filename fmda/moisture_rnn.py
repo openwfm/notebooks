@@ -155,13 +155,15 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
                         return_sequences=False,
                         # initial_state=h0,
                         activation=activation,
-                        dense_layers=dense_layers)
+                        dense_layers=dense_layers,
+                        verbose = verbose)
     
     Et = rnn_dat['Et']
     model_predict=create_RNN_2(hidden_units=hidden_units, dense_units=dense_units,  
                             input_shape=(hours,features),stateful = False,
                             return_sequences=True,
-                            activation=activation,dense_layers=dense_layers)
+                            activation=activation,dense_layers=dense_layers,
+                              verbose = verbose)
 
     ## Note: this line executes an in-place operation that changes object. Keeping comment in for tracking purposes
     # vprint('model_predict input shape',Et.shape,'output shape',model_predict(np.reshape(Et,(1, hours, features))).shape)
