@@ -189,14 +189,14 @@ def mse(a, b):
 def mape(a, b):
     return ((a - b).__abs__()).mean()
     
-def mse_data(dat, hours = None, h2 = None):
+def mse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     if hours is None:
         hours = dat['hours']
     if h2 is None:
         h2 = dat['h2']
     
-    m = dat['m']
-    fm = dat['fm']
+    m = dat[simulation]
+    fm = dat[measurements]
     
     train = mse(m[:h2], fm[:h2])
     test = mse(m[h2:hours], fm[h2:hours])
