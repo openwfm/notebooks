@@ -171,7 +171,6 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
     plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
     plot_one(hmin,hmax,dat,'fm',linestyle='-',c='g',label='FMC truth')
-    plot_one(hmin,hmax,dat,'fm',linestyle=':',c='b',label='FMC observation')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FMC estimate')
     plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
     plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='rain intensity')
