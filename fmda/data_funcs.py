@@ -63,7 +63,8 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
 def check_data_array(dat,hours,a,s):
     if a in dat:
         ar = dat[a]
-        print("array %s %s length %i min %s max %s %s" % (a,s,len(ar),min(ar),max(ar),type(ar)))
+        print("array %s %s length %i min %s max %s hash %s %s" %
+              (a,s,len(ar),min(ar),max(ar),hash2(ar),type(ar)))
         if hours is not None:
             if len(ar) < hours:
                 print('len(%a) = %i does not equal to hours = %i' % (a,len(ar),hours))
@@ -83,6 +84,7 @@ def check_data(dat):
     check_data_scalar(dat,'note')
     check_data_scalar(dat,'hours')
     check_data_scalar(dat,'h2')
+    check_data_scalar(dat,'case')
     if 'hours' in dat:
         hours = dat['hours']
     else:
