@@ -81,7 +81,8 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
+def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False,
+                   timesteps=5):
     if hours is None:
         hours = dat['hours']
     if h2 is None:
@@ -114,7 +115,7 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
         datat = scalery.transform(datat)
         
     # split data
-    x_train, y_train = staircase(Et,datat,timesteps=5,trainsteps=h2,
+    x_train, y_train = staircase(Et,datat,timesteps=timesteps,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
     vprint('x_train shape=',x_train.shape)
     samples, timesteps, features = x_train.shape
