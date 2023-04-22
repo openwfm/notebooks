@@ -60,7 +60,10 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     
 # the following input or output dictionary with all model data and variables
 
+items = '_items_'     # dictionary key to keep list of items in
 def check_data_array(dat,hours,a,s):
+    if a in dat[items]:
+         dat[items].remove(a)
     if a in dat:
         ar = dat[a]
         print("array %s %s length %i min %s max %s hash %s %s" %
@@ -73,12 +76,15 @@ def check_data_array(dat,hours,a,s):
         print(a + ' not present')
         
 def check_data_scalar(dat,a):
+    if a in dat[items]:
+         dat[items].remove(a)
     if a in dat:
         print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
     else:
         print(a + ' not present' )
 
 def check_data(dat):
+    dat[items] = list(dat.keys())   # add list of items to the dictionary
     check_data_scalar(dat,'filename')
     check_data_scalar(dat,'title')
     check_data_scalar(dat,'note')
@@ -96,7 +102,17 @@ def check_data(dat):
     check_data_array(dat,hours,'rain','rain intensity (mm/h)')
     check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
     check_data_array(dat,hours,'m','fuel moisture estimate (%)')
-
+    if dat[items]:
+        print('additional items:',dat[items])
+        for a in dat[items].copy():
+            if dat[a] is None or np.isscalar(dat[a]):
+                check_data_scalar(dat,a)
+            elif isinstance(dat[a], np.ndarray):
+                check_data_array(dat,None,a,'unknown')
+            else:
+                print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
+        del dat[items] 
+        
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
     hours = days*24
