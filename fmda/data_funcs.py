@@ -181,8 +181,13 @@ def mse_data(dat, hours = None, h2 = None):
     
     m = dat['m']
     fm = dat['fm']
-    print('Training MSE:   ' + str(np.round(mse(m[:h2], fm[:h2]), 4)))
-    print('Prediction MSE: ' + str(np.round(mse(m[h2:hours], fm[h2:hours]), 4)))
+    
+    train = mse(m[:h2], fm[:h2])
+    test = mse(m[h2:hours], fm[h2:hours])
+    print('Training MSE:   ' + str(np.round(train, 4)))
+    print('Prediction MSE: ' + str(np.round(test, 4)))
+          
+    return train, test
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -216,12 +221,17 @@ def format_raws(stn, fixnames = True):
     # Add station id
     raws_dat['STID'] = stn['STID']
     
+    # Add lat/lon
+    raws_dat['LATITUDE'] = stn['LATITUDE']
+    raws_dat['LONGITUDE'] = stn['LONGITUDE']
+    
     # Simplify names 
     if fixnames:
         var_mapping = {
             'date_time': 'time', 'precip_accum': 'rain', 
             'fuel_moisture': 'fm', 'relative_humidity': 'rh',
-            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew', 'STID': 'STID'
+            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew', 'STID': 'STID',
+            'LONGITUDE': 'lon', 'LATITUDE': 'lat'
             }
         old_keys = [*raws_dat.keys()]
         old_keys = [k.replace("_set_1", "") for k in old_keys]
@@ -237,6 +247,29 @@ def format_raws(stn, fixnames = True):
         return raws_dat2
     
     else: return raws_dat
+
+def format_rtma(rtma):
+    td = np.array(rtma['td'])
+    t2 = np.array(rtma['temp'])
+    rain=np.array(rtma['precipa'])
+    # compute relative humidity
+    rh = 100*np.exp(17.625*243.04*(td - t2) / (243.04 + t2 - 273.15) / (243.0 + td - 273.15))
+    Ed = 0.924*rh**0.679 + 0.000499*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - t2)*(1 - np.exp(-0.115*rh))
+    Ew = 0.618*rh**0.753 + 0.000454*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - t2)*(1 - np.exp(-0.115*rh))
+
+    rtma_dict = {
+        'time': rtma['time_str'],
+        'rain': format_precip(rtma['precipa']),
+        'rh' : rh,
+        'temp' : t2,
+        'rh' : rh,
+        'Ed' : Ed,
+        'Ew' : Ew,
+        'lat' : rtma['obs_lat'], 
+        'lon' : rtma['obs_lon']
+    }
+    
+    return rtma_dict
 
 def format_precip(precipa):
     rain=np.array(precipa, dtype = 'float64')
