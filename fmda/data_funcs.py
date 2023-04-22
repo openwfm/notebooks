@@ -4,6 +4,7 @@
 import numpy as np, random
 from numpy.random import rand
 from MesoPy import Meso
+import tensorflow as tf
 
 import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
@@ -83,35 +84,43 @@ def check_data_scalar(dat,a):
     else:
         print(a + ' not present' )
 
-def check_data(dat):
+def check_data(dat,case=True,name=None):
     dat[items] = list(dat.keys())   # add list of items to the dictionary
-    check_data_scalar(dat,'filename')
-    check_data_scalar(dat,'title')
-    check_data_scalar(dat,'note')
-    check_data_scalar(dat,'hours')
-    check_data_scalar(dat,'h2')
-    check_data_scalar(dat,'case')
-    if 'hours' in dat:
-        hours = dat['hours']
-    else:
-        hours = None
-    check_data_array(dat,hours,'E','drying equilibrium (%)')
-    check_data_array(dat,hours,'Ed','drying equilibrium (%)')
-    check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
-    check_data_array(dat,hours,'Ec','equilibrium equilibrium (%)')
-    check_data_array(dat,hours,'rain','rain intensity (mm/h)')
-    check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
-    check_data_array(dat,hours,'m','fuel moisture estimate (%)')
+    if name is not None:
+        print(name)
+    if case:
+        check_data_scalar(dat,'filename')
+        check_data_scalar(dat,'title')
+        check_data_scalar(dat,'note')
+        check_data_scalar(dat,'hours')
+        check_data_scalar(dat,'h2')
+        check_data_scalar(dat,'case')
+        if 'hours' in dat:
+            hours = dat['hours']
+        else:
+            hours = None
+        check_data_array(dat,hours,'E','drying equilibrium (%)')
+        check_data_array(dat,hours,'Ed','drying equilibrium (%)')
+        check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
+        check_data_array(dat,hours,'Ec','equilibrium equilibrium (%)')
+        check_data_array(dat,hours,'rain','rain intensity (mm/h)')
+        check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
+        check_data_array(dat,hours,'m','fuel moisture estimate (%)')
     if dat[items]:
-        print('additional items:',dat[items])
+        print('items:',dat[items])
         for a in dat[items].copy():
+            ar=dat[a]
             if dat[a] is None or np.isscalar(dat[a]):
                 check_data_scalar(dat,a)
-            elif isinstance(dat[a], np.ndarray):
-                check_data_array(dat,None,a,'unknown')
+            elif isinstance(ar, np.ndarray):
+                print("array", a, "shape",ar.shape,"min",np.min(ar),
+                       "max",np.max(ar),"hash",hash2(ar),"type",type(ar))
+            elif isinstance(ar, tf.Tensor):
+                print("array", a, "shape",ar.shape,"min",np.min(ar),
+                       "max",np.max(ar),"type",type(ar))
             else:
                 print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
-        del dat[items] 
+        del dat[items] # clean up
         
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
