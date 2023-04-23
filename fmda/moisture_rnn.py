@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
-from utils import vprint
+from utils import vprint, hash2
 import reproducibility
 from data_funcs import check_data, mse_data, plot_data
-from utils import hash2
+import moisture_models as mod
 
 
 
@@ -243,15 +243,26 @@ def run_rnn(case_data,fit=True,verbose=False,title2=''):
     if case_data['case']=='case11' and fit:
         hv5 = 5.55077327554663e+19
         print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
-        assert(hv,hv5)
+        assert (hv == hv5)
     else:
         print('check - hash weights:',hv)
     
-    case_data['m'] = rnn_predict(model_predict, rnn_dat, rnn_dat['hours'], verbose = verbose)
+    case_data['m'] = rnn_predict(model_predict, rnn_dat,rnn_dat['hours'], verbose = verbose)
     mse_data(case_data)
     plot_data(case_data,title2=title2)
     plt.show()
     
     
 def run_case(case_data,verbose=False,title2=''):
-    
+    check_data(case_data)
+    hours=case_data['hours']
+    h2=case_data['h2']
+    plot_data(case_data,title2='case data on input')
+    m,Ec = mod.run_augmented_kf(case_data)  # extract from state
+    case_data['m']=m
+    case_data['Ec']=Ec
+    plot_data(case_data,title2='augmented KF')
+    mse_data(case_data)
+    del case_data['Ec']  # cleanup
+    run_rnn(case_data,fit=False,verbose=verbose,title2='with initial weights, no fit')
+    run_rnn(case_data,fit=True,title2='with trained RNN')
