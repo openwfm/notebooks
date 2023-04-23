@@ -1,6 +1,15 @@
 import numpy as np
 from functools import singledispatch
 import pandas as pd
+import numbers
+
+numeric_kinds = {'i', 'u', 'f', 'c'}
+
+def is_numeric_ndarray(array):
+    if isinstance(array, np.ndarray):
+        return array.dtype.kind in numeric_kinds
+    else:
+        return False
 
 def vprint(*args):
     import inspect

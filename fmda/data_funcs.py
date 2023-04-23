@@ -9,57 +9,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
 from datetime import datetime, timedelta
+from utils import  is_numeric_ndarray, hash2
+
 import json
-from utils import hash2
-
-def to_json(dic,filename):
-    print('writing ',filename)
-    check_data(dic)
-    new={}
-    for i in dic:
-        if type(dic[i]) is np.ndarray:
-            new[i]=dic[i].tolist()  # because numpy.ndarray is not serializable
-        else:
-            new[i]=dic[i]
-        # print('i',type(new[i]))
-    new['filename']=filename
-    print('Hash: ', hash2(new))
-    json.dump(new,open(filename,'w'),indent=4)
-
-def from_json(filename):
-    print('reading ',filename)
-    dic=json.load(open(filename,'r'))
-    new={}
-    for i in dic:
-        if type(dic[i]) is list:
-            new[i]=np.array(dic[i])  # because ndarray is not serializable
-        else:
-            new[i]=dic[i]
-    check_data(new)
-    print('Hash: ', hash2(new))
-    return new
-
-# Function to simulate moisture data and equilibrium for model testing
-def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
-    hours = days*24
-    h2 = int(hours/2)
-    hour = np.array(range(hours))
-    day = np.array(range(hours))/24.
-
-    # artificial equilibrium data
-    E = 100.0*np.power(np.sin(np.pi*day),4) # diurnal curve
-    E = 0.05+0.25*E
-    # FMC free run
-    m_f = np.zeros(hours)
-    m_f[0] = 0.1         # initial FMC
-    process_noise=0.
-    for t in range(hours-1):
-        m_f[t+1] = max(0.,model_decay(m_f[t],E[t])  + random.gauss(0,process_noise) )
-    data = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
-    E = E + DeltaE    
-    return E,m_f,data,hour,h2,DeltaE
-    
-# the following input or output dictionary with all model data and variables
 
 items = '_items_'     # dictionary key to keep list of items in
 def check_data_array(dat,hours,a,s):
@@ -112,7 +64,8 @@ def check_data(dat,case=True,name=None):
             ar=dat[a]
             if dat[a] is None or np.isscalar(dat[a]):
                 check_data_scalar(dat,a)
-            elif isinstance(ar, np.ndarray):
+            elif is_numeric_ndarray(ar):
+                print(type(ar))
                 print("array", a, "shape",ar.shape,"min",np.min(ar),
                        "max",np.max(ar),"hash",hash2(ar),"type",type(ar))
             elif isinstance(ar, tf.Tensor):
@@ -121,7 +74,57 @@ def check_data(dat,case=True,name=None):
             else:
                 print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
         del dat[items] # clean up
-        
+ 
+def to_json(dic,filename):
+    print('writing ',filename)
+    check_data(dic)
+    new={}
+    for i in dic:
+        if type(dic[i]) is np.ndarray:
+            new[i]=dic[i].tolist()  # because numpy.ndarray is not serializable
+        else:
+            new[i]=dic[i]
+        # print('i',type(new[i]))
+    new['filename']=filename
+    print('Hash: ', hash2(new))
+    json.dump(new,open(filename,'w'),indent=4)
+
+def from_json(filename):
+    print('reading ',filename)
+    dic=json.load(open(filename,'r'))
+    new={}
+    for i in dic:
+        if type(dic[i]) is list:
+            new[i]=np.array(dic[i])  # because ndarray is not serializable
+        else:
+            new[i]=dic[i]
+    check_data(new)
+    print('Hash: ', hash2(new))
+    return new
+
+# Function to simulate moisture data and equilibrium for model testing
+def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
+    hours = days*24
+    h2 = int(hours/2)
+    hour = np.array(range(hours))
+    day = np.array(range(hours))/24.
+
+    # artificial equilibrium data
+    E = 100.0*np.power(np.sin(np.pi*day),4) # diurnal curve
+    E = 0.05+0.25*E
+    # FMC free run
+    m_f = np.zeros(hours)
+    m_f[0] = 0.1         # initial FMC
+    process_noise=0.
+    for t in range(hours-1):
+        m_f[t+1] = max(0.,model_decay(m_f[t],E[t])  + random.gauss(0,process_noise) )
+    data = m_f + np.random.normal(loc=0,scale=data_noise,size=hours)
+    E = E + DeltaE    
+    return E,m_f,data,hour,h2,DeltaE
+    
+# the following input or output dictionary with all model data and variables
+
+       
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
     hours = days*24
