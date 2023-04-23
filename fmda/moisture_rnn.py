@@ -251,3 +251,7 @@ def run_rnn(case_data,fit=True,verbose=False,title2=''):
     mse_data(case_data)
     plot_data(case_data,title2=title2)
     plt.show()
+    
+    
+def run_case(case_data,verbose=False,title2=''):
+    
