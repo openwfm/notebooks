@@ -140,7 +140,8 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False,
     
     return rnn_dat
 
-def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, verbose = False):
+def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, 
+              verbose = False, fit=True, DeltaE=0.0):
     
     if hours is None:
         hours = rnn_dat['hours']
@@ -174,11 +175,8 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     y_train = rnn_dat['y_train']
 
     # print('model_fit input shape',x_train.shape,'output shape',model_fit(x_train).shape) 
-    model_fit(x_train) ## In-place operation to replace print statement above
+    model_fit(x_train) ## evalue the model once to set nonzero initial state
     
-    
-    # fitting
-    DeltaE = 0.0  
     w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.*DeltaE])]
     
     w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.0])]
@@ -192,7 +190,11 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
             else:
                 w[i][j]=w_initial[i][0]
     model_fit.set_weights(w)
-    model_fit.fit(x_train, y_train, epochs=5000,batch_size=samples, verbose=0)
+    
+    if fit:
+        model_fit.fit(x_train, y_train, epochs=5000,batch_size=samples, verbose=0)
+    else:
+        print('Fitting skipped, using initial weights')
 
     w_fitted=model_fit.get_weights()
     for i in range(len(w)):
