@@ -12,7 +12,8 @@ import keras.backend as K
 import tensorflow as tf
 from utils import vprint
 import reproducibility
-from data_funcs import check_data, hash2, mse_data
+from data_funcs import check_data, mse_data, plot_data
+from utils import hash2
 
 
 
@@ -224,7 +225,7 @@ def rnn_predict(model, rnn_dat, hours, scale = False, verbose = False):
     
     return m
 
-def run_rnn(case_data,fit=True,verbose=False):
+def run_rnn(case_data,fit=True,verbose=False,title2=''):
     reproducibility.set_seed() # Set seed for reproducibility
     rnn_dat = create_rnn_data(case_data,scale=False, verbose=verbose)
     check_data(rnn_dat,case=0,name='rnn_dat')
@@ -248,3 +249,5 @@ def run_rnn(case_data,fit=True,verbose=False):
     
     case_data['m'] = rnn_predict(model_predict, rnn_dat, rnn_dat['hours'], verbose = verbose)
     mse_data(case_data)
+    plot_data(case_data,title2=title2)
+    plt.show()
