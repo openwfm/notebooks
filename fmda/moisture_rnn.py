@@ -238,6 +238,13 @@ def run_rnn(case_data,fit=True,verbose=False):
         verbose = verbose,
         fit=fit
     )
-    print('check - hash weights:',hash2(model_predict.get_weights()))
+    hv = hash2(model_predict.get_weights())
+    if case_data['case']=='case11' and fit:
+        hv5 = 5.55077327554663e+19
+        print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
+        assert(hv,hv5)
+    else:
+        print('check - hash weights:',hv)
+    
     case_data['m'] = rnn_predict(model_predict, rnn_dat, rnn_dat['hours'], verbose = verbose)
     mse_data(case_data)
