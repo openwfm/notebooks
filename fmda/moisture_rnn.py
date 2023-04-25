@@ -180,9 +180,9 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     # print('model_fit input shape',x_train.shape,'output shape',model_fit(x_train).shape) 
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
-    w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.*DeltaE])]
+    w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]), np.array([[1.0]]), np.array([-1.*DeltaE])]
     
-    w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.0])]
+    w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]), np.array([[1.0]]), np.array([-1.0])]
     w=model_fit.get_weights()
     for i in range(len(w)):
         vprint('weight',i,'shape',w[i].shape,'ndim',w[i].ndim,'given',w_initial[i].shape)
