@@ -178,10 +178,10 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
     w_initial=np.array([1.-np.exp(-0.1), np.exp(-0.1), 0., 1.0, -1.0])
+    w_name = ['wx','wh','bh','wd','bd']
                         
     w=model_fit.get_weights()
     for i in range(len(w)):
-        print('weight',i,'shape',w[i].shape,'ndim',w[i].ndim,'given',w_initial[i].shape)
         for j in range(w[i].shape[0]):
             if w[i].ndim==2:
                 # initialize all entries of the weight matrix to the same number
@@ -192,18 +192,19 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
             else:
                 print('weight',i,'shape',w[i].shape)
                 raise ValueError("Only 1 or 2 dimensions supported")
-
+        print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,'initial: sum',np.sum(w[i],axis=0),'\nentries',w[i])
     model_fit.set_weights(w)
     
     if fit:
         model_fit.fit(x_train, y_train, epochs=5000,batch_size=samples, verbose=0)
+        w_fitted=model_fit.get_weights()
+        for i in range(len(w_fitted)):
+            print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
     else:
         print('Fitting skipped, using initial weights')
-
-    w_fitted=model_fit.get_weights()
-    for i in range(len(w)):
-        vprint('intial weight',i,w_initial[i],' fitted:',w_fitted[i])
-    
+        w_fitted=w
+        
     model_predict.set_weights(w_fitted)
     
     return model_predict
