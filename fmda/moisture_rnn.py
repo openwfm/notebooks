@@ -169,29 +169,30 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
                             return_sequences=True,
                             activation=activation,dense_layers=dense_layers,
                               verbose = verbose)
-
-    ## Note: this line executes an in-place operation that changes object. Keeping comment in for tracking purposes
-    # vprint('model_predict input shape',Et.shape,'output shape',model_predict(np.reshape(Et,(1, hours, features))).shape)
+    
     if verbose: print(model_predict.summary())
     
     x_train = rnn_dat['x_train']
     y_train = rnn_dat['y_train']
 
-    # print('model_fit input shape',x_train.shape,'output shape',model_fit(x_train).shape) 
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
-    w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]), np.array([[1.0]]), np.array([-1.*DeltaE])]
-    
-    w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]), np.array([[1.0]]), np.array([-1.0])]
+    w_initial=np.array([1.-np.exp(-0.1), np.exp(-0.1), 0., 1.0, -1.0])
+                        
     w=model_fit.get_weights()
     for i in range(len(w)):
-        vprint('weight',i,'shape',w[i].shape,'ndim',w[i].ndim,'given',w_initial[i].shape)
+        print('weight',i,'shape',w[i].shape,'ndim',w[i].ndim,'given',w_initial[i].shape)
         for j in range(w[i].shape[0]):
             if w[i].ndim==2:
+                # initialize all entries of the weight matrix to the same number
                 for k in range(w[i].shape[1]):
-                    w[i][j][k]=w_initial[i][0][0]/w[i].shape[0]
+                    w[i][j][k]=w_initial[i]/w[i].shape[0]
+            elif w[i].ndim==1:
+                w[i][j]=w_initial[i]
             else:
-                w[i][j]=w_initial[i][0]
+                print('weight',i,'shape',w[i].shape)
+                raise ValueError("Only 1 or 2 dimensions supported")
+
     model_fit.set_weights(w)
     
     if fit:
@@ -201,7 +202,7 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
 
     w_fitted=model_fit.get_weights()
     for i in range(len(w)):
-        vprint('weight',i,' exact:',w_exact[i],':  initial:',w_initial[i],' fitted:',w_fitted[i])
+        vprint('intial weight',i,w_initial[i],' fitted:',w_fitted[i])
     
     model_predict.set_weights(w_fitted)
     
