@@ -193,8 +193,9 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     # -1.0 makes no sense but leaving for check 5 in run run_case. Final RMSE is about the same.   
     w0_initial={'Ed':(1.-np.exp(-0.1))/2, 
                 'Ew':(1.-np.exp(-0.1))/2,
-                'rain':5*rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # 
-    w_initial=np.array([np.nan,np.exp(-0.1), 0., 1.0, -1.0])
+                'rain':5*rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - nput feature
+                                 #  wh      wb   wd    bd = bias -1
+    w_initial=np.array([np.nan,np.exp(-0.1), 0., 1.0, -1.0/rnn_dat['scale_fm']]) 
     
     w_name = ['wx','wh','bh','wd','bd']
                         
