@@ -84,7 +84,7 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False,
+def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
                    timesteps=5):
     if hours is None:
         hours = dat['hours']
@@ -100,6 +100,19 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False,
     
     # Average Equilibrium
     # E = (Ed + Ew)/2         # why?
+
+    # Scale Data if required
+    if scale:
+        print('scaling to range 0 to',scale)
+        scale_fm=max(max(Ew),max(Ed),max(fm))/scale
+        scale_rain=max(max(rain),0.01)/scale
+        Ed = Ed/scale_fm
+        Ew = Ew/scale_fm
+        fm = fm/scale_fm
+        rain = rain/scale_rain
+    else:
+        scale_fm=1.0
+        scale_rain=1.0
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
     # Et = np.reshape(E,[E.shape[0],1])
@@ -107,16 +120,6 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False,
     
     datat = np.reshape(fm,[fm.shape[0],1])
     
-    # Scale Data if required
-    scale=False
-    if scale:
-        scalerx = MinMaxScaler()
-        scalerx.fit(Et)
-        Et = scalerx.transform(Et)
-        scalery = MinMaxScaler()
-        scalery.fit(datat)
-        datat = scalery.transform(datat)
-        
     # split data
     x_train, y_train = staircase(Et,datat,timesteps=timesteps,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
@@ -138,7 +141,10 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False,
         'features': features,
         'h0': h0,
         'hours':hours,
-        'h2':h2
+        'h2':h2,
+        'scale':scale,
+        'scale_fm':scale_fm,
+        'scale_rain':scale_rain
     }
     
     return rnn_dat
@@ -179,6 +185,7 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     
     # -1.0 makes no sense but leaving for check 5 in run run_case. Final RMSE is about the same.   
     w_initial=np.array([1.-np.exp(-0.1), np.exp(-0.1), 0., 1.0, -1.0])
+    #w_initial=np.array([1.-np.exp(-0.1), np.exp(-0.1), 0., 1.0, 0.0])
     w_name = ['wx','wh','bh','wd','bd']
                         
     w=model_fit.get_weights()
@@ -211,7 +218,7 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     return model_predict
 
 
-def rnn_predict(model, rnn_dat, hours, scale = False, verbose = False):
+def rnn_predict(model, rnn_dat, hours, verbose = False):
     features = rnn_dat['features']
     # model.set_weights(w_fitted)
     x_input=np.reshape(rnn_dat['Et'],(1, hours, features))
@@ -221,16 +228,15 @@ def rnn_predict(model, rnn_dat, hours, scale = False, verbose = False):
     
     m = np.reshape(y_output,hours)
     # print('weights=',w)
-    if scale:
+    if rnn_dat['scale']:
         vprint('scaling')
-        m = scalery.inverse_transform(m)
+        m = m*rnn_dat['scale_fm']
     m = np.reshape(m,hours)
-    
     return m
 
-def run_rnn(case_data,fit=True,verbose=False,title2=''):
+def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0):
     reproducibility.set_seed() # Set seed for reproducibility
-    rnn_dat = create_rnn_data(case_data,scale=False, verbose=verbose)
+    rnn_dat = create_rnn_data(case_data,scale=scale, verbose=verbose)
     check_data(rnn_dat,case=0,name='rnn_dat')
     model_predict = train_rnn(
         rnn_dat,
@@ -256,7 +262,7 @@ def run_rnn(case_data,fit=True,verbose=False,title2=''):
     plt.show()
     
     
-def run_case(case_data,verbose=False,title2=''):
+def run_case(case_data,verbose=False,title2='',scale=0):
     check_data(case_data)
     hours=case_data['hours']
     h2=case_data['h2']
@@ -267,5 +273,5 @@ def run_case(case_data,verbose=False,title2=''):
     plot_data(case_data,title2='augmented KF')
     mse_data(case_data)
     del case_data['Ec']  # cleanup
-    run_rnn(case_data,fit=False,verbose=verbose,title2='with initial weights, no fit')
-    run_rnn(case_data,fit=True,title2='with trained RNN')
+    run_rnn(case_data,fit=False,verbose=verbose,title2='with initial weights, no fit',scale=scale)
+    run_rnn(case_data,fit=True,title2='with trained RNN',scale=scale)
