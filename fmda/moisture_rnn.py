@@ -249,9 +249,9 @@ def rnn_predict(model, rnn_dat, hours, verbose = False):
     m = np.reshape(m,hours)
     return m
 
-def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0):
+def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0,rain_do=False):
     reproducibility.set_seed() # Set seed for reproducibility
-    rnn_dat = create_rnn_data(case_data,scale=scale, verbose=verbose)
+    rnn_dat = create_rnn_data(case_data,scale=scale, verbose=verbose,rain_do=rain_do)
     check_data(rnn_dat,case=0,name='rnn_dat')
     model_predict = train_rnn(
         rnn_dat,
@@ -277,7 +277,7 @@ def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0):
     plt.show()
     
     
-def run_case(case_data,verbose=False,title2='',scale=0):
+def run_case(case_data,verbose=False,title2='',scale=0,rain_do=False):
     check_data(case_data)
     hours=case_data['hours']
     h2=case_data['h2']
@@ -288,5 +288,5 @@ def run_case(case_data,verbose=False,title2='',scale=0):
     plot_data(case_data,title2='augmented KF')
     mse_data(case_data)
     del case_data['Ec']  # cleanup
-    run_rnn(case_data,fit=False,verbose=verbose,title2='with initial weights, no fit',scale=scale)
-    run_rnn(case_data,fit=True,title2='with trained RNN',scale=scale)
+    run_rnn(case_data,fit=False,verbose=verbose,title2='with initial weights, no fit',scale=scale,rain_do=rain_do)
+    run_rnn(case_data,fit=True,title2='with trained RNN',scale=scale,rain_do=rain_do)
