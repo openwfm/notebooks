@@ -85,7 +85,7 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     return model
 
 def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
-                   timesteps=5):
+                   timesteps=5, rain_do = False):
     if hours is None:
         hours = dat['hours']
     if h2 is None:
@@ -116,8 +116,13 @@ def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
     # Et = np.reshape(E,[E.shape[0],1])
-    Et = np.vstack((Ed, Ew)).T
     
+    if rain_do:
+        Et = np.vstack((Ed, Ew, rain)).T
+        features_list = ['Ed', 'Ew', 'rain']
+    else:
+        Et = np.vstack((Ed, Ew)).T        
+        features_list = ['Ed', 'Ew']
     datat = np.reshape(fm,[fm.shape[0],1])
     
     # split data
@@ -144,7 +149,9 @@ def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
         'h2':h2,
         'scale':scale,
         'scale_fm':scale_fm,
-        'scale_rain':scale_rain
+        'scale_rain':scale_rain,
+        'rain_do':rain_do,
+        'features_list':features_list
     }
     
     return rnn_dat
@@ -184,13 +191,20 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
     # -1.0 makes no sense but leaving for check 5 in run run_case. Final RMSE is about the same.   
-    w_initial=np.array([1.-np.exp(-0.1), np.exp(-0.1), 0., 1.0, -1.0])
-    #w_initial=np.array([1.-np.exp(-0.1), np.exp(-0.1), 0., 1.0, 0.0])
+    w0_initial={'Ed':(1.-np.exp(-0.1))/2, 
+                'Ew':(1.-np.exp(-0.1))/2,
+                'rain':5*rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # 
+    w_initial=np.array([np.nan,np.exp(-0.1), 0., 1.0, -1.0])
+    
     w_name = ['wx','wh','bh','wd','bd']
                         
     w=model_fit.get_weights()
-    for i in range(len(w)):
-        for j in range(w[i].shape[0]):
+    for j in range(w[0].shape[0]):
+            feature = rnn_dat['features_list'][j]
+            for k in range(w[0].shape[1]):
+                    w[0][j][k]=w0_initial[feature]
+    for i in range(1,len(w)):            # number of the weight
+        for j in range(w[i].shape[0]):   # number of the inputs
             if w[i].ndim==2:
                 # initialize all entries of the weight matrix to the same number
                 for k in range(w[i].shape[1]):
