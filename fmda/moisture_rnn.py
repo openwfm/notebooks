@@ -12,7 +12,7 @@ import keras.backend as K
 import tensorflow as tf
 from utils import vprint, hash2
 import reproducibility
-from data_funcs import check_data, mse_data, plot_data
+from data_funcs import check_data, rmse_data, plot_data
 import moisture_models as mod
 
 
@@ -272,7 +272,7 @@ def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0,rain_do=False):
         print('check - hash weights:',hv)
     
     case_data['m'] = rnn_predict(model_predict, rnn_dat,rnn_dat['hours'], verbose = verbose)
-    mse_data(case_data)
+    rmse_data(case_data)
     plot_data(case_data,title2=title2)
     plt.show()
     
@@ -286,7 +286,7 @@ def run_case(case_data,verbose=False,title2='',scale=0,rain_do=False):
     case_data['m']=m
     case_data['Ec']=Ec
     plot_data(case_data,title2='augmented KF')
-    mse_data(case_data)
+    rmse_data(case_data)
     del case_data['Ec']  # cleanup
     run_rnn(case_data,fit=False,verbose=verbose,title2='with initial weights, no fit',scale=scale,rain_do=rain_do)
     run_rnn(case_data,fit=True,title2='with trained RNN',scale=scale,rain_do=rain_do)

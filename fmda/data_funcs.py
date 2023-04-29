@@ -183,7 +183,8 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
         t=dat['title']
         # print('title',type(t),t)
     if title2 is not None:
-        t = t + ' ' + title2
+        t = t + ' ' + title2 
+    t = t + ' ' + rmse_data_str(dat)
     plt.title(t)
     plt.xlabel('Time (hours)')
     if 'rain' in dat:
@@ -193,14 +194,32 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plt.legend()
     
 # Calculate mean squared error
-def mse(a, b):
-    return ((a - b)**2).mean()
+def rmse(a, b):
+    return np.sqrt(((a - b)**2).mean())
+
+def rmse_skip_nan(x, y):
+    mask = ~np.isnan(x) & ~np.isnan(y)
+    if np.count_nonzero(mask):
+        return np.sqrt(np.mean((x[mask] - y[mask]) ** 2))
+    else:
+        return np.nan
+    
+def rmse_str(a,b):
+    rmse = rmse_skip_nan(a,b)
+    return "RMSE " + "{:.2f}".format(rmse)
+
+def rmse_data_str(data):
+    if 'm' in data and 'fm' in data:
+        return rmse_str(data['m'],data['fm'])
+    else:
+        return ''
+                    
     
 # Calculate mean absolute error
 def mape(a, b):
     return ((a - b).__abs__()).mean()
     
-def mse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
+def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     if hours is None:
         hours = dat['hours']
     if h2 is None:
@@ -209,10 +228,10 @@ def mse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     m = dat[simulation]
     fm = dat[measurements]
     
-    train = mse(m[:h2], fm[:h2])
-    test = mse(m[h2:hours], fm[h2:hours])
-    print('Training MSE:   ' + str(np.round(train, 4)))
-    print('Prediction MSE: ' + str(np.round(test, 4)))
+    train =rmse(m[:h2], fm[:h2])
+    test = rmse(m[h2:hours], fm[h2:hours])
+    print('Training RMSE:   ' + str(np.round(train, 4)))
+    print('Prediction RMSE: ' + str(np.round(test, 4)))
           
     return train, test
 
