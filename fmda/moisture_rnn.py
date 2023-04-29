@@ -84,8 +84,12 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
-                   timesteps=5, rain_do = False):
+def create_rnn_data(dat, params, hours=None, h2=None):
+    timesteps = params['timesteps']
+    scale = params['scale']
+    rain_do = params['rain_do']
+    verbose = params['verbose']
+    
     if hours is None:
         hours = dat['hours']
     if h2 is None:
@@ -113,6 +117,8 @@ def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
     else:
         scale_fm=1.0
         scale_rain=1.0
+        
+    print('scale_fm=',scale_fm,'scale_rain=',scale_rain)
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
     # Et = np.reshape(E,[E.shape[0],1])
@@ -156,8 +162,9 @@ def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
     
     return rnn_dat
 
-def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, 
-              verbose = False, fit=True, DeltaE=[0,-1]):
+def train_rnn(rnn_dat, params,hours, fit=True):
+
+    verbose = params['verbose']
     
     if hours is None:
         hours = rnn_dat['hours']
@@ -166,22 +173,24 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     features = rnn_dat['features']
     timesteps = rnn_dat['timesteps']
     
-    model_fit=create_RNN_2(hidden_units=hidden_units, 
-                        dense_units=dense_units, 
+    model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'], 
                         batch_shape=(samples,timesteps,features),
                         stateful=True,
                         return_sequences=False,
                         # initial_state=h0,
-                        activation=activation,
-                        dense_layers=dense_layers,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
                         verbose = verbose)
     
     Et = rnn_dat['Et']
-    model_predict=create_RNN_2(hidden_units=hidden_units, dense_units=dense_units,  
-                            input_shape=(hours,features),stateful = False,
-                            return_sequences=True,
-                            activation=activation,dense_layers=dense_layers,
-                              verbose = verbose)
+    model_predict=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'],  
+                        input_shape=(hours,features),stateful = False,
+                        return_sequences=True,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
+                        verbose = verbose)
     
     if verbose: print(model_predict.summary())
     
@@ -190,10 +199,13 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
 
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
+    DeltaE = params['DeltaE']
+    T1 = params['T1']
+    fmr = params['fmr']
     # -1.0 makes no sense but leaving for check 5 in run run_case. Final RMSE is about the same.   
-    w0_initial={'Ed':(1.-np.exp(-0.1))/2, 
-                'Ew':(1.-np.exp(-0.1))/2,
-                'rain':5*rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - input feature
+    w0_initial={'Ed':(1.-np.exp(-T1))/2, 
+                'Ew':(1.-np.exp(-T1))/2,
+                'rain':fmr * rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - input feature
                                  #  wh      wb   wd    bd = bias -1
     
     w_initial=np.array([np.nan,np.exp(-0.1), DeltaE[0]/rnn_dat['scale_fm'], 1.0, DeltaE[1]/rnn_dat['scale_fm']])
@@ -252,18 +264,16 @@ def rnn_predict(model, rnn_dat, hours, verbose = False):
     m = np.reshape(m,hours)
     return m
 
-def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0,rain_do=False):
+def run_rnn(case_data,params,fit=True,title2=''):
+    verbose = params['verbose']
+    
     reproducibility.set_seed() # Set seed for reproducibility
-    rnn_dat = create_rnn_data(case_data,scale=scale, verbose=verbose,rain_do=rain_do)
+    rnn_dat = create_rnn_data(case_data,params)
     check_data(rnn_dat,case=0,name='rnn_dat')
     model_predict = train_rnn(
         rnn_dat,
+        params,
         rnn_dat['hours'],
-        activation=['linear','linear'],
-        hidden_units=6,
-        dense_units=1,
-        dense_layers=1,
-        verbose = verbose,
         fit=fit
     )
     
@@ -285,7 +295,7 @@ def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0,rain_do=False):
     plt.show()
     
     
-def run_case(case_data,verbose=False,title2='',scale=0,rain_do=False):
+def run_case(case_data,params):
     check_data(case_data)
     hours=case_data['hours']
     h2=case_data['h2']
@@ -296,5 +306,5 @@ def run_case(case_data,verbose=False,title2='',scale=0,rain_do=False):
     plot_data(case_data,title2='augmented KF')
     rmse_data(case_data)
     del case_data['Ec']  # cleanup
-    run_rnn(case_data,fit=False,verbose=verbose,title2='with initial weights, no fit',scale=scale,rain_do=rain_do)
-    run_rnn(case_data,fit=True,title2='with trained RNN',scale=scale,rain_do=rain_do)
+    run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')
+    run_rnn(case_data,params,fit=True,title2='with trained RNN')
