@@ -199,6 +199,26 @@ def train_rnn(rnn_dat, params,hours, fit=True):
 
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
+    w, w_name=get_initial_weights(model_fit, params, rnn_dat)
+    
+    model_fit.set_weights(w)
+    
+    if fit:
+        model_fit.fit(x_train, y_train, epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
+        w_fitted=model_fit.get_weights()
+        for i in range(len(w_fitted)):
+            print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
+    else:
+        print('Fitting skipped, using initial weights')
+        w_fitted=w
+        
+    model_predict.set_weights(w_fitted)
+    
+    return model_predict
+
+def get_initial_weights(model_fit,params,rnn_dat):
+    
     DeltaE = params['DeltaE']
     T1 = params['T1']
     fmr = params['fmr']
@@ -231,22 +251,8 @@ def train_rnn(rnn_dat, params,hours, fit=True):
                 print('weight',i,'shape',w[i].shape)
                 raise ValueError("Only 1 or 2 dimensions supported")
         print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,'initial: sum',np.sum(w[i],axis=0),'\nentries',w[i])
-    model_fit.set_weights(w)
     
-    if fit:
-        model_fit.fit(x_train, y_train, epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
-        w_fitted=model_fit.get_weights()
-        for i in range(len(w_fitted)):
-            print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
-                  'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
-    else:
-        print('Fitting skipped, using initial weights')
-        w_fitted=w
-        
-    model_predict.set_weights(w_fitted)
-    
-    return model_predict
-
+    return w, w_name
 
 def rnn_predict(model, rnn_dat, hours, verbose = False):
     features = rnn_dat['features']
