@@ -266,6 +266,10 @@ def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0,rain_do=False):
         verbose = verbose,
         fit=fit
     )
+    
+    case_data['m'] = rnn_predict(model_predict, rnn_dat,rnn_dat['hours'], verbose = verbose)
+    rmse_data(case_data)
+
     hv = hash2(model_predict.get_weights())
     if case_data['case']=='case11' and fit:
         hv5 = 5.55077327554663e+19
@@ -274,8 +278,6 @@ def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0,rain_do=False):
     else:
         print('check - hash weights:',hv)
     
-    case_data['m'] = rnn_predict(model_predict, rnn_dat,rnn_dat['hours'], verbose = verbose)
-    rmse_data(case_data)
     plot_data(case_data,title2=title2)
     plt.show()
     
