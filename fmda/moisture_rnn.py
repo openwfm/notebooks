@@ -275,6 +275,9 @@ def run_rnn(case_data,fit=True,verbose=False,title2='',scale=0,rain_do=False):
         hv5 = 5.55077327554663e+19
         print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
         # assert (hv == hv5)
+        checkm = case_data['m'][350]
+        mv = 3.77920889854431152
+        print('checkm=',format(checkm, '.17f'),' error',checkm-mv)
     else:
         print('check - hash weights:',hv)
     
