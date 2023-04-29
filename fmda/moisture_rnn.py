@@ -157,7 +157,7 @@ def create_rnn_data(dat, hours=None, h2=None, scale = 0, verbose = False,
     return rnn_dat
 
 def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, 
-              verbose = False, fit=True, DeltaE=0.0):
+              verbose = False, fit=True, DeltaE=[0,-1]):
     
     if hours is None:
         hours = rnn_dat['hours']
@@ -193,9 +193,12 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     # -1.0 makes no sense but leaving for check 5 in run run_case. Final RMSE is about the same.   
     w0_initial={'Ed':(1.-np.exp(-0.1))/2, 
                 'Ew':(1.-np.exp(-0.1))/2,
-                'rain':5*rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - nput feature
+                'rain':5*rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - input feature
                                  #  wh      wb   wd    bd = bias -1
-    w_initial=np.array([np.nan,np.exp(-0.1), 0., 1.0, -1.0/rnn_dat['scale_fm']]) 
+    
+    w_initial=np.array([np.nan,np.exp(-0.1), DeltaE[0]/rnn_dat['scale_fm'], 1.0, DeltaE[1]/rnn_dat['scale_fm']])
+    
+    print('Equilibrium moisture correction bias',DeltaE[0],'in the hidden layer and',DeltaE[1],' in the output layer')
     
     w_name = ['wx','wh','bh','wd','bd']
                         
