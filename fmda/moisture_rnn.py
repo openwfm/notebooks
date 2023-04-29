@@ -172,6 +172,7 @@ def train_rnn(rnn_dat, params,hours, fit=True):
     samples = rnn_dat['samples']
     features = rnn_dat['features']
     timesteps = rnn_dat['timesteps']
+    centering = params['centering']
     
     model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
                         dense_units=params['dense_units'], 
@@ -204,7 +205,7 @@ def train_rnn(rnn_dat, params,hours, fit=True):
     model_fit.set_weights(w)
     
     if fit:
-        model_fit.fit(x_train, y_train, epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
+        model_fit.fit(x_train, y_train + centering[1] , epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
         w_fitted=model_fit.get_weights()
         for i in range(len(w_fitted)):
             print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
@@ -222,13 +223,15 @@ def get_initial_weights(model_fit,params,rnn_dat):
     DeltaE = params['DeltaE']
     T1 = params['T1']
     fmr = params['fmr']
-    # -1.0 makes no sense but leaving for check 5 in run run_case. Final RMSE is about the same.   
+    centering = params['centering']  # shift activation down
+    
     w0_initial={'Ed':(1.-np.exp(-T1))/2, 
                 'Ew':(1.-np.exp(-T1))/2,
                 'rain':fmr * rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - input feature
                                  #  wh      wb   wd    bd = bias -1
     
-    w_initial=np.array([np.nan,np.exp(-0.1), DeltaE[0]/rnn_dat['scale_fm'], 1.0, DeltaE[1]/rnn_dat['scale_fm']])
+    w_initial=np.array([np.nan, np.exp(-0.1), DeltaE[0]/rnn_dat['scale_fm'], # layer 0
+                        1.0, -centering[0] + DeltaE[1]/rnn_dat['scale_fm']])                 # layer 1
     
     print('Equilibrium moisture correction bias',DeltaE[0],'in the hidden layer and',DeltaE[1],' in the output layer')
     
@@ -254,11 +257,15 @@ def get_initial_weights(model_fit,params,rnn_dat):
     
     return w, w_name
 
-def rnn_predict(model, rnn_dat, hours, verbose = False):
+def rnn_predict(model, params, rnn_dat):
+    verbose = params['verbose']
+    centering = params['centering']
     features = rnn_dat['features']
+    hours = rnn_dat['hours']
+    
     # model.set_weights(w_fitted)
     x_input=np.reshape(rnn_dat['Et'],(1, hours, features))
-    y_output = model.predict(x_input, verbose = verbose)
+    y_output = model.predict(x_input, verbose = verbose) - centering[1]
     
     vprint('x_input.shape=',x_input.shape,'y_output.shape=',y_output.shape)
     
@@ -283,7 +290,7 @@ def run_rnn(case_data,params,fit=True,title2=''):
         fit=fit
     )
     
-    case_data['m'] = rnn_predict(model_predict, rnn_dat,rnn_dat['hours'], verbose = verbose)
+    case_data['m'] = rnn_predict(model_predict, params, rnn_dat)
     rmse_data(case_data)
 
     hv = hash2(model_predict.get_weights())

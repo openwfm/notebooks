@@ -5,6 +5,7 @@ import numpy as np, random
 from numpy.random import rand
 from MesoPy import Meso
 import tensorflow as tf
+import pickle, os
 
 import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
@@ -375,3 +376,19 @@ def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
     return raws_dat
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def load_and_fix_data(filename,params):
+    with open(filename, 'rb') as handle:
+        test_dict = pickle.load(handle)
+        if params['cases']=='all':
+            params['cases'] = test_dict.keys()
+        for case in test_dict:
+            case_data = test_dict[case]
+            case_data['case'] = case
+            case_data['filename'] = filename
+            for key in case_data.keys():
+                var = case_data[key]
+                if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
+                    nans = np.sum(np.isnan(var))
+                    if nans:
+                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values')
+    return test_dict
