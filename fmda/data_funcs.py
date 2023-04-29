@@ -227,11 +227,12 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     
     m = dat[simulation]
     fm = dat[measurements]
+    case = dat['case']
     
     train =rmse(m[:h2], fm[:h2])
     test = rmse(m[h2:hours], fm[h2:hours])
-    print('Training RMSE:   ' + str(np.round(train, 4)))
-    print('Prediction RMSE: ' + str(np.round(test, 4)))
+    print(case,'Training 1 to',h2,'hours RMSE:   ' + str(np.round(train, 4)))
+    print(case,'Prediction',h2+1,'to',hours,'hours RMSE: ' + str(np.round(test, 4)))
           
     return train, test
 

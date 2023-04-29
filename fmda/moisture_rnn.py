@@ -234,7 +234,7 @@ def train_rnn(rnn_dat, params,hours, fit=True):
     model_fit.set_weights(w)
     
     if fit:
-        model_fit.fit(x_train, y_train, epochs=5000,batch_size=samples, verbose=0)
+        model_fit.fit(x_train, y_train, epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
         w_fitted=model_fit.get_weights()
         for i in range(len(w_fitted)):
             print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
@@ -296,8 +296,12 @@ def run_rnn(case_data,params,fit=True,title2=''):
     
     
 def run_case(case_data,params):
+    print('\n***** ',case_data['case'],' *****\n')
+    case_data['rain'][np.isnan(case_data['rain'])] = 0
     check_data(case_data)
     hours=case_data['hours']
+    if 'train_frac' in params:
+        case_data['h2'] = round(hours * params['train_frac'])
     h2=case_data['h2']
     plot_data(case_data,title2='case data on input')
     m,Ec = mod.run_augmented_kf(case_data)  # extract from state
