@@ -231,11 +231,12 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     case = dat['case']
     
     train =rmse(m[:h2], fm[:h2])
-    test = rmse(m[h2:hours], fm[h2:hours])
+    predict = rmse(m[h2:hours], fm[h2:hours])
+    all = rmse(m[:hours], fm[:hours])
     print(case,'Training 1 to',h2,'hours RMSE:   ' + str(np.round(train, 4)))
-    print(case,'Prediction',h2+1,'to',hours,'hours RMSE: ' + str(np.round(test, 4)))
-          
-    return train, test
+    print(case,'Prediction',h2+1,'to',hours,'hours RMSE: ' + str(np.round(predict, 4)))
+    
+    return {'train':train, 'predict':predict, 'all':all}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -389,18 +390,14 @@ def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
     return raws_dat
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def load_and_fix_data(filename,params):
+def load_and_fix_data(filename):
     with open(filename, 'rb') as handle:
         test_dict = pickle.load(handle)
-        if params['cases']=='all':
-            params['cases'] = test_dict.keys()
-            print("Changing params['cases'] =",params['cases']),
         for case in test_dict:
-            case_data = test_dict[case]
-            case_data['case'] = case
-            case_data['filename'] = filename
-            for key in case_data.keys():
-                var = case_data[key]    # pointer to test_dict[case][key]
+            test_dict[case]['case'] = case
+            test_dict[case]['filename'] = filename
+            for key in test_dict[case].keys():
+                var = test_dict[case][key]    # pointer to test_dict[case][key]
                 if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
                     nans = np.sum(np.isnan(var))
                     if nans:

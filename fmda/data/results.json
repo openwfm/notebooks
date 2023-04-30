@@ -1,0 +1,452 @@
+{
+    "0": {
+        "cases": {
+            "case11": {
+                "Augmented KF": {
+                    "all": 0.9061249439407393,
+                    "predict": 1.0984268618847821,
+                    "train": 0.33047073142627476
+                },
+                "RNN initial": {
+                    "all": 1.4983486205665615,
+                    "predict": 1.58343693275214,
+                    "train": 1.3269545567623797
+                },
+                "RNN trained": {
+                    "all": 0.7571179715782734,
+                    "predict": 0.732981018480678,
+                    "train": 0.7997785106981811
+                }
+            }
+        },
+        "params": {
+            "DeltaE": [
+                0,
+                -1
+            ],
+            "T1": 0.1,
+            "activation": [
+                "linear",
+                "linear"
+            ],
+            "cases": [
+                "case11"
+            ],
+            "centering": [
+                0.0,
+                0.0
+            ],
+            "dense_layers": 1,
+            "dense_units": 1,
+            "epochs": 5000,
+            "fm_raise_vs_rain": 2.0,
+            "hidden_units": 6,
+            "id": 0,
+            "note": "check 5 should give zero error",
+            "purpose": "reproducibility",
+            "rain_do": false,
+            "scale": 0,
+            "synthetic": false,
+            "timesteps": 5,
+            "verbose": false,
+            "verbose_fit": false,
+            "verbose_weights": false
+        }
+    },
+    "1": {
+        "cases": {
+            "case10": {
+                "Augmented KF": {
+                    "all": 1.124729422409734,
+                    "predict": 1.4170835271066387,
+                    "train": 0.72243119012905
+                },
+                "RNN initial": {
+                    "all": 30.83903197167338,
+                    "predict": 2.894544324191159,
+                    "train": 43.5168174279218
+                },
+                "RNN trained": {
+                    "all": 2.9025350397988077,
+                    "predict": 3.666477240304604,
+                    "train": 1.845633755881179
+                }
+            },
+            "case11": {
+                "Augmented KF": {
+                    "all": 0.9381104126731539,
+                    "predict": 1.2955200737612529,
+                    "train": 0.28588464669028313
+                },
+                "RNN initial": {
+                    "all": 1.4983481199770357,
+                    "predict": 1.3489755877288487,
+                    "train": 1.6341233249020841
+                },
+                "RNN trained": {
+                    "all": 0.6857216599959906,
+                    "predict": 0.6705952439700319,
+                    "train": 0.7005215262503268
+                }
+            },
+            "case7": {
+                "Augmented KF": {
+                    "all": 2.062032898281509,
+                    "predict": 2.9044740769065704,
+                    "train": 0.2607483149863215
+                },
+                "RNN initial": {
+                    "all": 13.606716766982968,
+                    "predict": 18.89912217076865,
+                    "train": 3.6205888372130537
+                },
+                "RNN trained": {
+                    "all": 4.559104179598284,
+                    "predict": 6.259698151022319,
+                    "train": 1.5450051452823186
+                }
+            },
+            "case8": {
+                "Augmented KF": {
+                    "all": 1.9797317663128065,
+                    "predict": 2.7168888577236636,
+                    "train": 0.676158759370206
+                },
+                "RNN initial": {
+                    "all": 18.031544051061417,
+                    "predict": 16.183832458866224,
+                    "train": 19.70676860051096
+                },
+                "RNN trained": {
+                    "all": 3.3978909307803584,
+                    "predict": 3.5011236486877704,
+                    "train": 3.291421995362803
+                }
+            },
+            "case9": {
+                "Augmented KF": {
+                    "all": 5.574818223890552,
+                    "predict": 7.871270021958024,
+                    "train": 0.4475541311052058
+                },
+                "RNN initial": {
+                    "all": 24.520912753842964,
+                    "predict": 34.044406586465804,
+                    "train": 6.597628720878505
+                },
+                "RNN trained": {
+                    "all": 3.977214728911933,
+                    "predict": 5.317459511619198,
+                    "train": 1.833329850855696
+                }
+            }
+        },
+        "params": {
+            "DeltaE": [
+                0,
+                -1
+            ],
+            "T1": 0.1,
+            "activation": [
+                "linear",
+                "linear"
+            ],
+            "cases": [
+                "case1",
+                "case2",
+                "case3",
+                "case4",
+                "case5",
+                "case6",
+                "case7",
+                "case8",
+                "case9",
+                "case10",
+                "case11"
+            ],
+            "centering": [
+                0.0,
+                0.0
+            ],
+            "dense_layers": 1,
+            "dense_units": 1,
+            "epochs": 1000,
+            "fm_raise_vs_rain": 2.0,
+            "hidden_units": 20,
+            "id": 1,
+            "purpose": "test 1",
+            "rain_do": true,
+            "scale": 1,
+            "synthetic": false,
+            "timesteps": 5,
+            "train_frac": 0.5,
+            "verbose": false,
+            "verbose_fit": false,
+            "verbose_weights": false
+        }
+    },
+    "2": {
+        "cases": {
+            "case10": {
+                "Augmented KF": {
+                    "all": 1.124729422409734,
+                    "predict": 1.4170835271066387,
+                    "train": 0.72243119012905
+                },
+                "RNN initial": {
+                    "all": 1.8241236805991292,
+                    "predict": 2.2133346582535807,
+                    "train": 1.325143046926834
+                },
+                "RNN trained": {
+                    "all": 1.7212577064048864,
+                    "predict": 2.2346262423995684,
+                    "train": 0.9653505790621377
+                }
+            },
+            "case11": {
+                "Augmented KF": {
+                    "all": 0.9381104126731539,
+                    "predict": 1.2955200737612529,
+                    "train": 0.28588464669028313
+                },
+                "RNN initial": {
+                    "all": 0.7204269522195984,
+                    "predict": 0.5547409877209436,
+                    "train": 0.8545714853136812
+                },
+                "RNN trained": {
+                    "all": 0.7137695904313113,
+                    "predict": 0.6958704894942551,
+                    "train": 0.7312306874714637
+                }
+            },
+            "case7": {
+                "Augmented KF": {
+                    "all": 2.062032898281509,
+                    "predict": 2.9044740769065704,
+                    "train": 0.2607483149863215
+                },
+                "RNN initial": {
+                    "all": 2.7130134887563875,
+                    "predict": 3.350607752762744,
+                    "train": 1.8693079113603535
+                },
+                "RNN trained": {
+                    "all": 2.6055288898668345,
+                    "predict": 3.451741642030297,
+                    "train": 1.2895895581677863
+                }
+            },
+            "case8": {
+                "Augmented KF": {
+                    "all": 1.9797317663128065,
+                    "predict": 2.7168888577236636,
+                    "train": 0.676158759370206
+                },
+                "RNN initial": {
+                    "all": 3.3427051891575297,
+                    "predict": 3.066559410875619,
+                    "train": 3.597717240530657
+                },
+                "RNN trained": {
+                    "all": 2.857748230375698,
+                    "predict": 3.5937519996364293,
+                    "train": 1.84889060291301
+                }
+            },
+            "case9": {
+                "Augmented KF": {
+                    "all": 5.574818223890552,
+                    "predict": 7.871270021958024,
+                    "train": 0.4475541311052058
+                },
+                "RNN initial": {
+                    "all": 2.05550606662954,
+                    "predict": 1.3788553990515775,
+                    "train": 2.5590951854919344
+                },
+                "RNN trained": {
+                    "all": 1.5280754101405236,
+                    "predict": 1.4696076067414732,
+                    "train": 1.5843870740320556
+                }
+            }
+        },
+        "params": {
+            "DeltaE": [
+                0,
+                -1
+            ],
+            "T1": 0.1,
+            "activation": [
+                "tanh",
+                "tanh"
+            ],
+            "cases": [
+                "case1",
+                "case2",
+                "case3",
+                "case4",
+                "case5",
+                "case6",
+                "case7",
+                "case8",
+                "case9",
+                "case10",
+                "case11"
+            ],
+            "centering": [
+                0.0,
+                0.0
+            ],
+            "dense_layers": 1,
+            "dense_units": 1,
+            "epochs": 10000,
+            "fm_raise_vs_rain": 2.0,
+            "hidden_units": 20,
+            "id": 2,
+            "purpose": "test 2",
+            "rain_do": true,
+            "scale": 0.8,
+            "synthetic": false,
+            "timesteps": 5,
+            "train_frac": 0.5,
+            "verbose": false,
+            "verbose_fit": false,
+            "verbose_weights": false
+        }
+    },
+    "3": {
+        "cases": {
+            "case10": {
+                "Augmented KF": {
+                    "all": 1.124729422409734,
+                    "predict": 1.4170835271066387,
+                    "train": 0.72243119012905
+                },
+                "RNN initial": {
+                    "all": 5.4611095383986505,
+                    "predict": 5.484881249098956,
+                    "train": 5.4372338982298825
+                },
+                "RNN trained": {
+                    "all": 1.7523454741826483,
+                    "predict": 2.133107372854109,
+                    "train": 1.2614603670556852
+                }
+            },
+            "case11": {
+                "Augmented KF": {
+                    "all": 0.9381104126731539,
+                    "predict": 1.2955200737612529,
+                    "train": 0.28588464669028313
+                },
+                "RNN initial": {
+                    "all": 3.5281388352563785,
+                    "predict": 3.1906189594941075,
+                    "train": 3.8360758513101914
+                },
+                "RNN trained": {
+                    "all": 0.7244384947975072,
+                    "predict": 0.7199152220297464,
+                    "train": 0.7289336997140526
+                }
+            },
+            "case7": {
+                "Augmented KF": {
+                    "all": 2.062032898281509,
+                    "predict": 2.9044740769065704,
+                    "train": 0.2607483149863215
+                },
+                "RNN initial": {
+                    "all": 6.253654488070941,
+                    "predict": 7.555951002516959,
+                    "train": 4.596084568401956
+                },
+                "RNN trained": {
+                    "all": 2.834150888405676,
+                    "predict": 3.7758856404753494,
+                    "train": 1.3444367395134011
+                }
+            },
+            "case8": {
+                "Augmented KF": {
+                    "all": 1.9797317663128065,
+                    "predict": 2.7168888577236636,
+                    "train": 0.676158759370206
+                },
+                "RNN initial": {
+                    "all": 8.19491101004976,
+                    "predict": 7.752734780211848,
+                    "train": 8.614420256347092
+                },
+                "RNN trained": {
+                    "all": 2.010607786407093,
+                    "predict": 1.9871502076428114,
+                    "train": 2.0337948258825898
+                }
+            },
+            "case9": {
+                "Augmented KF": {
+                    "all": 5.574818223890552,
+                    "predict": 7.871270021958024,
+                    "train": 0.4475541311052058
+                },
+                "RNN initial": {
+                    "all": 6.250983529849147,
+                    "predict": 5.425545533487346,
+                    "train": 6.979473178180866
+                },
+                "RNN trained": {
+                    "all": 1.747633169555666,
+                    "predict": 1.6348776632974886,
+                    "train": 1.853542127040362
+                }
+            }
+        },
+        "params": {
+            "DeltaE": [
+                0,
+                0
+            ],
+            "T1": 0.1,
+            "activation": [
+                "sigmoid",
+                "sigmoid"
+            ],
+            "cases": [
+                "case1",
+                "case2",
+                "case3",
+                "case4",
+                "case5",
+                "case6",
+                "case7",
+                "case8",
+                "case9",
+                "case10",
+                "case11"
+            ],
+            "centering": [
+                0.5,
+                0.5
+            ],
+            "dense_layers": 1,
+            "dense_units": 1,
+            "epochs": 10000,
+            "fm_raise_vs_rain": 2.0,
+            "hidden_units": 20,
+            "id": 3,
+            "purpose": "test 3",
+            "rain_do": true,
+            "scale": 0.8,
+            "synthetic": false,
+            "timesteps": 5,
+            "train_frac": 0.5,
+            "verbose": false,
+            "verbose_fit": false,
+            "verbose_weights": false
+        }
+    }
+}
