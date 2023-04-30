@@ -327,14 +327,27 @@ def format_precip(precipa):
     rain[rain < 0] = np.NaN # filter out negative, results from diff function after precipa goes to zero
     return rain
 
-# fix isolated nans
-def fixnan(a,n):
-    for c in range(n):
-        for i in np.where(np.isnan(a)):
-            a[i]=0.5*(a[i-1]+a[i+1])
+def fixnan(a,n=99999): # size of gaps we can fill
+    if a.ndim > 1:
+        print('fixnan: input has',a.ndim,'dimensions, only one supported')
+        raise ValueError
+    for c in range(n):   
+        # try fixing isolated nans first, replace by average
+        for i in np.where(np.isnan(a))[0]:
+            if i==0:  
+                a[i] = a[i+1]
+            elif i==len(a)-1:
+                a[i] = a[i-1]
+            elif not np.isnan(a[i-1]) and not np.isnan(a[i+1]):
+                a[i] = 0.5*(a[i-1]+a[i+1])
+            elif not np.isnan(a[i-1]):
+                a[i] = a[i-1]
+            elif not np.isnan(a[i+1]):
+                a[i] = a[i+1]
         if not any(np.isnan(a)):
             break
-    return a
+    if any(np.isnan(a)):
+        a = np.nan_to_num(a, nan=0.0)
 
 def retrieve_raws(mes, stid, raws_vars, time1, time2):
     meso_ts = mes.timeseries(time1, time2, 
@@ -381,14 +394,18 @@ def load_and_fix_data(filename,params):
         test_dict = pickle.load(handle)
         if params['cases']=='all':
             params['cases'] = test_dict.keys()
+            print("Changing params['cases'] =",params['cases']),
         for case in test_dict:
             case_data = test_dict[case]
             case_data['case'] = case
             case_data['filename'] = filename
             for key in case_data.keys():
-                var = case_data[key]
+                var = case_data[key]    # pointer to test_dict[case][key]
                 if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
                     nans = np.sum(np.isnan(var))
                     if nans:
-                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values')
+                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values, fixing')
+                        fixnan(var)
+                        nans = np.sum(np.isnan(test_dict[case][key]))
+                        print('After fixing, remained',nans,'nan values')
     return test_dict
