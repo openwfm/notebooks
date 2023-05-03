@@ -243,7 +243,7 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
 ## RAWS Data Functions
 
 def format_raws(stn, fixnames = True):
-    raws_dat = stn['OBSERVATIONS']
+    raws_dat = stn['OBSERVATIONS'].copy() # bug fix for in-place changing of dictionary outside of func call
     
     # Convert to Numpy arrays, check data type for floats
     for key in [*stn['OBSERVATIONS'].keys()]:
