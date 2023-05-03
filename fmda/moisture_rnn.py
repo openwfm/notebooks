@@ -10,7 +10,10 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
-from utils import vprint
+from utils import vprint, hash2
+import reproducibility
+from data_funcs import check_data, rmse_data, plot_data
+import moisture_models as mod
 
 
 
@@ -81,7 +84,12 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
+def create_rnn_data(dat, params, hours=None, h2=None):
+    timesteps = params['timesteps']
+    scale = params['scale']
+    rain_do = params['rain_do']
+    verbose = params['verbose']
+    
     if hours is None:
         hours = dat['hours']
     if h2 is None:
@@ -96,25 +104,36 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
     
     # Average Equilibrium
     # E = (Ed + Ew)/2         # why?
+
+    # Scale Data if required
+    if scale:
+        print('scaling to range 0 to',scale)
+        scale_fm=max(max(Ew),max(Ed),max(fm))/scale
+        scale_rain=max(max(rain),0.01)/scale
+        Ed = Ed/scale_fm
+        Ew = Ew/scale_fm
+        fm = fm/scale_fm
+        rain = rain/scale_rain
+    else:
+        scale_fm=1.0
+        scale_rain=1.0
+     
+    if params['verbose_weights']:
+        print('scale_fm=',scale_fm,'scale_rain=',scale_rain)
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
     # Et = np.reshape(E,[E.shape[0],1])
-    Et = np.vstack((Ed, Ew)).T
     
+    if rain_do:
+        Et = np.vstack((Ed, Ew, rain)).T
+        features_list = ['Ed', 'Ew', 'rain']
+    else:
+        Et = np.vstack((Ed, Ew)).T        
+        features_list = ['Ed', 'Ew']
     datat = np.reshape(fm,[fm.shape[0],1])
     
-    # Scale Data if required
-    scale=False
-    if scale:
-        scalerx = MinMaxScaler()
-        scalerx.fit(Et)
-        Et = scalerx.transform(Et)
-        scalery = MinMaxScaler()
-        scalery.fit(datat)
-        datat = scalery.transform(datat)
-        
     # split data
-    x_train, y_train = staircase(Et,datat,timesteps=5,trainsteps=h2,
+    x_train, y_train = staircase(Et,datat,timesteps=timesteps,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
     vprint('x_train shape=',x_train.shape)
     samples, timesteps, features = x_train.shape
@@ -134,12 +153,19 @@ def create_rnn_data(dat, hours=None, h2=None, scale = False, verbose = False):
         'features': features,
         'h0': h0,
         'hours':hours,
-        'h2':h2
+        'h2':h2,
+        'scale':scale,
+        'scale_fm':scale_fm,
+        'scale_rain':scale_rain,
+        'rain_do':rain_do,
+        'features_list':features_list
     }
     
     return rnn_dat
 
-def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layers, verbose = False):
+def train_rnn(rnn_dat, params,hours, fit=True):
+
+    verbose = params['verbose']
     
     if hours is None:
         hours = rnn_dat['hours']
@@ -147,75 +173,162 @@ def train_rnn(rnn_dat, hours, activation, hidden_units, dense_units, dense_layer
     samples = rnn_dat['samples']
     features = rnn_dat['features']
     timesteps = rnn_dat['timesteps']
+    centering = params['centering']
     
-    model_fit=create_RNN_2(hidden_units=hidden_units, 
-                        dense_units=dense_units, 
+    model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'], 
                         batch_shape=(samples,timesteps,features),
                         stateful=True,
                         return_sequences=False,
                         # initial_state=h0,
-                        activation=activation,
-                        dense_layers=dense_layers,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
                         verbose = verbose)
     
     Et = rnn_dat['Et']
-    model_predict=create_RNN_2(hidden_units=hidden_units, dense_units=dense_units,  
-                            input_shape=(hours,features),stateful = False,
-                            return_sequences=True,
-                            activation=activation,dense_layers=dense_layers,
-                              verbose = verbose)
-
-    ## Note: this line executes an in-place operation that changes object. Keeping comment in for tracking purposes
-    # vprint('model_predict input shape',Et.shape,'output shape',model_predict(np.reshape(Et,(1, hours, features))).shape)
+    model_predict=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'],  
+                        input_shape=(hours,features),stateful = False,
+                        return_sequences=True,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
+                        verbose = verbose)
+    
     if verbose: print(model_predict.summary())
     
     x_train = rnn_dat['x_train']
     y_train = rnn_dat['y_train']
 
-    # print('model_fit input shape',x_train.shape,'output shape',model_fit(x_train).shape) 
-    model_fit(x_train) ## In-place operation to replace print statement above
+    model_fit(x_train) ## evalue the model once to set nonzero initial state
     
+    w, w_name=get_initial_weights(model_fit, params, rnn_dat)
     
-    # fitting
-    DeltaE = 0.0  
-    w_exact=  [np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.*DeltaE])]
-    
-    w_initial=[np.array([[1.-np.exp(-0.1)]]), np.array([[np.exp(-0.1)]]), np.array([0.]),np.array([[1.0]]),np.array([-1.0])]
-    w=model_fit.get_weights()
-    for i in range(len(w)):
-        vprint('weight',i,'shape',w[i].shape,'ndim',w[i].ndim,'given',w_initial[i].shape)
-        for j in range(w[i].shape[0]):
-            if w[i].ndim==2:
-                for k in range(w[i].shape[1]):
-                    w[i][j][k]=w_initial[i][0][0]/w[i].shape[0]
-            else:
-                w[i][j]=w_initial[i][0]
     model_fit.set_weights(w)
-    model_fit.fit(x_train, y_train, epochs=5000,batch_size=samples, verbose=0)
-
-    w_fitted=model_fit.get_weights()
-    for i in range(len(w)):
-        vprint('weight',i,' exact:',w_exact[i],':  initial:',w_initial[i],' fitted:',w_fitted[i])
     
+    if fit:
+        model_fit.fit(x_train, y_train + centering[1] , epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
+        w_fitted=model_fit.get_weights()
+        if params['verbose_weights']:
+            for i in range(len(w_fitted)):
+                print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
+    else:
+        print('Fitting skipped, using initial weights')
+        w_fitted=w
+        
     model_predict.set_weights(w_fitted)
     
     return model_predict
 
+def get_initial_weights(model_fit,params,rnn_dat):
+    
+    DeltaE = params['DeltaE']
+    T1 = params['T1']
+    fmr = params['fm_raise_vs_rain']
+    centering = params['centering']  # shift activation down
+    
+    w0_initial={'Ed':(1.-np.exp(-T1))/2, 
+                'Ew':(1.-np.exp(-T1))/2,
+                'rain':fmr * rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - input feature
+                                 #  wh      wb   wd    bd = bias -1
+    
+    w_initial=np.array([np.nan, np.exp(-0.1), DeltaE[0]/rnn_dat['scale_fm'], # layer 0
+                        1.0, -centering[0] + DeltaE[1]/rnn_dat['scale_fm']])                 # layer 1
+    if params['verbose_weights']:
+        print('Equilibrium moisture correction bias',DeltaE[0],
+              'in the hidden layer and',DeltaE[1],' in the output layer')
+    
+    w_name = ['wx','wh','bh','wd','bd']
+                        
+    w=model_fit.get_weights()
+    for j in range(w[0].shape[0]):
+            feature = rnn_dat['features_list'][j]
+            for k in range(w[0].shape[1]):
+                    w[0][j][k]=w0_initial[feature]
+    for i in range(1,len(w)):            # number of the weight
+        for j in range(w[i].shape[0]):   # number of the inputs
+            if w[i].ndim==2:
+                # initialize all entries of the weight matrix to the same number
+                for k in range(w[i].shape[1]):
+                    w[i][j][k]=w_initial[i]/w[i].shape[0]
+            elif w[i].ndim==1:
+                w[i][j]=w_initial[i]
+            else:
+                print('weight',i,'shape',w[i].shape)
+                raise ValueError("Only 1 or 2 dimensions supported")
+        if params['verbose_weights']:
+            print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'initial: sum',np.sum(w[i],axis=0),'\nentries',w[i])
+    
+    return w, w_name
 
-def rnn_predict(model, rnn_dat, hours, scale = False, verbose = False):
+def rnn_predict(model, params, rnn_dat):
+    verbose = params['verbose']
+    centering = params['centering']
     features = rnn_dat['features']
+    hours = rnn_dat['hours']
+    
     # model.set_weights(w_fitted)
     x_input=np.reshape(rnn_dat['Et'],(1, hours, features))
-    y_output = model.predict(x_input, verbose = verbose)
+    y_output = model.predict(x_input, verbose = verbose) - centering[1]
     
     vprint('x_input.shape=',x_input.shape,'y_output.shape=',y_output.shape)
     
     m = np.reshape(y_output,hours)
     # print('weights=',w)
-    if scale:
+    if rnn_dat['scale']:
         vprint('scaling')
-        m = scalery.inverse_transform(m)
+        m = m*rnn_dat['scale_fm']
     m = np.reshape(m,hours)
-    
     return m
 
+def run_rnn(case_data,params,fit=True,title2=''):
+    verbose = params['verbose']
+    
+    reproducibility.set_seed() # Set seed for reproducibility
+    rnn_dat = create_rnn_data(case_data,params)
+    if params['verbose']:
+        check_data(rnn_dat,case=0,name='rnn_dat')
+    model_predict = train_rnn(
+        rnn_dat,
+        params,
+        rnn_dat['hours'],
+        fit=fit
+    )
+    
+    case_data['m'] = rnn_predict(model_predict, params, rnn_dat)
+
+    hv = hash2(model_predict.get_weights())
+    if case_data['case']=='case11' and fit:
+        hv5 = 5.55077327554663e+19
+        print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
+        # assert (hv == hv5)
+        checkm = case_data['m'][350]
+        mv = 3.77920889854431152
+        print('checkm=',format(checkm, '.17f'),' error',checkm-mv)
+    else:
+        print('check - hash weights:',hv)
+    
+    plot_data(case_data,title2=title2)
+    plt.show()
+    return rmse_data(case_data)
+    
+    
+def run_case(case_data,params):
+    print('\n***** ',case_data['case'],' *****\n')
+    case_data['rain'][np.isnan(case_data['rain'])] = 0
+    check_data(case_data)
+    hours=case_data['hours']
+    if 'train_frac' in params:
+        case_data['h2'] = round(hours * params['train_frac'])
+    h2=case_data['h2']
+    plot_data(case_data,title2='case data on input')
+    m,Ec = mod.run_augmented_kf(case_data)  # extract from state
+    case_data['m']=m
+    case_data['Ec']=Ec
+    plot_data(case_data,title2='augmented KF')
+    rmse =      {'Augmented KF':rmse_data(case_data)}
+    del case_data['Ec']  # cleanup
+    rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')})
+    rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')})
+    return rmse

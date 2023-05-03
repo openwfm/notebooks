@@ -4,13 +4,78 @@
 import numpy as np, random
 from numpy.random import rand
 from MesoPy import Meso
+import tensorflow as tf
+import pickle, os
 
 import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
 from datetime import datetime, timedelta
-import json
-from utils import hash2
+from utils import  is_numeric_ndarray, hash2
 
+import json
+
+items = '_items_'     # dictionary key to keep list of items in
+def check_data_array(dat,hours,a,s):
+    if a in dat[items]:
+         dat[items].remove(a)
+    if a in dat:
+        ar = dat[a]
+        print("array %s %s length %i min %s max %s hash %s %s" %
+              (a,s,len(ar),min(ar),max(ar),hash2(ar),type(ar)))
+        if hours is not None:
+            if len(ar) < hours:
+                print('len(%a) = %i does not equal to hours = %i' % (a,len(ar),hours))
+                exit(1)
+    else:
+        print(a + ' not present')
+        
+def check_data_scalar(dat,a):
+    if a in dat[items]:
+         dat[items].remove(a)
+    if a in dat:
+        print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
+    else:
+        print(a + ' not present' )
+
+def check_data(dat,case=True,name=None):
+    dat[items] = list(dat.keys())   # add list of items to the dictionary
+    if name is not None:
+        print(name)
+    if case:
+        check_data_scalar(dat,'filename')
+        check_data_scalar(dat,'title')
+        check_data_scalar(dat,'note')
+        check_data_scalar(dat,'hours')
+        check_data_scalar(dat,'h2')
+        check_data_scalar(dat,'case')
+        if 'hours' in dat:
+            hours = dat['hours']
+        else:
+            hours = None
+        check_data_array(dat,hours,'E','drying equilibrium (%)')
+        check_data_array(dat,hours,'Ed','drying equilibrium (%)')
+        check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
+        check_data_array(dat,hours,'Ec','equilibrium equilibrium (%)')
+        check_data_array(dat,hours,'rain','rain intensity (mm/h)')
+        check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
+        check_data_array(dat,hours,'m','fuel moisture estimate (%)')
+    if dat[items]:
+        print('items:',dat[items])
+        for a in dat[items].copy():
+            ar=dat[a]
+            if dat[a] is None or np.isscalar(dat[a]):
+                check_data_scalar(dat,a)
+            elif is_numeric_ndarray(ar):
+                print(type(ar))
+                print("array", a, "shape",ar.shape,"min",np.min(ar),
+                       "max",np.max(ar),"hash",hash2(ar),"type",type(ar))
+            elif isinstance(ar, tf.Tensor):
+                print("array", a, "shape",ar.shape,"min",np.min(ar),
+                       "max",np.max(ar),"type",type(ar))
+            else:
+                print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
+        del dat[items] # clean up
+ 
 def to_json(dic,filename):
     print('writing ',filename)
     check_data(dic)
@@ -60,41 +125,7 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     
 # the following input or output dictionary with all model data and variables
 
-def check_data_array(dat,hours,a,s):
-    if a in dat:
-        ar = dat[a]
-        print("array %s %s length %i min %s max %s %s" % (a,s,len(ar),min(ar),max(ar),type(ar)))
-        if hours is not None:
-            if len(ar) < hours:
-                print('len(%a) = %i does not equal to hours = %i' % (a,len(ar),hours))
-                exit(1)
-    else:
-        print(a + ' not present')
-        
-def check_data_scalar(dat,a):
-    if a in dat:
-        print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
-    else:
-        print(a + ' not present' )
-
-def check_data(dat):
-    check_data_scalar(dat,'filename')
-    check_data_scalar(dat,'title')
-    check_data_scalar(dat,'note')
-    check_data_scalar(dat,'hours')
-    check_data_scalar(dat,'h2')
-    if 'hours' in dat:
-        hours = dat['hours']
-    else:
-        hours = None
-    check_data_array(dat,hours,'E','drying equilibrium (%)')
-    check_data_array(dat,hours,'Ed','drying equilibrium (%)')
-    check_data_array(dat,hours,'Ew','wetting equilibrium (%)')
-    check_data_array(dat,hours,'Ec','equilibrium equilibrium (%)')
-    check_data_array(dat,hours,'rain','rain intensity (mm/h)')
-    check_data_array(dat,hours,'fm','RAWS fuel moisture data (%)')
-    check_data_array(dat,hours,'m','fuel moisture estimate (%)')
-
+       
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
     hours = days*24
@@ -144,7 +175,6 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
     plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
     plot_one(hmin,hmax,dat,'fm',linestyle='-',c='g',label='FMC truth')
-    plot_one(hmin,hmax,dat,'fm',linestyle=':',c='b',label='FMC observation')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FMC estimate')
     plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
     plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='rain intensity')
@@ -154,7 +184,8 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
         t=dat['title']
         # print('title',type(t),t)
     if title2 is not None:
-        t = t + ' ' + title2
+        t = t + ' ' + title2 
+    t = t + ' ' + rmse_data_str(dat)
     plt.title(t)
     plt.xlabel('Time (hours)')
     if 'rain' in dat:
@@ -164,35 +195,55 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plt.legend()
     
 # Calculate mean squared error
-def mse(a, b):
-    return ((a - b)**2).mean()
+def rmse(a, b):
+    return np.sqrt(((a - b)**2).mean())
+
+def rmse_skip_nan(x, y):
+    mask = ~np.isnan(x) & ~np.isnan(y)
+    if np.count_nonzero(mask):
+        return np.sqrt(np.mean((x[mask] - y[mask]) ** 2))
+    else:
+        return np.nan
+    
+def rmse_str(a,b):
+    rmse = rmse_skip_nan(a,b)
+    return "RMSE " + "{:.2f}".format(rmse)
+
+def rmse_data_str(data):
+    if 'm' in data and 'fm' in data:
+        return rmse_str(data['m'],data['fm'])
+    else:
+        return ''
+                    
     
 # Calculate mean absolute error
 def mape(a, b):
     return ((a - b).__abs__()).mean()
     
-def mse_data(dat, hours = None, h2 = None):
+def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     if hours is None:
         hours = dat['hours']
     if h2 is None:
         h2 = dat['h2']
     
-    m = dat['m']
-    fm = dat['fm']
+    m = dat[simulation]
+    fm = dat[measurements]
+    case = dat['case']
     
-    train = mse(m[:h2], fm[:h2])
-    test = mse(m[h2:hours], fm[h2:hours])
-    print('Training MSE:   ' + str(np.round(train, 4)))
-    print('Prediction MSE: ' + str(np.round(test, 4)))
-          
-    return train, test
+    train =rmse(m[:h2], fm[:h2])
+    predict = rmse(m[h2:hours], fm[h2:hours])
+    all = rmse(m[:hours], fm[:hours])
+    print(case,'Training 1 to',h2,'hours RMSE:   ' + str(np.round(train, 4)))
+    print(case,'Prediction',h2+1,'to',hours,'hours RMSE: ' + str(np.round(predict, 4)))
+    
+    return {'train':train, 'predict':predict, 'all':all}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ## RAWS Data Functions
 
 def format_raws(stn, fixnames = True):
-    raws_dat = stn['OBSERVATIONS']
+    raws_dat = stn['OBSERVATIONS'].copy() # bug fix for in-place changing of dictionary outside of func call
     
     # Convert to Numpy arrays, check data type for floats
     for key in [*stn['OBSERVATIONS'].keys()]:
@@ -277,14 +328,27 @@ def format_precip(precipa):
     rain[rain < 0] = np.NaN # filter out negative, results from diff function after precipa goes to zero
     return rain
 
-# fix isolated nans
-def fixnan(a,n):
-    for c in range(n):
-        for i in np.where(np.isnan(a)):
-            a[i]=0.5*(a[i-1]+a[i+1])
+def fixnan(a,n=99999): # size of gaps we can fill
+    if a.ndim > 1:
+        print('fixnan: input has',a.ndim,'dimensions, only one supported')
+        raise ValueError
+    for c in range(n):   
+        # try fixing isolated nans first, replace by average
+        for i in np.where(np.isnan(a))[0]:
+            if i==0:  
+                a[i] = a[i+1]
+            elif i==len(a)-1:
+                a[i] = a[i-1]
+            elif not np.isnan(a[i-1]) and not np.isnan(a[i+1]):
+                a[i] = 0.5*(a[i-1]+a[i+1])
+            elif not np.isnan(a[i-1]):
+                a[i] = a[i-1]
+            elif not np.isnan(a[i+1]):
+                a[i] = a[i+1]
         if not any(np.isnan(a)):
             break
-    return a
+    if any(np.isnan(a)):
+        a = np.nan_to_num(a, nan=0.0)
 
 def retrieve_raws(mes, stid, raws_vars, time1, time2):
     meso_ts = mes.timeseries(time1, time2, 
@@ -326,3 +390,19 @@ def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
     return raws_dat
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def load_and_fix_data(filename):
+    with open(filename, 'rb') as handle:
+        test_dict = pickle.load(handle)
+        for case in test_dict:
+            test_dict[case]['case'] = case
+            test_dict[case]['filename'] = filename
+            for key in test_dict[case].keys():
+                var = test_dict[case][key]    # pointer to test_dict[case][key]
+                if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
+                    nans = np.sum(np.isnan(var))
+                    if nans:
+                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values, fixing')
+                        fixnan(var)
+                        nans = np.sum(np.isnan(test_dict[case][key]))
+                        print('After fixing, remained',nans,'nan values')
+    return test_dict

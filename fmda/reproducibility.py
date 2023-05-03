@@ -1,8 +1,8 @@
 # make session reproducible
 import os
-print('setting TF_DETERMINISTIC_OPS=1 PYTHONHASHSEED=0')
-os.environ['TF_DETERMINISTIC_OPS'] = '1'
-os.environ['PYTHONHASHSEED'] = '0'
+environ={'TF_DETERMINISTIC_OPS':'1','PYTHONHASHSEED':'0','TF_CPP_MIN_LOG_LEVEL':'2'}
+# print('setting',environ)
+os.environ.update(environ)
 def set_seed(seed=123):
     import random
     random.seed(seed)
@@ -11,7 +11,7 @@ def set_seed(seed=123):
     import tensorflow as tf
     tf.random.set_seed(seed)
     tf.keras.utils.set_random_seed(seed)
-    print('resetting random seed do %i' % seed)
-set_seed()
-print('call set_seed() or set_seed(seed=value) to reset')
+    print('resetting random seeds to %i' % seed)
+# set_seed()
+# print('call set_seed() or set_seed(seed=value) to reset')
 
