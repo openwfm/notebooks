@@ -355,7 +355,7 @@ def gather_hrrr_time_range(start, end,
     time2 = datetime.strptime(start_time, fmt)
     days_diff = time1-time2
     times = (days_diff.days+1)*24
-    dates = pd.date_range(start=start,periods=times, freq="1H") # Series of dates
+    dates = pd.date_range(start=time1,periods=times, freq="1H") # Series of dates
     
     dates[0].hour
     
