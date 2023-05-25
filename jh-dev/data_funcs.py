@@ -293,3 +293,75 @@ def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
     return raws_dat
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+## Set of functions to build a time series of FMC observations at list of lat/lons
+## HRRR data source from AWS
+## Functions assume hourly data
+
+import os
+import subprocess
+
+def download_grib(source_url,time,model,dest_dir="",fmt = "%Y-%m-%d %H:%M"):
+    # source_url: starting url string that specifies grib data source
+    # time: time of time slice to gather data
+    # model: particular grib file to get from time slice
+    # dest_dir: destination subdirectory, send grib file to this location
+    # fmt: date format string
+    
+    ## Utility function, lightweight so defined within this func
+    ## source: chat-gpt4
+    def check_file_exists(file_path):
+        if os.path.exists(file_path):
+            print(f"The file '{file_path}' was successfully downloaded.")
+        else:
+            raise AssertionError(f"The file '{file_path}' does not exist.")
+
+    ## Construct full destination file with path
+    time_date = datetime.strptime(time, fmt)
+    day_date = time_date.strftime("%Y%m%d")
+    hourmin = time_date.strftime("%H%M")
+    dest_file=dest_dir+"/hrrr."+day_date+hourmin+".grib2"
+        
+    grib_url=source_url+day_date+"/conus/hrrr."+model+hourmin+".grib2"
+    
+    command = " ".join(["wget",grib_url, "-O",dest_file])
+    
+    subprocess.call(command,shell=True)
+    
+    # Assert T that file exists
+    check_file_exists(dest_file)
+    
+    
+def gather_hrrr_time_range(start, end, 
+                           source_url = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.",
+                           model = "t18z.wrfsubhf0015",
+                           dest_dir = "data",
+                           fmt = "%Y-%m-%d %H:%M"):
+    # ----------------------------------------------------------
+    ## start: starting time
+    ## end: ending time
+    ## source_url: starting url string that specifies grib data source
+    ## time: time slice to gather data
+    ## model: particular grib file to get from time slice
+    ## dest_dir: destination directory, send grib file to this location
+    ## fmt: date format string
+    # -------------------------------------------------------
+    
+    
+    # Create a range of dates given start and end
+    # Calculate time diff in hours
+    time1 = datetime.strptime(end_time, fmt)
+    time2 = datetime.strptime(start_time, fmt)
+    days_diff = time1-time2
+    times = (days_diff.days+1)*24
+    dates = pd.date_range(start=start,periods=times, freq="1H") # Series of dates
+    
+    dates[0].hour
+    
+    download_grib(
+        source_url = source_url,
+        date = date,
+        model = model,
+        dest_dir =  dest_dir # destination subdirectory for url content
+    )
