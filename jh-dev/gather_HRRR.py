@@ -148,3 +148,22 @@ def gather_hrrr_time_range(start, end, pts,
     
     
     return hrrr_dat
+
+
+## Function not used anymore, might be useful later
+
+# def west_to_east(pts):
+#     # Convert longitude in list of tuples 
+#     # from deg W to deg E
+#     # pts: list of tuples of form (lon, lat)
+
+#     ## Extract list of lons and lats
+#     lons = list(map(lambda pt: pt[0], pts))
+#     lat = list(map(lambda pt: pt[1], pts))
+#     ## Convert deg west to deg east
+#     lons = list(map(lambda l: l+360,lons))
+    
+#     ## Combine back into list of tuples
+#     coords = [(lons[i], lats[i]) for i in range(0, len(lons))]
+    
+#     return coords
