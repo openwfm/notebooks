@@ -392,3 +392,4 @@ def gather_hrrr_time_range(start, end,
         model = model,
         dest_dir =  dest_dir # destination subdirectory for url content
     )
+    
