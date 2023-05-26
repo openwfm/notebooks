@@ -4,8 +4,12 @@
 
 import os
 import subprocess
+import pandas as pd
+import numpy as np
+import xarray as xr
+from datetime import date, timedelta, datetime
 
-def download_grib(source_url,time,model,dest_dir="",fmt = "%Y-%m-%d %H:%M",sector="conus",forecast_hour = 0  ):
+def download_grib(time,model,source_url="https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.",dest_dir="",fmt = "%Y-%m-%d %H:%M",sector="conus",forecast_hour = 0  ):
     # source_url: starting url string that specifies grib data source
     # time: time of time slice to gather data
     # model: particular grib file to get from time slice
@@ -21,9 +25,6 @@ def download_grib(source_url,time,model,dest_dir="",fmt = "%Y-%m-%d %H:%M",secto
             print(f"The file '{file_path}' was successfully downloaded.")
         else:
             raise AssertionError(f"The file '{file_path}' does not exist.")
-
-            
-            
             
     source_url = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com"
     # sector = "conus"
@@ -37,10 +38,6 @@ def download_grib(source_url,time,model,dest_dir="",fmt = "%Y-%m-%d %H:%M",secto
     # Put it all together
     file_path = f"hrrr.t{cycle:02}z.{product}{forecast_hour:02}.grib2"
     grib_url=source_url+"/hrrr."+day_date+"/conus/"+file_path
-    
-    
-    
-    
     
     
     ## Construct full destination file with path
@@ -63,7 +60,37 @@ def download_grib(source_url,time,model,dest_dir="",fmt = "%Y-%m-%d %H:%M",secto
     
     return dest_file, grib_url
     
-def gather_hrrr_time_range(start, end, 
+
+
+
+def extract_2m_vars(ds, coord, convert_EW=True):
+    ## Get variables from the 2m above ground HRRR layer
+    ## Vars include: temp (k), RH
+    # ds: xarray object from HRRR
+    # coord: tuple of the form (lon, lat)
+    lon = coord[0]
+    if ds.longitude.attrs['units']=="degrees_east" and convert_EW:
+        lon = 360 + lon
+        # print('Converting target longitude to Deg. E')
+    
+    lat = coord[1]
+    
+    abslat = np.abs(ds.latitude-lat)
+    abslon = np.abs(ds.longitude-lon)
+    c = np.maximum(abslon, abslat)
+
+    ([xloc], [yloc]) = np.where(c == np.min(c))
+
+    # use that index location to get the values, 
+    # NOTE: HRRR requires reorder (y,x)
+    point_ds = ds.sel(x=yloc, y=xloc)
+    
+    return point_ds
+    
+    
+    
+    
+def gather_hrrr_time_range(start, end, pts,
                            source_url = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.",
                            model = "t18z.wrfsubhf0015",
                            dest_dir = "data",
@@ -71,28 +98,53 @@ def gather_hrrr_time_range(start, end,
     # ----------------------------------------------------------
     ## start: starting time
     ## end: ending time
+    ## pts: list of tuples of points to built time-series at
     ## source_url: starting url string that specifies grib data source
     ## time: time slice to gather data
     ## model: particular grib file to get from time slice
     ## dest_dir: destination directory, send grib file to this location
     ## fmt: date format string
     # -------------------------------------------------------
+
+    # Handle Dates
+    time1 = datetime.strptime(start, fmt)
+    time2 = datetime.strptime(end, fmt)
+    dates = pd.date_range(start=time1,end=time2, freq="1H") # Series of dates in 1 hour increments
+    
+    # Initialize matrix of time series obs
+    # (x, y, z) dims == (ntime, ncoords, nvars)
+    # vars=["rh", "temp", "solar1", "solar2"]
+    # nvars=len(vars)
+    ## TEMPORARILY just collecting 2 fields: temp and RH
+    hrrr_dat = np.zeros((dates.shape[0], len(pts), 2))
     
     
-    # Create a range of dates given start and end
-    # Calculate time diff in hours
-    time1 = datetime.strptime(end_time, fmt)
-    time2 = datetime.strptime(start_time, fmt)
-    days_diff = time1-time2
-    times = (days_diff.days+1)*24
-    dates = pd.date_range(start=time1,periods=times, freq="1H") # Series of dates
+    for t in range(0, dates.shape[0]):
+        # Format time
+        time=dates[t].strftime("%Y-%m-%d %H:%M")
+        print('Time '+str(t)+', '+str(time))
     
-    dates[0].hour
+        # Temporarily download grib file at given time
+        tempfile, url = download_grib(
+            source_url = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com",
+            time = time,
+            model = "wrfsfcf",
+            dest_dir =  "data" # destination subdirectory for url content
+        )
+
+        # Read grib file
+        ds=xr.open_dataset(
+            tempfile,
+            filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 2}
+        )
+
+        # Extract Data from grib file for each point
+        for i in range(0, len(pts)):
+            point_ds = extract_2m_vars(ds, pts[i])
+            hrrr_dat[t][i][0] = point_ds.t2m.values
+            hrrr_dat[t][i][1] = point_ds.r2.values
+
+        os.remove(tempfile)
     
-    download_grib(
-        source_url = source_url,
-        date = date,
-        model = model,
-        dest_dir =  dest_dir # destination subdirectory for url content
-    )
     
+    return hrrr_dat
