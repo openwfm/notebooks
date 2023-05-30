@@ -63,17 +63,19 @@ def download_grib(time,model,source_url="https://noaa-hrrr-bdp-pds.s3.amazonaws.
 
 
 
-def extract_2m_vars(ds, coord, convert_EW=True):
-    ## Get variables from the 2m above ground HRRR layer
+def extract_hrrr(ds, coord, convert_EW=True):
+    ## Get variables from the given HRRR layer
     ## Vars include: temp (k), RH
-    # ds: xarray object from HRRR
+    # ds: xarray object from HRRR, layer could be 2m, 10m, surface
     # coord: tuple of the form (lon, lat)
-    lon = coord[0]
+    # convert_EW: whether or not to convert longitude from E to W
+
     if ds.longitude.attrs['units']=="degrees_east" and convert_EW:
-        lon = 360 + lon
+        coord = west_to_east(coord)
         # print('Converting target longitude to Deg. E')
     
-    lat = coord[1]
+    lon = coord[0][0]
+    lat = coord[0][1]
     
     abslat = np.abs(ds.latitude-lat)
     abslon = np.abs(ds.longitude-lon)
@@ -87,10 +89,30 @@ def extract_2m_vars(ds, coord, convert_EW=True):
     
     return point_ds
     
+def west_to_east(pts):
+    # Convert longitude in list of tuples 
+    # from deg W to deg E
+    # pts: list of tuples of form (lon, lat)
+
+    # If pts is just one lon/lat pair it is tuple type, treat differently
+    if type(pts) is tuple:
+        lon = pts[0]+360
+        lat = pts[1]
+        coords = [(lon, lat)]
+    else:
+        ## Extract list of lons and lats
+        lons = list(map(lambda pt: pt[0], pts))
+        lats = list(map(lambda pt: pt[1], pts))
+        ## Convert deg west to deg east
+        lons = list(map(lambda l: l+360,lons))
+
+        ## Combine back into list of tuples
+        coords = [(lons[i], lats[i]) for i in range(0, len(lons))]
+    
+    return coords    
     
     
-    
-def gather_hrrr_time_range(start, end, pts,
+def gather_hrrr_time_range(start, end, pts, vs,
                            source_url = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.",
                            model = "t18z.wrfsubhf0015",
                            dest_dir = "data",
@@ -99,6 +121,7 @@ def gather_hrrr_time_range(start, end, pts,
     ## start: starting time
     ## end: ending time
     ## pts: list of tuples of points to built time-series at
+    ## vs: pandas dataframe of variables to extract
     ## source_url: starting url string that specifies grib data source
     ## time: time slice to gather data
     ## model: particular grib file to get from time slice
@@ -113,11 +136,13 @@ def gather_hrrr_time_range(start, end, pts,
     
     # Initialize matrix of time series obs
     # (x, y, z) dims == (ntime, ncoords, nvars)
-    # vars=["rh", "temp", "solar1", "solar2"]
-    # nvars=len(vars)
-    ## TEMPORARILY just collecting 2 fields: temp and RH
-    hrrr_dat = np.zeros((dates.shape[0], len(pts), 2))
+    # ncoords=number of lon/lab coordinates supplied
+    # nvars=vs.shape
+    hrrr_dat = np.zeros((dates.shape[0], len(pts), vs.shape[0]))
     
+    vars_2m=list(vs['HRRR Name'][vs['Layer'] == '2m'])
+    vars_10m=list(vs['HRRR Name'][vs['Layer'] == '10m'])
+    vars_surf=list(vs['HRRR Name'][vs['Layer'] == 'surface'])
     
     for t in range(0, dates.shape[0]):
         # Format time
@@ -132,17 +157,46 @@ def gather_hrrr_time_range(start, end, pts,
             dest_dir =  "data" # destination subdirectory for url content
         )
 
-        # Read grib file
-        ds=xr.open_dataset(
-            tempfile,
-            filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 2}
-        )
+        # Get 2m vars
+        if len(vars_2m)>0:
+            # Read grib file
+            ds=xr.open_dataset(
+                tempfile,
+                filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 2}
+            )
+            # Extract Data from grib file for each point
+            for i in range(0, len(pts)):
+                point_ds = extract_hrrr(ds, pts[i])
+                for k in range(0, len(vars_2m)):
+                    hrrr_dat[t][i][k] = point_ds.get(vars_2m[k]).values
+            
+            
+        # Get surface vars
+        if len(vars_surf)>0:
+            # Read grib file
+            ds=xr.open_dataset(
+                tempfile,
+                filter_by_keys={'typeOfLevel': 'surface', 'stepType': 'instant'}
+            )
+            # Extract Data from grib file for each point
+            for i in range(0, len(pts)):
+                point_ds = extract_hrrr(ds, pts[i])
+                for k in range(0, len(vars_surf)):
+                    hrrr_dat[t][i][k+len(vars_2m)] = point_ds.get(vars_surf[k]).values
+                
+        # Get 10m vars
+        if len(vars_10m)>0:
+            # Read grib file
+            ds=xr.open_dataset(
+                tempfile,
+                filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 10}
+            )
+            # Extract Data from grib file for each point
+            for i in range(0, len(pts)):
+                point_ds = extract_hrrr(ds, pts[i])
+                for k in range(0, len(vars_10m)):
+                    hrrr_dat[t][i][k+len(vars_2m)+len(vars_surf)] = point_ds.get(vars_10m[k]).values
 
-        # Extract Data from grib file for each point
-        for i in range(0, len(pts)):
-            point_ds = extract_2m_vars(ds, pts[i])
-            hrrr_dat[t][i][0] = point_ds.t2m.values
-            hrrr_dat[t][i][1] = point_ds.r2.values
 
         os.remove(tempfile)
     
@@ -150,20 +204,4 @@ def gather_hrrr_time_range(start, end, pts,
     return hrrr_dat
 
 
-## Function not used anymore, might be useful later
 
-# def west_to_east(pts):
-#     # Convert longitude in list of tuples 
-#     # from deg W to deg E
-#     # pts: list of tuples of form (lon, lat)
-
-#     ## Extract list of lons and lats
-#     lons = list(map(lambda pt: pt[0], pts))
-#     lat = list(map(lambda pt: pt[1], pts))
-#     ## Convert deg west to deg east
-#     lons = list(map(lambda l: l+360,lons))
-    
-#     ## Combine back into list of tuples
-#     coords = [(lons[i], lats[i]) for i in range(0, len(lons))]
-    
-#     return coords
