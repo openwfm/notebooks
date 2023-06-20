@@ -45,7 +45,7 @@ def download_grib(time,model,source_url="https://noaa-hrrr-bdp-pds.s3.amazonaws.
     # day_date = time_date.strftime("%Y%m%d")
     # hour=time_date.strftime("%H")
     # mins=time_date.strftime("%M")
-    dest_file=dest_dir+"hrrr_"+day_date+str(cycle)+".grib2"
+    dest_file=dest_dir+"/hrrr_"+day_date+str(cycle)+".grib2"
 
     # grib_url=source_url+day_date+"/conus/hrrr.t"+hour+"z."+model+hour+".grib2"
     
