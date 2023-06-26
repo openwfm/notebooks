@@ -111,6 +111,51 @@ def west_to_east(pts):
     
     return coords    
     
+
+    
+def slice_hrrr(tempfile, vs):
+    # Given Grib file location and df of variables,
+    # slice layers 2m, 10m, and surface
+    vars_2m=list(vs['HRRR Name'][vs['Layer'] == '2m'])
+    vars_10m=list(vs['HRRR Name'][vs['Layer'] == '10m'])
+    vars_surf=list(vs['HRRR Name'][vs['Layer'] == 'surface'])
+
+    # Get 2m vars
+    if len(vars_2m)>0:
+        # Read grib file
+        ds1=xr.open_dataset(
+            tempfile,
+            filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 2}
+        )
+
+    # Get surface vars
+    if len(vars_surf)>0:
+        # Read grib file
+        ds2=xr.open_dataset(
+            tempfile,
+            filter_by_keys={'typeOfLevel': 'surface', 'stepType': 'instant'}
+        )
+        # Add height above ground field
+        ds2=ds2.assign_coords({'heightAboveGround': np.float64(0)})
+
+    # Get 10m vars
+    if len(vars_10m)>0:
+        # Read grib file
+        ds3=xr.open_dataset(
+            tempfile,
+            filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 10}
+        )
+
+    return ds1, ds2, ds3
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
 def gather_hrrr_time_range(start, end, pts, vs,
                            source_url = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.",
