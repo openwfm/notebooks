@@ -277,7 +277,7 @@ def format_raws(stn, fixnames = True):
     # Simplify names 
     if fixnames:
         var_mapping = {
-            'date_time': 'time', 'precip_accum': 'rain', 
+            'date_time': 'time', 'precip_accum': 'rain', 'solar_radiation': 'solar',
             'fuel_moisture': 'fm', 'relative_humidity': 'rh',
             'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew', 'STID': 'STID',
             'LONGITUDE': 'lon', 'LATITUDE': 'lat'
