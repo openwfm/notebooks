@@ -314,10 +314,11 @@ def run_rnn(case_data,params,fit=True,title2=''):
     return rmse_data(case_data)
     
     
-def run_case(case_data,params):
+def run_case(case_data,params, check_data=False):
     print('\n***** ',case_data['case'],' *****\n')
     case_data['rain'][np.isnan(case_data['rain'])] = 0
-    check_data(case_data)
+    if check_data:
+        check_data(case_data)
     hours=case_data['hours']
     if 'train_frac' in params:
         case_data['h2'] = round(hours * params['train_frac'])
