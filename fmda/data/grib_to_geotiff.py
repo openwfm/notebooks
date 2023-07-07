@@ -2,6 +2,8 @@ import argparse
 from osgeo import gdal
 import numpy as np
 
+gdal.DontUseExceptions()
+
 def grib_to_geotiff(input_filename, output_filename_base, band_number):
     # Open the GRIB file
     ds = gdal.Open(input_filename)
