@@ -2,7 +2,7 @@ import argparse
 from osgeo import gdal
 import numpy as np
 
-def grib_to_geotiff(input_filename, output_filename, band_number):
+def grib_to_geotiff(input_filename, output_filename_base, band_number):
     # Open the GRIB file
     ds = gdal.Open(input_filename)
     
@@ -20,6 +20,9 @@ def grib_to_geotiff(input_filename, output_filename, band_number):
     if len(arr.shape) != 2:
         print(f"Skipping band {band_number} because it is not 2D")
         return
+
+    # Create the output filename
+    output_filename = f"{output_filename_base}.{band_number}.tif"
 
     # Create a new data source in memory
     driver = gdal.GetDriverByName("GTiff")
@@ -43,11 +46,11 @@ if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Extract a band from a GRIB file and save as a GeoTIFF if it is 2D.')
     parser.add_argument('input_filename', help='Path to the input GRIB file')
-    parser.add_argument('output_filename', help='Path to the output GeoTIFF file')
+    parser.add_argument('output_filename_base', help='Base of the output GeoTIFF filename (band number will be appended)')
     parser.add_argument('band_number', type=int, help='Number of the band to extract (1-based)')
 
     args = parser.parse_args()
 
     # Call the function with the arguments
-    grib_to_geotiff(args.input_filename, args.output_filename, args.band_number)
+    grib_to_geotiff(args.input_filename, args.output_filename_base, args.band_number)
 
