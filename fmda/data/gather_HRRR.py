@@ -250,3 +250,60 @@ def gather_hrrr_time_range(start, end, pts, vs,
 
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+if __name__ == '__main__':
+    print('executing main code')
+    
+    #-------------------------------------------------------------
+    ## Make into json config file
+    hrrr_config = {
+        'start_time': "2022-06-01 00:00",
+        'end_time': "2022-06-01 02:00",
+        'dest_dir': "" # optional subdir string, needs more tests
+    }
+    #-------------------------------------------------------------
+    
+
+    # Handle Dates
+    fmt = "%Y-%m-%d %H:%M"
+    time1 = datetime.strptime(hrrr_config["start_time"], fmt) # use Dict util to get . operator to match wrfxpy
+    time2 = datetime.strptime(hrrr_config["end_time"], fmt) # use Dict util to get . operator to match wrfxpy
+    dates = pd.date_range(start=time1,end=time2, freq="1H") # Series of dates in 1 hour increments
+    
+    for t in range(0, dates.shape[0]):
+        # Format time
+        time=dates[t].strftime("%Y-%m-%d %H:%M")
+        print('Time '+str(t)+', '+str(time))
+
+        # Format output subdirectory
+        dest_dir = ''
+        time_str = datetime.strptime(time,'%Y-%m-%d %H:%M').strftime("%Y-%m-%d_%H")
+        os.makedirs(osp.join(dest_dir, time_str), exist_ok=True)
+
+        # Temporarily download grib file at given time
+        tempfile, url = download_grib(
+            source_url = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com",
+            time = time,
+            model = "wrfsfcf",
+            dest_dir = osp.join(dest_dir, time_str)
+        )
+
+        # Slice HRRR grib file
+        ds1, ds2, ds3 = slice_hrrr(tempfile,vs)
+
+        # Save Slices
+        ds1.to_netcdf(osp.join(dest_dir, time_str, time_str +'-hrrr-2m.nc'))
+        ds2.to_netcdf(osp.join(dest_dir, time_str, time_str +'-hrrr-surf.nc'))
+        ds3.to_netcdf(osp.join(dest_dir, time_str, time_str +'-hrrr-10m.nc'))
+
+        os.remove(tempfile)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
