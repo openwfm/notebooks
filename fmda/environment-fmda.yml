@@ -1,0 +1,28 @@
+name: fmda
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.9.12
+  - pip
+
+  #==============
+  # Dependencies
+  #==============
+
+  - tensorflow>=2.9.2
+  - keras>=2.9.0
+  - matplotlib>=3.5.3
+  - numpy
+  - pandas
+  - xarray>=0.20.1
+  - osgeo
+  - jupyter
+  - jupyterlab
+  - pip:
+    - datetime
+    - functools
+    - json
+    - pickle
+    - MesoPy>=2.0.3
+    - sklearn
+
