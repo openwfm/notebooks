@@ -3,6 +3,7 @@
 ## Functions assume hourly data
 
 import os
+import os.path as osp
 import subprocess
 import pandas as pd
 import numpy as np
@@ -113,38 +114,23 @@ def west_to_east(pts):
     
 
     
-def slice_hrrr(tempfile, vs):
-    # Given Grib file location and df of variables,
-    # slice layers 2m, 10m, and surface
-    vars_2m=list(vs['HRRR Name'][vs['Layer'] == '2m'])
-    vars_10m=list(vs['HRRR Name'][vs['Layer'] == '10m'])
-    vars_surf=list(vs['HRRR Name'][vs['Layer'] == 'surface'])
+def slice_hrrr(tempfile):
 
-    # Get 2m vars
-    if len(vars_2m)>0:
-        # Read grib file
-        ds1=xr.open_dataset(
+    ds1=xr.open_dataset(
             tempfile,
             filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 2}
-        )
-
-    # Get surface vars
-    if len(vars_surf)>0:
-        # Read grib file
-        ds2=xr.open_dataset(
+    )
+    ds2=xr.open_dataset(
             tempfile,
             filter_by_keys={'typeOfLevel': 'surface', 'stepType': 'instant'}
-        )
-        # Add height above ground field
-        ds2=ds2.assign_coords({'heightAboveGround': np.float64(0)})
-
-    # Get 10m vars
-    if len(vars_10m)>0:
-        # Read grib file
-        ds3=xr.open_dataset(
+    )
+        
+    ds2=ds2.assign_coords({'heightAboveGround': np.float64(0)}) # Add height above ground field
+    ds3=xr.open_dataset(
             tempfile,
             filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 10}
         )
+
 
     return ds1, ds2, ds3
     
@@ -289,7 +275,7 @@ if __name__ == '__main__':
         )
 
         # Slice HRRR grib file
-        ds1, ds2, ds3 = slice_hrrr(tempfile,vs)
+        ds1, ds2, ds3 = slice_hrrr(tempfile)
 
         # Save Slices
         ds1.to_netcdf(osp.join(dest_dir, time_str, time_str +'-hrrr-2m.nc'))
