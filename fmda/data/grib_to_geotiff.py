@@ -5,6 +5,14 @@ import numpy as np
 gdal.DontUseExceptions()
 
 def grib_to_geotiff(input_filename, output_filename_base, band_number):
+    """
+    Convert existing grib file to geotiff. 
+    :param input_filename:   str, file name w relative path
+    :param output_filename_base:  str, output file name that is later appended
+    :param band_number:   integer?
+    :return: None
+    """
+    
     # Open the GRIB file
     ds = gdal.Open(input_filename)
     
