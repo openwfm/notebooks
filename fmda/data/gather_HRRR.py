@@ -4,11 +4,14 @@
 
 import os
 import os.path as osp
+import json
 import subprocess
 import pandas as pd
 import numpy as np
 import xarray as xr
 from datetime import date, timedelta, datetime
+
+
 
 def download_grib(time,model,source_url="https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.",dest_dir="",fmt = "%Y-%m-%d %H:%M",sector="conus",forecast_hour = 0  ):
     # source_url: starting url string that specifies grib data source
@@ -240,15 +243,8 @@ def gather_hrrr_time_range(start, end, pts, vs,
 if __name__ == '__main__':
     print('executing main code')
     
-    #-------------------------------------------------------------
-    ## Make into json config file
-    hrrr_config = {
-        'start_time': "2022-06-01 00:00",
-        'end_time': "2022-06-01 02:00",
-        'dest_dir': "" # optional subdir string, needs more tests
-    }
-    #-------------------------------------------------------------
-    
+    # Read config json file
+    hrrr_config = json.load(open('hrrr_conf.json','r'))
 
     # Handle Dates
     fmt = "%Y-%m-%d %H:%M"
