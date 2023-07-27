@@ -1,4 +1,4 @@
-name: fmda
+name: fmda_ml
 channels:
   - conda-forge
 dependencies:
@@ -14,15 +14,11 @@ dependencies:
   - matplotlib>=3.5.3
   - numpy
   - pandas
-  - xarray>=0.20.1
-  - osgeo
   - jupyter
   - jupyterlab
   - pip:
     - datetime
-    - functools
     - json
     - pickle
-    - MesoPy>=2.0.3
     - sklearn
 

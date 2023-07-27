@@ -1,0 +1,15 @@
+name: fmda_data
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.9.12
+  - pip
+  - gdal
+  - xarray
+  - pandas
+  - numpy
+  - matplotlib
+  - jupyter
+  - jupyterlab
+  - pip:
+    - MesoPy
