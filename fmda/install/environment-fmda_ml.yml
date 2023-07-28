@@ -4,11 +4,6 @@ channels:
 dependencies:
   - python>=3.9.12
   - pip
-
-  #==============
-  # Dependencies
-  #==============
-
   - tensorflow>=2.9.2
   - keras>=2.9.0
   - matplotlib>=3.5.3
