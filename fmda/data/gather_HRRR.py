@@ -245,6 +245,7 @@ if __name__ == '__main__':
     
     # Read config json file
     hrrr_config = json.load(open('hrrr_conf.json','r'))
+    dest_dir = hrrr_config['dest_dir']
 
     # Handle Dates
     fmt = "%Y-%m-%d %H:%M"
@@ -258,7 +259,6 @@ if __name__ == '__main__':
         print('Time '+str(t)+', '+str(time))
 
         # Format output subdirectory
-        dest_dir = ''
         time_str = datetime.strptime(time,'%Y-%m-%d %H:%M').strftime("%Y-%m-%d_%H")
         os.makedirs(osp.join(dest_dir, time_str), exist_ok=True)
 
