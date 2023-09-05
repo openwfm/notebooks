@@ -9,7 +9,7 @@ def grib_to_geotiff(input_filename, output_filename_base, band_number):
     Convert existing grib file to geotiff. 
     :param input_filename:   str, file name w relative path
     :param output_filename_base:  str, output file name that is later appended
-    :param band_number:   integer?
+    :param band_number:   integer
     :return: None
     """
     
@@ -51,6 +51,7 @@ def grib_to_geotiff(input_filename, output_filename_base, band_number):
     out_ds = None
 
     print(f"Band {band_number} from {input_filename} saved to {output_filename}")
+   
 
 if __name__ == '__main__':
     # Parse command line arguments
