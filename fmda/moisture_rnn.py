@@ -2,7 +2,8 @@ import numpy as np
 import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense, SimpleRNN
-from keras.utils.vis_utils import plot_model
+# from keras.utils.vis_utils import plot_model
+from keras.utils import plot_model
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 import math
