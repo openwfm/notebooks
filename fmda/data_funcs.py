@@ -4,7 +4,7 @@
 import numpy as np, random
 from numpy.random import rand
 from MesoPy import Meso
-import tensorflow as tf
+# import tensorflow as tf
 import pickle, os
 
 import matplotlib.pyplot as plt
@@ -78,7 +78,7 @@ def check_data(dat,case=True,name=None):
  
 def to_json(dic,filename):
     print('writing ',filename)
-    check_data(dic)
+    # check_data(dic)
     new={}
     for i in dic:
         if type(dic[i]) is np.ndarray:
@@ -150,7 +150,7 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     
     return dat
 
-def plot_one(hmin,hmax,dat,name,linestyle,c,label,type='plot'):
+def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
 # helper for plot_data
     if name in dat:
         h = len(dat[name])
@@ -160,9 +160,9 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label,type='plot'):
             hmax=len(dat[name])
         hour = np.array(range(hmin,hmax))
         if type=='plot':
-            plt.plot(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label)
+            plt.plot(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
         elif type=='scatter':
-            plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label)
+            plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
             
 def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     if 'hours' in dat:
@@ -171,13 +171,30 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
         else:
             hmax = min(hmax, dat['hours'])
     plt.figure(figsize=(16,4))
-    plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='equilibrium')
-    plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='r',label='drying equilibrium')
-    plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='b',label='wetting equilibrium')
-    plot_one(hmin,hmax,dat,'fm',linestyle='-',c='g',label='FMC truth')
-    plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FMC estimate')
-    plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='g',label='equilibrium correction')
-    plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='rain intensity')
+    plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
+    plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
+    plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='#7CCCEF',label='wetting EQ', alpha=.8)
+    plot_one(hmin,hmax,dat,'fm',linestyle='-',c='#8BC084',label='FM Observed')
+    plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
+    plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
+    plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    plt.axvline(dat['h2'], linestyle=':', c='k', alpha=.8)
+    
+    plt.annotate('', xy=(0, -6),xytext=(dat['h2'],-6),                  
+            arrowprops=dict(arrowstyle='<->'),
+            annotation_clip=False)
+    plt.annotate('Training',xy=(np.ceil(dat['h2']/2),-7),xytext=(np.ceil(dat['h2']/2),-7),
+            annotation_clip=False)
+    plt.annotate('', xy=(dat['h2'], -6),xytext=(dat['hours'],-6),                  
+            arrowprops=dict(arrowstyle='<->'),
+            annotation_clip=False)
+    plt.annotate('Forecast',xy=(dat['h2']+np.ceil(dat['h2']/2),-7),xytext=(dat['h2']+np.ceil(dat['h2']/2),-7),
+            annotation_clip=False)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    
     if title is not None:
         t = title
     else:
@@ -185,11 +202,11 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
         # print('title',type(t),t)
     if title2 is not None:
         t = t + ' ' + title2 
-    t = t + ' ' + rmse_data_str(dat)
+    t = t + ' (' + rmse_data_str(dat)+')'
     plt.title(t)
     plt.xlabel('Time (hours)')
     if 'rain' in dat:
-        plt.ylabel('FMC (%) / Rain mm/h')
+        plt.ylabel('FM (%) / Rain (mm/h)')
     else:
         plt.ylabel('Fuel moisture content (%)')
     plt.legend()
