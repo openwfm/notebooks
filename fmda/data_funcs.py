@@ -181,18 +181,21 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     plt.axvline(dat['h2'], linestyle=':', c='k', alpha=.8)
-    
-    plt.annotate('', xy=(0, -6),xytext=(dat['h2'],-6),                  
-            arrowprops=dict(arrowstyle='<->'),
+    yy = plt.ylim() # used to format annotations
+    plt.annotate('', xy=(yy[0], yy[0]),xytext=(dat['h2'],yy[0]),                  
+            arrowprops=dict(arrowstyle='<-', linewidth=2),
             annotation_clip=False)
-    plt.annotate('Training',xy=(np.ceil(dat['h2']/2),-7),xytext=(np.ceil(dat['h2']/2),-7),
+    plt.annotate('(Training)',xy=(np.ceil(dat['h2']/2),yy[1]),xytext=(np.ceil(dat['h2']/2),yy[1]+1),
+            annotation_clip=False, alpha=.8)
+    plt.annotate('', xy=(dat['h2'], yy[0]),xytext=(dat['hours'],yy[0]),                  
+            arrowprops=dict(arrowstyle='<-', linewidth=2),
             annotation_clip=False)
-    plt.annotate('', xy=(dat['h2'], -6),xytext=(dat['hours'],-6),                  
-            arrowprops=dict(arrowstyle='<->'),
-            annotation_clip=False)
-    plt.annotate('Forecast',xy=(dat['h2']+np.ceil(dat['h2']/2),-7),xytext=(dat['h2']+np.ceil(dat['h2']/2),-7),
-            annotation_clip=False)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    plt.annotate('(Forecast)',xy=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]),
+                 xytext=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]+1),
+            annotation_clip=False, alpha=.8)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     
     if title is not None:
@@ -203,7 +206,7 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     if title2 is not None:
         t = t + ' ' + title2 
     t = t + ' (' + rmse_data_str(dat)+')'
-    plt.title(t)
+    plt.title(t, y=1.1)
     plt.xlabel('Time (hours)')
     if 'rain' in dat:
         plt.ylabel('FM (%) / Rain (mm/h)')
