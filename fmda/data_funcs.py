@@ -75,8 +75,17 @@ def check_data(dat,case=True,name=None):
             else:
                 print('%s = %s' % (a,dat[a]),' ',type(dat[a]))
         del dat[items] # clean up
- 
+
+# Note: the project structure has moved towards pickle files, so these json funcs might not be needed
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def to_json(dic,filename):
+    # Write given dictionary as json file. 
+    # This utility is used because the typical method fails on numpy.ndarray 
+    # Inputs:
+    # dic: dictionary
+    # filename: (str) output json filename, expect a ".json" file extension
+    # Return: none
+    
     print('writing ',filename)
     # check_data(dic)
     new={}
@@ -91,6 +100,9 @@ def to_json(dic,filename):
     json.dump(new,open(filename,'w'),indent=4)
 
 def from_json(filename):
+    # Read json file given a filename
+    # Inputs: filename (str) expect a ".json" string
+    
     print('reading ',filename)
     dic=json.load(open(filename,'r'))
     new={}
@@ -102,6 +114,8 @@ def from_json(filename):
     check_data(new)
     print('Hash: ', hash2(new))
     return new
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Function to simulate moisture data and equilibrium for model testing
 def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,DeltaE=0.0):
@@ -124,7 +138,6 @@ def create_synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,Delt
     return E,m_f,data,hour,h2,DeltaE
     
 # the following input or output dictionary with all model data and variables
-
        
 def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     DeltaE=0.0,Emin=5,Emax=30,p_rain=0.01,max_rain=10.0):
@@ -151,7 +164,7 @@ def synthetic_data(days=20,power=4,data_noise=0.02,process_noise=0.0,
     return dat
 
 def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
-# helper for plot_data
+    # helper for plot_data
     if name in dat:
         h = len(dat[name])
         if hmin is None:
@@ -165,6 +178,11 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
             plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
             
 def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
+    # Plot fmda dictionary of data and model if present
+    # Inputs:
+    # dat: FMDA dictionary
+    # Returns: none
+    
     if 'hours' in dat:
         if hmax is None:
             hmax = dat['hours']
@@ -180,6 +198,7 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Note: the code within the tildes here makes a more complex, annotated plot
     plt.axvline(dat['h2'], linestyle=':', c='k', alpha=.8)
     yy = plt.ylim() # used to format annotations
     plt.annotate('', xy=(yy[0], yy[0]),xytext=(dat['h2'],yy[0]),                  
@@ -193,9 +212,7 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plt.annotate('(Forecast)',xy=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]),
                  xytext=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]+1),
             annotation_clip=False, alpha=.8)
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     
     if title is not None:
@@ -212,7 +229,7 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
         plt.ylabel('FM (%) / Rain (mm/h)')
     else:
         plt.ylabel('Fuel moisture content (%)')
-    plt.legend()
+    plt.legend(loc="upper left")
     
 # Calculate mean squared error
 def rmse(a, b):
@@ -263,8 +280,13 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
 ## RAWS Data Functions
 
 def format_raws(stn, fixnames = True):
-    raws_dat = stn['OBSERVATIONS'].copy() # bug fix for in-place changing of dictionary outside of func call
+    # Given RAWS station, format and clean data
+    # Inputs: 
+    # stn: (dict) part of output of MesoPy query
+    # fixnames: (bool) whether or not to change input names from the MesoPy format. Default T as it simplifies the names
+    # Return: formatted dict 
     
+    raws_dat = stn['OBSERVATIONS'].copy() # bug fix for in-place changing of dictionary outside of func call
     # Convert to Numpy arrays, check data type for floats
     for key in [*stn['OBSERVATIONS'].keys()]:
         if type(stn['OBSERVATIONS'][key][0]) is float:
@@ -341,6 +363,12 @@ def format_rtma(rtma):
     return rtma_dict
 
 def format_precip(precipa):
+    # Converts accumulated precipitation (typically units of in or mm) to rainfall (mm/hr)
+    # Inputs: 
+    # precipa: numpy array of accumulated precip values 
+    # Returns:
+    # rainfall (typically hourly based on data products)
+    
     rain=np.array(precipa, dtype = 'float64')
     rain = np.diff(rain) # first difference to convert accumulated to hourly
     rain = np.insert(rain, 0, [np.NaN]) # add NaN entry to account for diff
