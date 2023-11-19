@@ -246,9 +246,25 @@ def rmse_str(a,b):
     rmse = rmse_skip_nan(a,b)
     return "RMSE " + "{:.2f}".format(rmse)
 
-def rmse_data_str(data):
-    if 'm' in data and 'fm' in data:
-        return rmse_str(data['m'],data['fm'])
+def rmse_data_str(dat, predict=True, hours = None, h2 = None):
+    # Return RMSE for model object in formatted string. Used within plotting
+    # Inputs:
+    # dat: (dict) fmda dictionary 
+    # predict: (bool) Whether to return prediction period RMSE. Default True 
+    # hours: (int) total number of modeled time periods
+    # h2: (int) end of training period
+    # Return: (str) RMSE value
+    
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['h2']
+    
+    if 'm' in dat and 'fm' in dat:
+        if predict:
+            return rmse_str(dat['m'][h2:hours],dat['fm'][h2:hours])
+        else: 
+            return rmse_str(dat['m'],dat['fm'])
     else:
         return ''
                     
