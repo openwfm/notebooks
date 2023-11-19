@@ -1,15 +1,6 @@
 import numpy as np
-import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN
-from keras.utils.vis_utils import plot_model
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error
 import math
 import matplotlib.pyplot as plt
-import tensorflow as tf
-import keras.backend as K
-import tensorflow as tf
 from utils import vprint
 
 
