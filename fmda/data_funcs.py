@@ -455,6 +455,12 @@ def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def load_and_fix_data(filename):
+    # Given path to FMDA training dictionary, read and return cleaned dictionary
+    # Inputs: 
+    # filename: (str) path to file with .pickle extension
+    # Returns:
+    # FMDA dictionary with NA values "fixed"
+    
     with open(filename, 'rb') as handle:
         test_dict = pickle.load(handle)
         for case in test_dict:
@@ -469,4 +475,9 @@ def load_and_fix_data(filename):
                         fixnan(var)
                         nans = np.sum(np.isnan(test_dict[case][key]))
                         print('After fixing, remained',nans,'nan values')
+            if not 'title' in test_dict[case].keys():
+                test_dict[case]['title']=case
+            if not 'descr' in test_dict[case].keys():
+                test_dict[case]['descr']=f"{case} FMDA dictionary"
     return test_dict
+
