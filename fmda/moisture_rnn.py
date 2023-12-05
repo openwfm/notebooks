@@ -2,7 +2,8 @@ import numpy as np
 import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense, SimpleRNN
-from keras.utils.vis_utils import plot_model
+# from keras.utils.vis_utils import plot_model
+from keras.utils import plot_model
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 import math
@@ -10,6 +11,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
+import pandas as pd
 from utils import vprint, hash2
 import reproducibility
 from data_funcs import check_data, rmse_data, plot_data
@@ -283,6 +285,12 @@ def rnn_predict(model, params, rnn_dat):
     return m
 
 def run_rnn(case_data,params,fit=True,title2=''):
+    # Run RNN on given case dictionary of FMDA data with certain params. Used internally in run_case
+    # Inputs:
+    # case_data: (dict) collection of cases with FMDA data. Cases are different locations and times, or synthetic data
+    # params: (dict) collection of run options for model
+    # fit: (bool) whether or not to fit RNN to data
+    # title2: (str) title of RNN run to be joined to string with other info for plotting title
     verbose = params['verbose']
     
     reproducibility.set_seed() # Set seed for reproducibility
@@ -314,10 +322,16 @@ def run_rnn(case_data,params,fit=True,title2=''):
     return rmse_data(case_data)
     
     
-def run_case(case_data,params):
+def run_case(case_data,params, check_data=False):
+    # Given a formatted FMDA dictionary of data, run RNN model using given run params
+    # Inputs:
+    # case_data: (dict)
+    # params: (dict) collection of run options for model
+    # Return: (dict) collection of RMSE error for RNN & EKF, for train and prediction periods
     print('\n***** ',case_data['case'],' *****\n')
     case_data['rain'][np.isnan(case_data['rain'])] = 0
-    check_data(case_data)
+    if check_data:
+        check_data(case_data)
     hours=case_data['hours']
     if 'train_frac' in params:
         case_data['h2'] = round(hours * params['train_frac'])
