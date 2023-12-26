@@ -46,7 +46,7 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
                     y_train[i,k,j] = y[i+k,j]
     else:
         vprint('returning only the last timestep in a sample')
-    y_train = np.empty([samples, outputs])
+        y_train = np.empty([samples, outputs])
     for i in range(samples):
         for j in range(features):
             for k in range(timesteps):
