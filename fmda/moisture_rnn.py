@@ -165,7 +165,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     return rnn_dat
 
-def train_rnn(rnn_dat, params,hours, fit=True):
+def train_rnn(rnn_dat, params,hours, fit=True, callbacks=None):
 
     verbose = params['verbose']
     
@@ -208,7 +208,12 @@ def train_rnn(rnn_dat, params,hours, fit=True):
     model_fit.set_weights(w)
     
     if fit:
-        model_fit.fit(x_train, y_train + centering[1] , epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
+        model_fit.fit(x_train, 
+                      y_train + centering[1] , 
+                      epochs=params['epochs'],
+                      batch_size=samples,
+                      callbacks = callbacks,
+                      verbose=params['verbose_fit'])
         w_fitted=model_fit.get_weights()
         if params['verbose_weights']:
             for i in range(len(w_fitted)):
@@ -346,3 +351,7 @@ def run_case(case_data,params, check_data=False):
     rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')})
     rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')})
     return rmse
+
+
+
+
