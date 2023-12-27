@@ -322,8 +322,9 @@ def run_rnn(case_data,params,fit=True,title2=''):
         rnn_dat['hours'],
         fit=fit
     )
-    
-    case_data['m'] = rnn_predict(model_predict, params, rnn_dat)
+
+    m = rnn_predict(model_predict, params, rnn_dat)
+    case_data['m'] = m
 
     hv = hash2(model_predict.get_weights())
     if case_data['case']=='case11' and fit:
@@ -338,7 +339,7 @@ def run_rnn(case_data,params,fit=True,title2=''):
     
     plot_data(case_data,title2=title2)
     plt.show()
-    return rmse_data(case_data)
+    return m, rmse_data(case_data)
     
     
 def run_case(case_data,params, check_data=False):
@@ -362,8 +363,8 @@ def run_case(case_data,params, check_data=False):
     plot_data(case_data,title2='augmented KF')
     rmse =      {'Augmented KF':rmse_data(case_data)}
     del case_data['Ec']  # cleanup
-    rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')})
-    rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')})
+    rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')[1]})
+    rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')[1]})
     return rmse
 
 
