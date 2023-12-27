@@ -72,14 +72,10 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     else:
         inputs = tf.keras.Input(shape=input_shape)
     # https://stackoverflow.com/questions/43448029/how-can-i-print-the-values-of-keras-tensors
-    # inputs2 = K.print_tensor(inputs, message='inputs = ')  # change allso inputs to inputs2 below, must be used
     x = inputs
     for i in range(rnn_layers):
         x = tf.keras.layers.SimpleRNN(hidden_units,activation=activation[0],
-              stateful=stateful,return_sequences=return_sequences)(x
-              # ,initial_state=initial_state
-              )
-    # x = tf.keras.layers.Dense(hidden_units, activation=activation[1])(x)
+              stateful=stateful,return_sequences=return_sequences)(x)
     for i in range(dense_layers):
         x = tf.keras.layers.Dense(dense_units, activation=activation[1])(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
@@ -87,6 +83,13 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     return model
 
 def create_rnn_data(dat, params, hours=None, h2=None):
+    # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
+    # Inputs:
+    # dat: (dict) fmda dictionary
+    # params: (dict) hyperparameters
+    # hours: (int) optional parameter to set total length of train+predict
+    # h2: (int) optional parameter to set as length of training period (h2 = total - hours)
+    # Returns: (dict) formatted datat used in RNN 
     timesteps = params['timesteps']
     scale = params['scale']
     rain_do = params['rain_do']
@@ -124,7 +127,6 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         print('scale_fm=',scale_fm,'scale_rain=',scale_rain)
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
-    # Et = np.reshape(E,[E.shape[0],1])
     
     if rain_do:
         Et = np.vstack((Ed, Ew, rain)).T
@@ -165,7 +167,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     return rnn_dat
 
-def train_rnn(rnn_dat, params,hours, fit=True):
+def train_rnn(rnn_dat, params,hours, fit=True, callbacks=None):
 
     verbose = params['verbose']
     
@@ -208,7 +210,12 @@ def train_rnn(rnn_dat, params,hours, fit=True):
     model_fit.set_weights(w)
     
     if fit:
-        model_fit.fit(x_train, y_train + centering[1] , epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
+        model_fit.fit(x_train, 
+                      y_train + centering[1] , 
+                      epochs=params['epochs'],
+                      batch_size=samples,
+                      callbacks = callbacks,
+                      verbose=params['verbose_fit'])
         w_fitted=model_fit.get_weights()
         if params['verbose_weights']:
             for i in range(len(w_fitted)):
@@ -223,7 +230,12 @@ def train_rnn(rnn_dat, params,hours, fit=True):
     return model_predict
 
 def get_initial_weights(model_fit,params,rnn_dat):
-    
+    # Given a RNN architecture and hyperparameter dictionary, return array of physics-initiated weights
+    # Inputs:
+    # model_fit: output of create_RNN_2 with no training
+    # params: (dict) dictionary of hyperparameters
+    # rnn_dat: (dict) data dictionary, output of create_rnn_dat
+    # Returns: numpy ndarray of weights that should be a rough solution to the moisture ODE
     DeltaE = params['DeltaE']
     T1 = params['T1']
     fmr = params['fm_raise_vs_rain']
@@ -265,6 +277,13 @@ def get_initial_weights(model_fit,params,rnn_dat):
     return w, w_name
 
 def rnn_predict(model, params, rnn_dat):
+    # Given compiled model, hyperparameters, and data dictionary, return array of predicted values.
+    # NOTE: this does not distinguish in-sample vs out-of-sample data, it just fits the model to the given data
+    # Inputs:
+    # model: compiled moisture model
+    # params: (dict) dictionary of hyperparameters
+    # rnn_dat: (dict) dictionary of data to fit model to, output of create_rnn_dat
+    # Returns: numpy array of fitted moisture values
     verbose = params['verbose']
     centering = params['centering']
     features = rnn_dat['features']
@@ -303,8 +322,9 @@ def run_rnn(case_data,params,fit=True,title2=''):
         rnn_dat['hours'],
         fit=fit
     )
-    
-    case_data['m'] = rnn_predict(model_predict, params, rnn_dat)
+
+    m = rnn_predict(model_predict, params, rnn_dat)
+    case_data['m'] = m
 
     hv = hash2(model_predict.get_weights())
     if case_data['case']=='case11' and fit:
@@ -319,7 +339,7 @@ def run_rnn(case_data,params,fit=True,title2=''):
     
     plot_data(case_data,title2=title2)
     plt.show()
-    return rmse_data(case_data)
+    return m, rmse_data(case_data)
     
     
 def run_case(case_data,params, check_data=False):
@@ -343,6 +363,10 @@ def run_case(case_data,params, check_data=False):
     plot_data(case_data,title2='augmented KF')
     rmse =      {'Augmented KF':rmse_data(case_data)}
     del case_data['Ec']  # cleanup
-    rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')})
-    rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')})
+    rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')[1]})
+    rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')[1]})
     return rmse
+
+
+
+
