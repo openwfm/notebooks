@@ -213,6 +213,63 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     return rnn_dat
 
+def train_rnn_2(rnn_dat, params,hours, fit=True):
+
+    verbose = params['verbose']
+    
+    if hours is None:
+        hours = rnn_dat['hours']
+    
+    samples = rnn_dat['samples']
+    features = rnn_dat['features']
+    timesteps = rnn_dat['timesteps']
+    centering = params['centering']
+    
+    model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'], 
+                        batch_shape=(samples,timesteps,features),
+                        stateful=True,
+                        return_sequences=False,
+                        # initial_state=h0,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
+                        verbose = verbose)
+    
+    Et = rnn_dat['Et']
+    model_predict=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'],  
+                        input_shape=(hours,features),stateful = False,
+                        return_sequences=True,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
+                        verbose = verbose)
+    
+    if verbose: print(model_predict.summary())
+    
+    x_train = rnn_dat['x_train']
+    y_train = rnn_dat['y_train']
+
+    model_fit(x_train) ## evalue the model once to set nonzero initial state
+    
+    w, w_name=get_initial_weights(model_fit, params, rnn_dat)
+    
+    model_fit.set_weights(w)
+    
+    if fit:
+        model_fit.fit(x_train, y_train + centering[1] , epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
+        w_fitted=model_fit.get_weights()
+        if params['verbose_weights']:
+            for i in range(len(w_fitted)):
+                print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
+    else:
+        print('Fitting skipped, using initial weights')
+        w_fitted=w
+        
+    model_predict.set_weights(w_fitted)
+    
+    return model_predict
+
 def train_rnn(rnn_dat, params,hours, fit=True):
 
     verbose = params['verbose']
