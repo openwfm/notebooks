@@ -56,6 +56,54 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
 
     return x_train, y_train
 
+def staircase_2(x,y,timesteps,return_sequences=False, verbose = True):
+    # create RNN training data in multiple batches
+    # input:
+    #     x (,features)  
+    #     y (,outputs)
+    #     timesteps: split x and y into sequences length timesteps
+    #                a.k.a. lookback or sequence_length    
+    
+    # print params if verbose
+    vprint('shape x = ',x.shape)
+    vprint('shape y = ',y.shape)
+    vprint('timesteps=',timesteps)
+    vprint('return_sequences=',return_sequences)
+    
+    nx,features= x.shape
+    ny,outputs = y.shape
+    data_items = min(nx,ny)   
+    batch_size = timesteps 
+    
+    # sequence j in a given batch is assumed to be the continuation of sequence j in the previous batch
+    # https://www.tensorflow.org/guide/keras/working_with_rnns Cross-batch statefulness
+    
+    # the first data item in batch i sequence j is at (i*batch_size+j)+0
+    # the last  data item in batch i sequence j is at (i*batch_size+j)+timesteps-1
+    # the last data item in the traning set is last item in the sequence at [batches-1,batch_size-1]
+    #   = ((batches-1)*batch_size +  batch_size - 1) + timesteps -1
+    #   = batches*batch_size + timesteps - 2 
+    
+    batches = (data_items - timesteps +2) // batch_size
+    x_train = np.zeros((batches,batch_size, timesteps, features))
+    if return_sequences:
+        vprint('returning all timesteps in a sample')
+        y_train = np.zeros((batches,batch_size, timesteps, outputs))
+    else:
+        y_train = np.zeros((batches,batch_size, outputs ))
+    for i in range(batches):
+        for j in range(batch_size):
+            beg = i*batch_size+j
+            nxt = beg+timesteps   # one higher per python
+            print('batch',i,'sequence',j,'data items',beg,'to',nxt-1)
+            x_train[i,j,:,:] = x[beg:nxt,:]
+            if return_sequences:
+                 y_train[i,j,:,:] = y[beg:nxt,:]
+            else:
+                 y_train[i,j,:] = y[nxt-1,:]   
+    return x_train, y_train
+
+
 def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
                  batch_shape=None, input_shape=None, dense_layers=1,
                  rnn_layers=1,return_sequences=False,
