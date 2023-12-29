@@ -18,7 +18,6 @@ from data_funcs import check_data, rmse_data, plot_data
 import moisture_models as mod
 
 
-
 def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
     # x [trainsteps+forecaststeps,features]    all inputs
     # y [trainsteps,outputs]
@@ -56,7 +55,7 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
 
     return x_train, y_train
 
-def staircase_2(x,y,timesteps,return_sequences=False, verbose = True):
+def staircase_2(x,y,timesteps,trainsteps,return_sequences=False, verbose = True):
     # create RNN training data in multiple batches
     # input:
     #     x (,features)  
@@ -72,7 +71,7 @@ def staircase_2(x,y,timesteps,return_sequences=False, verbose = True):
     
     nx,features= x.shape
     ny,outputs = y.shape
-    data_items = min(nx,ny)   
+    data_items = min(nx,ny,trainsteps)   
     batch_size = timesteps 
     
     # sequence j in a given batch is assumed to be the continuation of sequence j in the previous batch
