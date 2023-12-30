@@ -55,7 +55,7 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
 
     return x_train, y_train
 
-def staircase_2(x,y,timesteps,trainsteps,return_sequences=False, verbose = True):
+def staircase_2(x,y,timesteps,trainsteps=999999999,return_sequences=False, verbose = True):
     # create RNN training data in multiple batches
     # input:
     #     x (,features)  
