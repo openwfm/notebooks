@@ -141,6 +141,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     scale = params['scale']
     rain_do = params['rain_do']
     verbose = params['verbose']
+    version = params['version']
     
     if hours is None:
         hours = dat['hours']
