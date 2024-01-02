@@ -335,7 +335,10 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=None):
     print('x_train shape =',x_train.shape)
     print('y_train shape =',y_train.shape)
     
-    model_fit(x_train) ## evalue the model once to set nonzero initial state
+    if batches is None:
+        model_fit(x_train) ## evalue the model once to set nonzero initial state
+    else:
+        model_fit(x_train[0]) ## evalue the model once to set nonzero initial state
     
     w, w_name=get_initial_weights(model_fit, params, rnn_dat)
     
@@ -362,7 +365,8 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=None):
                           callbacks = callbacks,
                           verbose=params['verbose_fit'])  
                     model_fit.reset_states()
-                    print('epoch',i,'done') 
+                    # print('epoch',i,'batch j','done') 
+                print('epoch',i,'done')
 
         w_fitted=model_fit.get_weights()
         if params['verbose_weights']:
