@@ -330,6 +330,10 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=None):
     x_train = rnn_dat['x_train']
     y_train = rnn_dat['y_train']
     
+    print('train_rnn: batches=',batches)
+    print('x_train shape =',x_train.shape)
+    print('y_train shape =',y_train.shape)
+    
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
     w, w_name=get_initial_weights(model_fit, params, rnn_dat)
