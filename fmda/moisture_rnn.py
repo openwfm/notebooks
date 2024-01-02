@@ -95,7 +95,7 @@ def staircase_2(x,y,timesteps,trainsteps=999999999,return_sequences=False, verbo
         for j in range(batch_size):
             beg = i*batch_size+j
             nxt = beg+timesteps   # one higher per python
-            print('batch',i,'sequence',j,'data items',beg,'to',nxt-1)
+            # print('batch',i,'sequence',j,'data items',beg,'to',nxt-1)
             x_train[i,j,:,:] = x[beg:nxt,:]
             if return_sequences:
                  y_train[i,j,:,:] = y[beg:nxt,:]
