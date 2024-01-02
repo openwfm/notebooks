@@ -18,7 +18,6 @@ from data_funcs import check_data, rmse_data, plot_data
 import moisture_models as mod
 import sys
 
-batch_type = 1
 
 def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
     # x [trainsteps+forecaststeps,features]    all inputs
@@ -143,6 +142,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     scale = params['scale']
     rain_do = params['rain_do']
     verbose = params['verbose']
+    batch_type = params['batch_type']
     
     if hours is None:
         hours = dat['hours']
@@ -186,6 +186,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     datat = np.reshape(fm,[fm.shape[0],1])
     
     # split data
+    print('batch_type=',batch_type)
     if batch_type == 1:
         x_train, y_train = staircase(Et,datat,timesteps=timesteps,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
@@ -193,7 +194,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         x_train, y_train = staircase_2(Et,datat,timesteps=timesteps,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
     else:
-        print('unknown batch_type =',batch_type)
+        print('unknown batch_type',batch_type)
     
     vprint('x_train shape=',x_train.shape)
     
