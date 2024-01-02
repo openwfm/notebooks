@@ -178,7 +178,7 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
         elif type=='scatter':
             plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
             
-def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
+def plot_data(dat,title=None,title2=None,hmin=0,h2=None,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
@@ -197,39 +197,52 @@ def plot_data(dat,title=None,title2=None,hmin=None,hmax=None):
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
     plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
     plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
+    # for test
+    plot_one(hmin,hmax,dat,'x',linestyle='-',c='g',label='x input')
+    plot_one(hmin,hmax,dat,'y',linestyle='-',c='k',label='y truth')
+    plot_one(hmin,hmax,dat,'z',linestyle='-',c='r',label='z output')
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Note: the code within the tildes here makes a more complex, annotated plot
-    plt.axvline(dat['h2'], linestyle=':', c='k', alpha=.8)
-    yy = plt.ylim() # used to format annotations
-    plt.annotate('', xy=(yy[0], yy[0]),xytext=(dat['h2'],yy[0]),                  
-            arrowprops=dict(arrowstyle='<-', linewidth=2),
-            annotation_clip=False)
-    plt.annotate('(Training)',xy=(np.ceil(dat['h2']/2),yy[1]),xytext=(np.ceil(dat['h2']/2),yy[1]+1),
-            annotation_clip=False, alpha=.8)
-    plt.annotate('', xy=(dat['h2'], yy[0]),xytext=(dat['hours'],yy[0]),                  
-            arrowprops=dict(arrowstyle='<-', linewidth=2),
-            annotation_clip=False)
-    plt.annotate('(Forecast)',xy=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]),
-                 xytext=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]+1),
-            annotation_clip=False, alpha=.8)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if h2 is not None:
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Note: the code within the tildes here makes a more complex, annotated plot
+        plt.axvline(dat['h2'], linestyle=':', c='k', alpha=.8)
+        yy = plt.ylim() # used to format annotations
+        plt.annotate('', xy=(yy[0], yy[0]),xytext=(dat['h2'],yy[0]),                  
+                arrowprops=dict(arrowstyle='<-', linewidth=2),
+                annotation_clip=False)
+        plt.annotate('(Training)',xy=(np.ceil(dat['h2']/2),yy[1]),xytext=(np.ceil(dat['h2']/2),yy[1]+1),
+                annotation_clip=False, alpha=.8)
+        plt.annotate('', xy=(dat['h2'], yy[0]),xytext=(dat['hours'],yy[0]),                  
+                arrowprops=dict(arrowstyle='<-', linewidth=2),
+                annotation_clip=False)
+        plt.annotate('(Forecast)',xy=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]),
+                     xytext=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]+1),
+                annotation_clip=False, alpha=.8)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     
     if title is not None:
         t = title
-    else:
+    elif 'title' in dat:
         t=dat['title']
         # print('title',type(t),t)
+    else:
+        t=''
     if title2 is not None:
         t = t + ' ' + title2 
     t = t + ' (' + rmse_data_str(dat)+')'
     plt.title(t, y=1.1)
-    plt.xlabel('Time (hours)')
+    
+    if xlabel is None:
+        plt.xlabel('Time (hours)')
+    else:
+        plt.xlabel(xlabel)
     if 'rain' in dat:
         plt.ylabel('FM (%) / Rain (mm/h)')
-    else:
+    elif ylabel is None:
         plt.ylabel('Fuel moisture content (%)')
+    else:
+        plt.ylabel(ylabel)
     plt.legend(loc="upper left")
     
 # Calculate mean squared error
@@ -257,12 +270,14 @@ def rmse_data_str(dat, predict=True, hours = None, h2 = None):
     # Return: (str) RMSE value
     
     if hours is None:
-        hours = dat['hours']
+        if 'hours' in dat:
+            hours = dat['hours']               
     if h2 is None:
-        h2 = dat['h2']
+        if 'h2' in dat:
+            h2 = dat['h2']
     
     if 'm' in dat and 'fm' in dat:
-        if predict:
+        if predict and hours is not None and h2 is not None:
             return rmse_str(dat['m'][h2:hours],dat['fm'][h2:hours])
         else: 
             return rmse_str(dat['m'],dat['fm'])

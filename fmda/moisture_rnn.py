@@ -16,7 +16,7 @@ from utils import vprint, hash2
 import reproducibility
 from data_funcs import check_data, rmse_data, plot_data
 import moisture_models as mod
-
+import sys
 
 
 def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
@@ -46,7 +46,7 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
                     y_train[i,k,j] = y[i+k,j]
     else:
         vprint('returning only the last timestep in a sample')
-    y_train = np.empty([samples, outputs])
+        y_train = np.empty([samples, outputs])
     for i in range(samples):
         for j in range(features):
             for k in range(timesteps):
@@ -55,6 +55,54 @@ def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
             y_train[i,j] = y[i+timesteps-1,j]
 
     return x_train, y_train
+
+def staircase_2(x,y,timesteps,trainsteps=999999999,return_sequences=False, verbose = True):
+    # create RNN training data in multiple batches
+    # input:
+    #     x (,features)  
+    #     y (,outputs)
+    #     timesteps: split x and y into sequences length timesteps
+    #                a.k.a. lookback or sequence_length    
+    
+    # print params if verbose
+    vprint('shape x = ',x.shape)
+    vprint('shape y = ',y.shape)
+    vprint('timesteps=',timesteps)
+    vprint('return_sequences=',return_sequences)
+    
+    nx,features= x.shape
+    ny,outputs = y.shape
+    data_items = min(nx,ny,trainsteps)   
+    batch_size = timesteps 
+    
+    # sequence j in a given batch is assumed to be the continuation of sequence j in the previous batch
+    # https://www.tensorflow.org/guide/keras/working_with_rnns Cross-batch statefulness
+    
+    # the first data item in batch i sequence j is at (i*batch_size+j)+0
+    # the last  data item in batch i sequence j is at (i*batch_size+j)+timesteps-1
+    # the last data item in the traning set is last item in the sequence at [batches-1,batch_size-1]
+    #   = ((batches-1)*batch_size +  batch_size - 1) + timesteps -1
+    #   = batches*batch_size + timesteps - 2 
+    
+    batches = (data_items - timesteps +2) // batch_size
+    x_train = np.zeros((batches,batch_size, timesteps, features))
+    if return_sequences:
+        vprint('returning all timesteps in a sample')
+        y_train = np.zeros((batches,batch_size, timesteps, outputs))
+    else:
+        y_train = np.zeros((batches,batch_size, outputs ))
+    for i in range(batches):
+        for j in range(batch_size):
+            beg = i*batch_size+j
+            nxt = beg+timesteps   # one higher per python
+            # print('batch',i,'sequence',j,'data items',beg,'to',nxt-1)
+            x_train[i,j,:,:] = x[beg:nxt,:]
+            if return_sequences:
+                 y_train[i,j,:,:] = y[beg:nxt,:]
+            else:
+                 y_train[i,j,:] = y[nxt-1,:]   
+    return x_train, y_train
+
 
 def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
                  batch_shape=None, input_shape=None, dense_layers=1,
@@ -94,6 +142,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     scale = params['scale']
     rain_do = params['rain_do']
     verbose = params['verbose']
+    batch_type = params['batch_type']
     
     if hours is None:
         hours = dat['hours']
@@ -137,11 +186,30 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     datat = np.reshape(fm,[fm.shape[0],1])
     
     # split data
-    x_train, y_train = staircase(Et,datat,timesteps=timesteps,trainsteps=h2,
+    print('batch_type=',batch_type)
+    if batch_type == 1:
+        x_train, y_train = staircase(Et,datat,timesteps=timesteps,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
+    elif batch_type == 2:
+        x_train, y_train = staircase_2(Et,datat,timesteps=timesteps,trainsteps=h2,
+                                 return_sequences=False, verbose = verbose)
+    else:
+        print('unknown batch_type',batch_type)
+    
     vprint('x_train shape=',x_train.shape)
-    samples, timesteps, features = x_train.shape
     vprint('y_train shape=',y_train.shape)
+    
+    xtrain_ndim = len(x_train.shape)
+    if xtrain_ndim == 3:
+        samples, timesteps, features = x_train.shape
+        batches = None
+    elif xtrain_ndim == 4:
+        batches, samples, timesteps, features = x_train.shape
+    else:
+        print('x_train has',xtrain_ndim,'dimensions, must be 3 or 4')
+        sys.exit(1)
+    
+    
 
     h0 = tf.convert_to_tensor(datat[:samples],dtype=tf.float32)
     
@@ -152,6 +220,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         'x_train': x_train,
         'y_train': y_train,
         'Et': Et,
+        'batches':batches,
         'samples': samples,
         'timesteps': timesteps,
         'features': features,
@@ -167,7 +236,8 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     return rnn_dat
 
-def train_rnn(rnn_dat, params,hours, fit=True, callbacks=None):
+
+def train_rnn_2(rnn_dat, params,hours, fit=True):
 
     verbose = params['verbose']
     
@@ -210,12 +280,149 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=None):
     model_fit.set_weights(w)
     
     if fit:
-        model_fit.fit(x_train, 
+        model_fit.fit(x_train, y_train + centering[1] , epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
+        w_fitted=model_fit.get_weights()
+        if params['verbose_weights']:
+            for i in range(len(w_fitted)):
+                print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
+    else:
+        print('Fitting skipped, using initial weights')
+        w_fitted=w
+        
+    model_predict.set_weights(w_fitted)
+    
+    return model_predict
+
+from tensorflow.keras.callbacks import Callback
+
+class ResetStatesCallback(Callback):
+    def on_epoch_end(self, epoch, logs=None):
+        self.model.reset_states()
+
+
+def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
+
+    verbose = params['verbose']
+    
+    if hours is None:
+        hours = rnn_dat['hours']
+    
+    batches = rnn_dat['batches']
+    samples = rnn_dat['samples']
+    features = rnn_dat['features']
+    timesteps = rnn_dat['timesteps']
+    centering = params['centering']
+    training = params['training']
+    
+    model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'], 
+                        batch_shape=(samples,timesteps,features),
+                        stateful=True,
+                        return_sequences=False,
+                        # initial_state=h0,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
+                        verbose = verbose)
+    
+    Et = rnn_dat['Et']
+    model_predict=create_RNN_2(hidden_units=params['hidden_units'], 
+                        dense_units=params['dense_units'],  
+                        input_shape=(hours,features),stateful = False,
+                        return_sequences=True,
+                        activation=params['activation'],
+                        dense_layers=params['dense_layers'],
+                        verbose = verbose)
+    
+    if verbose: print(model_predict.summary())
+    
+    x_train = rnn_dat['x_train']
+    y_train = rnn_dat['y_train']
+    
+    print('train_rnn: batches=',batches)
+    print('x_train shape =',x_train.shape)
+    print('y_train shape =',y_train.shape)
+    
+    if batches is None:
+        model_fit(x_train) ## evalue the model once to set nonzero initial state for compatibility
+    
+    w, w_name=get_initial_weights(model_fit, params, rnn_dat)
+    
+    model_fit.set_weights(w)
+    
+    if fit:
+        if batches is None:
+            model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=params['epochs'],
                       batch_size=samples,
                       callbacks = callbacks,
                       verbose=params['verbose_fit'])
+        else:
+            epochs = params['epochs']
+            batches, batch_size, timesteps, features = x_train.shape
+            outputs = y_train.shape[2]
+            model_fit(x_train[0]) # evaluate once to set nonzero initial state  
+            print('training = ',training)
+            if training == 1:
+                print('training by batches')
+                for i in range(epochs):
+                    for j in range(batches):
+                        model_fit.fit(x_train[j], 
+                              y_train[j] + centering[1] , 
+                              epochs=1,
+                              callbacks = callbacks,
+                              verbose=params['verbose_fit'])  
+                        model_fit.reset_states()
+                        print('epoch',i,'batch j','done') 
+                    print('epoch',i,'done')
+            elif training==2:
+                print('training by epoch, resetting state after each epoch')
+                x_train = np.reshape(x_train,(batches * samples, timesteps, features))
+                y_train = np.reshape(y_train,(batches * samples, outputs))
+                for i in range(epochs):
+                    model_fit.fit(x_train, 
+                        y_train + centering[1] , 
+                        epochs=1, 
+                        batch_size=samples,
+                        callbacks = callbacks,
+                        verbose=params['verbose_fit'])  
+                    model_fit.reset_states()
+                    print('epoch',i,'done')
+            elif training==3:
+                print('training by epoch, not resetting state after each epoch')
+                x_train = np.reshape(x_train,(batches * samples, timesteps, features))
+                y_train = np.reshape(y_train,(batches * samples, outputs))
+                for i in range(epochs):
+                    model_fit.fit(x_train, 
+                        y_train + centering[1] , 
+                        epochs=1, 
+                        batch_size=samples,
+                        callbacks = callbacks,
+                        verbose=params['verbose_fit'])  
+                    print('epoch',i,'done')
+            elif training==4:
+                print('training in one pass, not resetting state after each epoch')
+                x_train = np.reshape(x_train,(batches * samples, timesteps, features))
+                y_train = np.reshape(y_train,(batches * samples, outputs))
+                model_fit.fit(x_train, 
+                    y_train + centering[1] , 
+                    epochs=epochs, 
+                    batch_size=samples,
+                    callbacks = callbacks,
+                    verbose=params['verbose_fit'])
+                
+            elif training==5:
+                print('training in one pass, resetting state after each epoch by callback')
+                x_train = np.reshape(x_train,(batches * samples, timesteps, features))
+                y_train = np.reshape(y_train,(batches * samples, outputs))
+                model_fit.fit(x_train, 
+                    y_train + centering[1] , 
+                    epochs=epochs, 
+                    batch_size=samples,
+                    callbacks = callbacks + [ResetStatesCallback()],
+                    verbose=params['verbose_fit'])
+           
         w_fitted=model_fit.get_weights()
         if params['verbose_weights']:
             for i in range(len(w_fitted)):
