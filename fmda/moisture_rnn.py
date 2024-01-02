@@ -303,13 +303,14 @@ def rnn_predict(model, params, rnn_dat):
     m = np.reshape(m,hours)
     return m
 
-def run_rnn(case_data,params,fit=True,title2=''):
+def run_rnn(case_data,params,fit=True,title2='', plot=True):
     # Run RNN on given case dictionary of FMDA data with certain params. Used internally in run_case
     # Inputs:
     # case_data: (dict) collection of cases with FMDA data. Cases are different locations and times, or synthetic data
     # params: (dict) collection of run options for model
     # fit: (bool) whether or not to fit RNN to data
     # title2: (str) title of RNN run to be joined to string with other info for plotting title
+    # plot: (bool) logical indicating whether or not to plot case
     verbose = params['verbose']
     
     reproducibility.set_seed() # Set seed for reproducibility
@@ -336,8 +337,8 @@ def run_rnn(case_data,params,fit=True,title2=''):
         print('checkm=',format(checkm, '.17f'),' error',checkm-mv)
     else:
         print('check - hash weights:',hv)
-    
-    plot_data(case_data,title2=title2)
+    if plot:
+        plot_data(case_data,title2=title2)
     plt.show()
     return m, rmse_data(case_data)
     
@@ -368,5 +369,20 @@ def run_case(case_data,params, check_data=False):
     return rmse
 
 
-
+def run_case2(case_data,params, check_data=False, plot=True):
+    # Different version of above function. No plotting and no augmented KF
+    
+    print('\n***** ',case_data['case'],' *****\n')
+    case_data['rain'][np.isnan(case_data['rain'])] = 0
+    if check_data:
+        check_data(case_data)
+    hours=case_data['hours']
+    if 'train_frac' in params:
+        case_data['h2'] = round(hours * params['train_frac'])
+    h2=case_data['h2']
+    
+    rmse = {'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit', plot=plot)[1]}
+    rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN', plot=plot)[1]})
+    
+    return rmse
 
