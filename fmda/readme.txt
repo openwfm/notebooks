@@ -33,16 +33,20 @@ sequence in each batch continues same sequence from previous batch => stateful
 flatted to pass to model.fit
 then break into batches by specifying batch_size when training=5
            
-better (future) single function controlled by batch_size and batches:
+better (future) single function controlled by batch_size :
 batch 1:
-[[1 2 3 4 5]  [2 3 4 5 6] ...  [5 6 7 8 9] [6 7 8 9 10] ...  (total batch_size, restart from 1 when run out) 
+[[1 2 3 4 5]  [2 3 4 5 6] ...  [5 6 7 8 9] [6 7 8 9 10] ...  up to batch_size sequences
 batch 2:
-[[6 7 8 9 10].... restart from 1 when runs our
+[[6 7 8 9 10].... continue sequences, stop when runs out
 etc
-restart from 1 when runs out breaks statefullnes but so does the start anyway
-special cases:
-batch_type = 1: batches = 1, batch_size = max before runs out
-batch_type = 2: batch_size = timesteps, batches = until runs out   
+
+batch_size large or inf: all in one batch - pass batch_size = sequences to model.fit
+batch_size = None: same, pass batch_size = None to model.fit 
+batch_size < timesteps: error
+batch_size = anything else: pass batch_size to model.fit
+
+batch_size = inf is same as previous batch_type = 1
+batch_size = timesteps is same as previous batch_type = 2
 
 
 

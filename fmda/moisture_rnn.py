@@ -141,7 +141,8 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     scale = params['scale']
     rain_do = params['rain_do']
     verbose = params['verbose']
-    batch_type = params['batch_type']
+    #batch_type = params['batch_type']
+    batch_type = 1
     
     if hours is None:
         hours = dat['hours']
@@ -313,6 +314,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     timesteps = rnn_dat['timesteps']
     centering = params['centering']
     training = params['training']
+    batch_size = params['batch_size']
     
     model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
                         dense_units=params['dense_units'], 
@@ -349,12 +351,15 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     
     model_fit.set_weights(w)
     
+    if batch_size == np.inf: 
+        batch_size=samples
+    
     if fit:
         if batches is None:
             model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=params['epochs'],
-                      batch_size=samples,
+                      batch_size=batch_size,
                       callbacks = callbacks,
                       verbose=params['verbose_fit'])
         else:
