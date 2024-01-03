@@ -19,19 +19,18 @@ import moisture_models as mod
 import sys
 
 
-def staircase(x,y,timesteps,trainsteps,return_sequences=False, verbose = False):
-    # x [trainsteps+forecaststeps,features]    all inputs
-    # y [trainsteps,outputs]
+def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
+    # x [datapoints,features]    all inputs
+    # y [datapoints,outputs]
     # timesteps: split x and y into samples length timesteps, shifted by 1
-    # trainsteps: number of timesteps to use for training, no more than y.shape[0]
+    # datapoints: number of timesteps to use for training, no more than y.shape[0]
     vprint('shape x = ',x.shape)
     vprint('shape y = ',y.shape)
     vprint('timesteps=',timesteps)
-    vprint('trainsteps=',trainsteps)
+    vprint('datapoints=',datapoints)
     outputs = y.shape[1]
     features = x.shape[1]
-    forecaststeps = x.shape[0]-trainsteps
-    samples = trainsteps-timesteps+1
+    samples = datapoints-timesteps+1
     vprint('staircase: samples=',samples,'timesteps=',timesteps,'features=',features)
     x_train = np.empty([samples, timesteps, features])
     vprint('return_sequences=',return_sequences)
@@ -188,7 +187,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     # split data
     print('batch_type=',batch_type)
     if batch_type == 1:
-        x_train, y_train = staircase(Et,datat,timesteps=timesteps,trainsteps=h2,
+        x_train, y_train = staircase(Et,datat,timesteps=timesteps,datapoints=h2,
                                  return_sequences=False, verbose = verbose)
     elif batch_type == 2:
         x_train, y_train = staircase_2(Et,datat,timesteps=timesteps,trainsteps=h2,
