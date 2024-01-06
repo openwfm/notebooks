@@ -26,21 +26,14 @@ sequences example: [1 2 3 4 5] [2 3 4 5 6] etc
 orig. no batching specified, left to keras
 sequences in a batch executed in parallel => not stateful 
 
-new staircase_2() invoked by batch_type = 2
-sequences: [[1 2 3 4 5]  [2 3 4 5 6] ...  [5 6 7 8 9]
-            [6 7 8 9 10] [7 8 9 10 11] ...
+new staircase_2() invoked by batch_type = 2, controlled by batch_size
+returns: [[1 2 3 4 5]  [2 3 4 5 6] ...  [5 6 7 8 9] [6 7 8 9 10]
+          [6 7 8 9 10] [7 8 9 10 11] ... the last batch is deleted
+            
 sequence in each batch continues same sequence from previous batch => stateful
-flatted to pass to model.fit
-then break into batches by specifying batch_size when training=5
-           
-better (future) single function controlled by batch_size :
-batch 1:
-[[1 2 3 4 5]  [2 3 4 5 6] ...  [5 6 7 8 9] [6 7 8 9 10] ...  up to batch_size sequences
-batch 2:
-[[6 7 8 9 10].... continue sequences, stop when runs out
-etc
+flattened to pass to model.fit
+then break into batches by specifying batch_size in training
 
-batch_size large or inf: all in one batch - pass batch_size = sequences to model.fit
 batch_size = None: same, pass batch_size = None to model.fit 
 batch_size < timesteps: error
 batch_size = anything else: pass batch_size to model.fit

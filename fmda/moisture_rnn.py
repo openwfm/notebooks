@@ -39,23 +39,19 @@ def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
         y_train = np.empty([samples, timesteps, outputs])  # all
         for i in range(samples):
             for k in range(timesteps):
-                for j in range(features):
-                    x_train[i,k,j] = x[i+k,j]
-                for j in range(outputs):
-                    y_train[i,k,j] = y[i+k,j]
+                x_train[i,k,:] = x[i+k,:]
+                y_train[i,k,:] = y[i+k,:]
     else:
         vprint('returning only the last timestep in a sample')
         y_train = np.empty([samples, outputs])
-    for i in range(samples):
-        for j in range(features):
+        for i in range(samples):
             for k in range(timesteps):
-                x_train[i,k,j] = x[i+k,j]
-        for j in range(outputs):
-            y_train[i,j] = y[i+timesteps-1,j]
+                x_train[i,k,:] = x[i+k,:]
+            y_train[i,:] = y[i+timesteps-1,:]
 
     return x_train, y_train
 
-def staircase_2(x,y,timesteps,trainsteps=999999999,return_sequences=False, verbose = True):
+def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences=False, verbose = True):
     # create RNN training data in multiple batches
     # input:
     #     x (,features)  
@@ -64,42 +60,65 @@ def staircase_2(x,y,timesteps,trainsteps=999999999,return_sequences=False, verbo
     #                a.k.a. lookback or sequence_length    
     
     # print params if verbose
+    print('staircase_2')
+    if batch_size is None:
+        raise ValueError('staircase_2 requires batch_size')
     vprint('shape x = ',x.shape)
     vprint('shape y = ',y.shape)
     vprint('timesteps=',timesteps)
+    vprint('batch_size=',batch_size)
     vprint('return_sequences=',return_sequences)
     
     nx,features= x.shape
     ny,outputs = y.shape
-    data_items = min(nx,ny,trainsteps)   
-    batch_size = timesteps 
+    datapoints = min(nx,ny,trainsteps)   
+    vprint('datapoints=',datapoints)
     
     # sequence j in a given batch is assumed to be the continuation of sequence j in the previous batch
     # https://www.tensorflow.org/guide/keras/working_with_rnns Cross-batch statefulness
     
-    # the first data item in batch i sequence j is at (i*batch_size+j)+0
-    # the last  data item in batch i sequence j is at (i*batch_size+j)+timesteps-1
-    # the last data item in the traning set is last item in the sequence at [batches-1,batch_size-1]
-    #   = ((batches-1)*batch_size +  batch_size - 1) + timesteps -1
-    #   = batches*batch_size + timesteps - 2 
+    # example with timesteps=3 batch_size=3 datapoints=10
+    #     batch 0: [0 1 2]   [1 2 3]   [2 3 4]  
+    #     batch 1: [3 4 5]   [4 5 6]   [5 6 7] 
+    #     batch 2: [6 7 8]   [7 8 9]    when runs out this is the last batch, can be shorter
+    #
+    #     the first sequence in batch j starts from timesteps*j and ends with timesteps*(j+1)-1
     
-    batches = (data_items - timesteps +2) // batch_size
-    x_train = np.zeros((batches,batch_size, timesteps, features))
+    batches = datapoints // timesteps
+    max_sequences = batches * batch_size
+ 
+    vprint('max_sequences=',max_sequences)
+                                      
+    x_train = np.zeros((max_sequences, timesteps, features)) 
     if return_sequences:
-        vprint('returning all timesteps in a sample')
-        y_train = np.zeros((batches,batch_size, timesteps, outputs))
+        y_train = np.empty((max_sequences, timesteps, outputs))
     else:
-        y_train = np.zeros((batches,batch_size, outputs ))
+        y_train = np.empty((max_sequences, outputs ))
+        
+    # build the sequences    
+    k=0
     for i in range(batches):
         for j in range(batch_size):
-            beg = i*batch_size+j
-            nxt = beg+timesteps   # one higher per python
-            # print('batch',i,'sequence',j,'data items',beg,'to',nxt-1)
-            x_train[i,j,:,:] = x[beg:nxt,:]
+            begin = i*timesteps + j
+            next  = begin + timesteps
+            if next > datapoints:
+                break
+            vprint('sequence',k,'batch',i,'sample',j,'data',begin,'to',next-1)
+            x_train[k,:,:] = x[begin:next,:]
             if return_sequences:
-                 y_train[i,j,:,:] = y[beg:nxt,:]
+                 y_train[k,:,:] = y[begin:next,:]
             else:
-                 y_train[i,j,:] = y[nxt-1,:]   
+                 y_train[k,:] = y[next-1,:]
+            k += 1   
+    
+    # remove partial and empty batches at the end
+    k = (k // batch_size) * batch_size
+    x_train = x_train[:k,:,:]
+    if return_sequences:
+         y_train = y_train[:k,:,:]
+    else:
+         y_train = y_train[:k,:]
+
     return x_train, y_train
 
 
@@ -141,7 +160,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     scale = params['scale']
     rain_do = params['rain_do']
     verbose = params['verbose']
-    #batch_type = params['batch_type']
+    batch_size = params['batch_size']
     batch_type = 1
     
     if hours is None:
@@ -186,31 +205,21 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     datat = np.reshape(fm,[fm.shape[0],1])
     
     # split data
-    print('batch_type=',batch_type)
-    if batch_type == 1:
+    print('batch_size=',batch_size)
+    if batch_size is None or batch_size is np.inf:
         x_train, y_train = staircase(Et,datat,timesteps=timesteps,datapoints=h2,
                                  return_sequences=False, verbose = verbose)
+        batches = None
     elif batch_type == 2:
-        x_train, y_train = staircase_2(Et,datat,timesteps=timesteps,trainsteps=h2,
+        x_train, y_train, batches = staircase_2(Et,datat,batch_size,timesteps,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
     else:
         print('unknown batch_type',batch_type)
     
     vprint('x_train shape=',x_train.shape)
-    vprint('y_train shape=',y_train.shape)
+    vprint('y_train shape=',y_train.shape)    
+    samples, timesteps, features = x_train.shape
     
-    xtrain_ndim = len(x_train.shape)
-    if xtrain_ndim == 3:
-        samples, timesteps, features = x_train.shape
-        batches = None
-    elif xtrain_ndim == 4:
-        batches, samples, timesteps, features = x_train.shape
-    else:
-        print('x_train has',xtrain_ndim,'dimensions, must be 3 or 4')
-        sys.exit(1)
-    
-    
-
     h0 = tf.convert_to_tensor(datat[:samples],dtype=tf.float32)
     
     # Set up return dictionary
@@ -351,20 +360,17 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     
     model_fit.set_weights(w)
     
-    if batch_size == np.inf: 
-        batch_size=samples
     
     if fit:
         if batches is None:
             model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=params['epochs'],
-                      batch_size=batch_size,
                       callbacks = callbacks,
                       verbose=params['verbose_fit'])
         else:
             epochs = params['epochs']
-            batches, batch_size, timesteps, features = x_train.shape
+            batches, timesteps, features = x_train.shape
             outputs = y_train.shape[2]
             model_fit(x_train[0]) # evaluate once to set nonzero initial state  
             print('training = ',training)
