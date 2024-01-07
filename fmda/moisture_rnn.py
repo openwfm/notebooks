@@ -366,6 +366,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
             model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=params['epochs'],
+                      batch_size=samples,
                       callbacks = callbacks,
                       verbose=params['verbose_fit'])
         else:
