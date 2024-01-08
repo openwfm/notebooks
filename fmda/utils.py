@@ -78,3 +78,21 @@ def print_args_test():
         # some code here
         return a + b
     print_args(my_function, a=1, b=2)
+    
+import inspect
+def get_item(dict,var,**kwargs):
+    caller_name = inspect.stack()[1][3]
+    if var in dict:
+        value = dict[var]
+    elif 'default' in kwargs:
+        value = kwargs['default']
+    try:
+        verbose
+    except NameError:
+        verbose = True
+    if verbose:
+        print(caller_name,':',var,'=',value)
+    return value
+        
+        
+            
