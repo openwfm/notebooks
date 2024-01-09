@@ -326,9 +326,12 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     centering = get_item(params,'centering')
     training = get_item(params,'training')
     batch_size = get_item(params,'batch_size')
-    if batch_size is None or batch_size is np.inf:
+
+    single_batch = batch_size is None or batch_size is np.inf
+    if single_batch:
         batch_size=samples
         print('replacing batch_size =',batch_size)
+
     epochs=get_item(params,'epochs')
     
     model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
@@ -357,15 +360,17 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     
     print('x_train shape =',x_train.shape)
     print('y_train shape =',y_train.shape)
-    
+    print('x_train hash =',hash2(x_train))
+    print('y_train hash =',hash2(y_train))
+
+    if single_batch:
+         model_fit(x_train) ## evalue the model once to set nonzero initial state for compatibility
     w, w_name=get_initial_weights(model_fit, params, rnn_dat)
-    
-    model_fit.set_weights(w)
-    
+    print('initial weights hash =',hash2(w))
     
     if fit:
-        if batch_size is None or batch_size is np.inf:
-            model_fit(x_train) ## evalue the model once to set nonzero initial state for compatibility
+        model_fit.set_weights(w)
+        if single_batch:
             model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=epochs,
@@ -428,6 +433,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                     verbose=params['verbose_fit'])
            
         w_fitted=model_fit.get_weights()
+        print('fitted weights hash =',w_fitted)
         if params['verbose_weights']:
             for i in range(len(w_fitted)):
                 print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
