@@ -433,7 +433,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                     verbose=params['verbose_fit'])
            
         w_fitted=model_fit.get_weights()
-        print('fitted weights hash =',w_fitted)
+        print('fitted weights hash =',hash2(w_fitted))
         if params['verbose_weights']:
             for i in range(len(w_fitted)):
                 print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
