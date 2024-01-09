@@ -229,6 +229,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     # Set up return dictionary
     
     rnn_dat = {
+        'case':dat['case'],
         'hours': hours,
         'x_train': x_train,
         'y_train': y_train,
@@ -316,6 +317,7 @@ class ResetStatesCallback(Callback):
 def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
 
     verbose = params['verbose']
+    case = get_item(rnn_dat,'case')
     
     if hours is None:
         hours = get_item(rnn_dat,'hours')
@@ -369,9 +371,10 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     print('initial weights hash =',hash2(w))
     
     if fit:
+        history = None
         model_fit.set_weights(w)
         if single_batch:
-            model_fit.fit(x_train, 
+            history = model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=epochs,
                       batch_size=samples,
@@ -416,7 +419,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                     print('epoch',i,'done')
             elif training==4:
                 print('training in one pass, not resetting state after each epoch')
-                model_fit.fit(x_train, 
+                history = model_fit.fit(x_train, 
                     y_train + centering[1] , 
                     epochs=epochs, 
                     batch_size=batch_size,
@@ -425,12 +428,23 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                 
             elif training==5:
                 print('training in one pass, resetting state after each epoch by callback')
-                model_fit.fit(x_train, 
+                history = model_fit.fit(x_train, 
                     y_train + centering[1] , 
                     epochs=epochs, 
                     batch_size=batch_size,
                     callbacks = callbacks + [ResetStatesCallback()],
                     verbose=params['verbose_fit'])
+
+        if history is not None:
+            plt.semilogy(history.history['loss'], label='Training loss')
+            if 'val_loss' in history.history:
+                plt.semilogy(history.history['val_loss'], label='Validation loss')
+            plt.title(case + ' Model loss')
+            plt.ylabel('Loss')
+            plt.xlabel('Epoch')
+            plt.legend(loc='upper left')
+            plt.show()
+
            
         w_fitted=model_fit.get_weights()
         print('fitted weights hash =',hash2(w_fitted))
