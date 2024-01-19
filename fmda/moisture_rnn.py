@@ -364,7 +364,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
             outputs = y_train.shape[2]
             model_fit(x_train[0]) # evaluate once to set nonzero initial state  
             print('training = ',training)
-            if training == 1:
+            if training == 1: # Ideal, but slow. Should be the same as ... 
                 print('training by batches')
                 for i in range(epochs):
                     for j in range(batches):
@@ -373,10 +373,11 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                               epochs=1,
                               callbacks = callbacks,
                               verbose=params['verbose_fit'])  
-                        model_fit.reset_states()
+                        # model_fit.reset_states()
                         print('epoch',i,'batch j','done') 
+                    model_fit.reset_states() ## Confirm this
                     print('epoch',i,'done')
-            elif training==2:
+            elif training==2: # Should be the same as train 1
                 print('training by epoch, resetting state after each epoch')
                 x_train = np.reshape(x_train,(batches * samples, timesteps, features))
                 y_train = np.reshape(y_train,(batches * samples, outputs))
@@ -389,7 +390,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                         verbose=params['verbose_fit'])  
                     model_fit.reset_states()
                     print('epoch',i,'done')
-            elif training==3:
+            elif training==3: # Experimental method, no reset state after each epoch
                 print('training by epoch, not resetting state after each epoch')
                 x_train = np.reshape(x_train,(batches * samples, timesteps, features))
                 y_train = np.reshape(y_train,(batches * samples, outputs))
@@ -401,7 +402,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                         callbacks = callbacks,
                         verbose=params['verbose_fit'])  
                     print('epoch',i,'done')
-            elif training==4:
+            elif training==4: # Should be the same as 3
                 print('training in one pass, not resetting state after each epoch')
                 x_train = np.reshape(x_train,(batches * samples, timesteps, features))
                 y_train = np.reshape(y_train,(batches * samples, outputs))
@@ -412,7 +413,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                     callbacks = callbacks,
                     verbose=params['verbose_fit'])
                 
-            elif training==5:
+            elif training==5: # resets state internally, should be same as training 1 and 2
                 print('training in one pass, resetting state after each epoch by callback')
                 x_train = np.reshape(x_train,(batches * samples, timesteps, features))
                 y_train = np.reshape(y_train,(batches * samples, outputs))
@@ -455,6 +456,7 @@ def get_initial_weights(model_fit,params,rnn_dat):
     
     w_initial=np.array([np.nan, np.exp(-0.1), DeltaE[0]/rnn_dat['scale_fm'], # layer 0
                         1.0, -centering[0] + DeltaE[1]/rnn_dat['scale_fm']])                 # layer 1
+    print(w_initial)
     if params['verbose_weights']:
         print('Equilibrium moisture correction bias',DeltaE[0],
               'in the hidden layer and',DeltaE[1],' in the output layer')
@@ -480,7 +482,8 @@ def get_initial_weights(model_fit,params,rnn_dat):
         if params['verbose_weights']:
             print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
                   'initial: sum',np.sum(w[i],axis=0),'\nentries',w[i])
-    
+
+    print(w)
     return w, w_name
 
 def rnn_predict(model, params, rnn_dat):
