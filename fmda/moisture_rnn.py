@@ -253,6 +253,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
 def train_rnn_2(rnn_dat, params,hours, fit=True):
 
     verbose = params['verbose']
+    initialize=get_item(params,'initialize',default=1)
     
     if hours is None:
         hours = rnn_dat['hours']
@@ -288,10 +289,13 @@ def train_rnn_2(rnn_dat, params,hours, fit=True):
 
     model_fit(x_train) ## evalue the model once to set nonzero initial state
     
-    w, w_name=get_initial_weights(model_fit, params, rnn_dat)
-    
-    model_fit.set_weights(w)
-    
+    if initialize:
+        print('initializing weights')
+        w, w_name=get_initial_weights(model_fit, params, rnn_dat)
+        model_fit.set_weights(w)
+    else:
+        print('NOT initializing weights')
+        
     if fit:
         model_fit.fit(x_train, y_train + centering[1] , epochs=params['epochs'],batch_size=samples, verbose=params['verbose_fit'])
         w_fitted=model_fit.get_weights()
