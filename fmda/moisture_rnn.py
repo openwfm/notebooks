@@ -332,6 +332,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     centering = get_item(params,'centering')
     training = get_item(params,'training')
     batch_size = get_item(params,'batch_size')
+    initialize=get_item(params,'initialize',default=1)
 
     single_batch = batch_size is None or batch_size is np.inf
     if single_batch:
@@ -371,12 +372,19 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
 
     if single_batch:
          model_fit(x_train) ## evalue the model once to set nonzero initial state for compatibility
-    w, w_name=get_initial_weights(model_fit, params, rnn_dat)
-    print('initial weights hash =',hash2(w))
+    
+    if initialize:
+        print('initializing weights')
+        w, w_name=get_initial_weights(model_fit, params, rnn_dat)
+        print('initial weights hash =',hash2(w))
+        model_fit.set_weights(w)
+    else:
+        print('NOT initializing weights')
+        w = model_fit.get_weights()
     
     if fit:
         history = None
-        model_fit.set_weights(w)
+        # model_fit.set_weights(w)
         if single_batch:
             history = model_fit.fit(x_train, 
                       y_train + centering[1] , 
@@ -585,6 +593,7 @@ def run_case(case_data,params, check_data=False):
     # Return: (dict) collection of RMSE error for RNN & EKF, for train and prediction periods
     print('\n***** ',case_data['case'],' *****\n')
     case_data['rain'][np.isnan(case_data['rain'])] = 0
+    print(params)
     if check_data:
         check_data(case_data)
     hours=case_data['hours']
