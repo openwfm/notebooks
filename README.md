@@ -10,5 +10,11 @@
 
 Clone this repository in to the directory where Jupyter the notebooks runs. 
 
-Jan Mandel
-2022-11-05
+install:
+cd  install
+conda env create -f tf-211.yml
+
+execute notebook:
+jupyter nbconvert --to notebook --execute NOTEBOOK.ipynb
+
+
