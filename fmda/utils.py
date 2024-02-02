@@ -94,5 +94,27 @@ def get_item(dict,var,**kwargs):
         print(caller_name,':',var,'=',value)
     return value
         
-        
+def print_dict_summary(d,indent=0):
+    """
+    Prints a summary for each array in the dictionary, showing the key and the size of the array.
+
+    Parameters:
+    - d (dict): The dictionary to summarize.
+    """
+    indent_str = ' ' * indent
+    for key, value in d.items():
+        # Check if the value is list-like using a simple method check
+        if isinstance(value, dict):
+            print(f"{indent_str}{key}")
+            print_dict_summary(value,indent=indent+5)
+        elif isinstance(value,np.ndarray):
+            if np.issubdtype(value.dtype, np.number):
+                print(f"{indent_str}{key}: NumPy array of shape {value.shape}, min: {value.min()}, max: {value.max()}")
+            else:
+                # Handle non-numeric arrays differently
+                print(f"{indent_str}{key}: NumPy array of shape {value.shape}, contains non-numeric data")
+        elif hasattr(value, "__iter__") and not isinstance(value, str):  # Check for iterable that is not a string
+            print(f"{indent_str}{key}: Array of {len(value)} items")
+        else:
+            print(indent_str,key,":",value)
             
