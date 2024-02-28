@@ -10,5 +10,4 @@ __pycache__
 fmda/data/**/*.pickle
 fmda/data/**/*.pkl
 fmda/data/**/*.nc
-fmda/data/**/*.tif
 fmda/*.png
