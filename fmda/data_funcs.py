@@ -99,7 +99,7 @@ def to_json(dic,filename):
     print('Hash: ', hash2(new))
     json.dump(new,open(filename,'w'),indent=4)
 
-def from_json(filename):
+def from_json(filename, checkdata = False):
     # Read json file given a filename
     # Inputs: filename (str) expect a ".json" string
     
@@ -111,7 +111,8 @@ def from_json(filename):
             new[i]=np.array(dic[i])  # because ndarray is not serializable
         else:
             new[i]=dic[i]
-    check_data(new)
+    if checkdata:
+        check_data(new)
     print('Hash: ', hash2(new))
     return new
 
