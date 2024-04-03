@@ -571,12 +571,17 @@ def run_rnn(case_data,params,fit=True,title2=''):
 
     hv = hash2(model_predict.get_weights())
     if case_data['case']=='case11' and fit:
-        hv5 = 5.55077327554663e+19
+        if params['initialize']:
+            hv5 = 5.55077327554663e+19
+            mv = 3.77920889854431152
+        else:
+            hv5 = 3.5246083873473495e+19
+            mv = 3.77248024940490723               
         print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
         # assert (hv == hv5)
         checkm = case_data['m'][350]
-        mv = 3.77920889854431152
         print('checkm=',format(checkm, '.17f'),' error',checkm-mv)
+        print('params:',params)
     else:
         print('check - hash weights:',hv)
     
