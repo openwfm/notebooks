@@ -2,7 +2,7 @@ import numpy as np
 from functools import singledispatch
 import pandas as pd
 import numbers
-import datetime
+from datetime import datetime
 
 numeric_kinds = {'i', 'u', 'f', 'c'}
 
@@ -119,23 +119,28 @@ def print_dict_summary(d,indent=0):
         else:
             print(indent_str,key,":",value)
             
-def print_first(items,num=3):
+def print_first(item_list,num=3):
     """
-    Print the first num items of the list followed by '...' if the list contains .
+    Print the first num items of the list followed by '...' 
 
     :param item_list: List of items to be printed
     :param num: number of items to list
     """
-    item_list=list(items)
     if len(item_list) > num:
-        print(', '.join(item_list[:3]) + ', ...')
-    else:
-        print(', '.join(item_list))
+        print(type(item_list[0]))
+    for i in range(min(num,len(item_list))):
+        print(item_list[i])
+    if len(item_list) > num:
+        print('...')
+                   
+from datetime import datetime
 
-def str2time(s):
-    # turn string like 2024-01-01T00:00:00Z to datetime
-    if isinstance(s, str):
-        return datetime.fromisoformat(input.replace('Z', '+00:00'))
+def str2time(input):
+    """
+    Convert a single string timestamp or a list of string timestamps to corresponding datetime object(s).
+    """
+    if isinstance(input, str):
+        return datetime.strptime(input.replace('Z', '+00:00'), '%Y-%m-%dT%H:%M:%S%z')
     elif isinstance(input, list):
         return [str2time(s) for s in input]
     else:
