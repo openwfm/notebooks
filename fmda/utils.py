@@ -2,6 +2,7 @@ import numpy as np
 from functools import singledispatch
 import pandas as pd
 import numbers
+import datetime
 
 numeric_kinds = {'i', 'u', 'f', 'c'}
 
@@ -118,3 +119,27 @@ def print_dict_summary(d,indent=0):
         else:
             print(indent_str,key,":",value)
             
+def print_first(items,num=3):
+    """
+    Print the first num items of the list followed by '...' if the list contains .
+
+    :param item_list: List of items to be printed
+    :param num: number of items to list
+    """
+    item_list=list(items)
+    if len(item_list) > num:
+        print(', '.join(item_list[:3]) + ', ...')
+    else:
+        print(', '.join(item_list))
+
+def str2time(s):
+    # turn string like 2024-01-01T00:00:00Z to datetime
+    if isinstance(s, str):
+        return datetime.fromisoformat(input.replace('Z', '+00:00'))
+    elif isinstance(input, list):
+        return [str2time(s) for s in input]
+    else:
+        raise ValueError("Input must be a string or a list of strings")
+
+
+    
