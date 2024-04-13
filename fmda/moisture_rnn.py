@@ -249,6 +249,100 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     return rnn_dat
 
+def create_rnn_data2(dat, params, hours=None, h2=None):
+    # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
+    # Inputs:
+    # dat: (dict) fmda dictionary
+    # params: (dict) hyperparameters
+    # hours: (int) optional parameter to set total length of train+predict
+    # h2: (int) optional parameter to set as length of training period (h2 = total - hours)
+    # Returns: (dict) formatted datat used in RNN 
+    timesteps = params['timesteps']
+    scale = params['scale']
+    rain_do = params['rain_do']
+    verbose = params['verbose']
+    batch_size = params['batch_size']
+    
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['h2']
+    vprint('create_rnn_data: hours=',hours,' h2=',h2)
+    # extract inputs the windown of interest
+    Ew = dat['Ew']
+    Ed = dat['Ed']
+    rain = dat['rain']
+    fm = dat['fm']
+    # temp = dat['temp']
+    
+    # Average Equilibrium
+    # E = (Ed + Ew)/2         # why?
+
+    # Scale Data if required
+    if scale:
+        print('scaling to range 0 to',scale)
+        scale_fm=max(max(Ew),max(Ed),max(fm))/scale
+        scale_rain=max(max(rain),0.01)/scale
+        Ed = Ed/scale_fm
+        Ew = Ew/scale_fm
+        fm = fm/scale_fm
+        rain = rain/scale_rain
+    else:
+        scale_fm=1.0
+        scale_rain=1.0
+     
+    if params['verbose_weights']:
+        print('scale_fm=',scale_fm,'scale_rain=',scale_rain)
+    
+    # transform as 2D, (timesteps, features) and (timesteps, outputs)
+    
+    if rain_do:
+        Et = np.vstack((Ed, Ew, rain)).T
+        features_list = ['Ed', 'Ew', 'rain']
+    else:
+        Et = np.vstack((Ed, Ew)).T        
+        features_list = ['Ed', 'Ew']
+    datat = np.reshape(fm,[fm.shape[0],1])
+    
+    # split data
+    print('batch_size=',batch_size)
+    if batch_size is None or batch_size is np.inf:
+        x_train, y_train = staircase(Et,datat,timesteps=timesteps,datapoints=h2,
+                                 return_sequences=False, verbose = verbose)
+        batches = None
+    else:
+        x_train, y_train = staircase_2(Et,datat,timesteps,batch_size,trainsteps=h2,
+                                 return_sequences=False, verbose = verbose)
+    
+    vprint('x_train shape=',x_train.shape)
+    vprint('y_train shape=',y_train.shape)    
+    samples, timesteps, features = x_train.shape
+    
+    h0 = tf.convert_to_tensor(datat[:samples],dtype=tf.float32)
+    
+    # Set up return dictionary
+    
+    rnn_dat = {
+        'case':dat['case'],
+        'hours': hours,
+        'x_train': x_train,
+        'y_train': y_train,
+        'Et': Et,
+        'samples': samples,
+        'timesteps': timesteps,
+        'features': features,
+        'h0': h0,
+        'hours':hours,
+        'h2':h2,
+        'scale':scale,
+        'scale_fm':scale_fm,
+        'scale_rain':scale_rain,
+        'rain_do':rain_do,
+        'features_list':features_list
+    }
+    
+    return rnn_dat
+
 
 def train_rnn_2(rnn_dat, params,hours, fit=True):
 
