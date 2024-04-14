@@ -249,19 +249,30 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     return rnn_dat
 
-def create_rnn_data2(dat, params, hours=None, h2=None):
+import pickle
+def read_fix_pkl(file_path):
+    with open(file_path, 'rb') as file:
+        dict = pickle.load(file)
+    for key in dict:
+        dict[key]['key']=key  # add key as item
+        for item in dict[key]
+        
+    
+
+def create_rnn_data_pkl(dict,key,params, hours=None, h2=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
     # Inputs:
-    # dat: (dict) fmda dictionary
+    # dat: (dict) dictionary from test_*.pkl file
+    # key: (string) the subdictionary to use 
     # params: (dict) hyperparameters
     # hours: (int) optional parameter to set total length of train+predict
     # h2: (int) optional parameter to set as length of training period (h2 = total - hours)
     # Returns: (dict) formatted datat used in RNN 
-    timesteps = params['timesteps']
-    scale = params['scale']
-    rain_do = params['rain_do']
+    timesteps = params['timesteps']  # depth of the recursion
+    scale = params['scale']          # every feature in [0, scale], or 0 for no scaling
+    rain_do = params['rain_do']      # use rain or not
     verbose = params['verbose']
-    batch_size = params['batch_size']
+    batch_size = params['batch_size'] # for trainig 
     
     if hours is None:
         hours = dat['hours']
