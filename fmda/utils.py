@@ -95,12 +95,14 @@ def get_item(dict,var,**kwargs):
         print(caller_name,':',var,'=',value)
     return value
         
-def print_dict_summary(d,indent=0):
+def print_dict_summary(d,indent=0,print_first=[],first_num=3):
     """
     Prints a summary for each array in the dictionary, showing the key and the size of the array.
 
-    Parameters:
-    - d (dict): The dictionary to summarize.
+    Arguments:
+     d (dict): The dictionary to summarize.
+     first_items (list): Print the first items for any arrays with these names
+    
     """
     indent_str = ' ' * indent
     for key, value in d.items():
@@ -114,8 +116,13 @@ def print_dict_summary(d,indent=0):
             else:
                 # Handle non-numeric arrays differently
                 print(f"{indent_str}{key}: NumPy array of shape {value.shape}, contains non-numeric data")
+            if key in print_first:
+                print_first(value,first_num)
         elif hasattr(value, "__iter__") and not isinstance(value, str):  # Check for iterable that is not a string
             print(f"{indent_str}{key}: Array of {len(value)} items")
+            if key in print_first:
+                print_first(value,first_num)
+
         else:
             print(indent_str,key,":",value)
             
@@ -147,4 +154,23 @@ def str2time(input):
         raise ValueError("Input must be a string or a list of strings")
 
 
+# interpolate linearly over nans
+
+def filter_nan_values(t1, v1):
+    # Filter out NaN values from v1 and corresponding times in t1
+    valid_indices = ~np.isnan(v1)  # Indices where v1 is not NaN
+    t1_filtered = np.array(t1)[valid_indices]
+    v1_filtered = np.array(v1)[valid_indices]
+    return t1_filtered, v1_filtered
+
+def time_intp(t1, v1, t2):
+    t1_no_nan, v1_no_nan = filter_nan_values(t1, v1)
     
+    # Convert datetime objects to timestamps
+    t1_stamps = np.array([t.timestamp() for t in t1_no_nan])
+    t2_stamps = np.array([t.timestamp() for t in t2])
+    
+    # Interpolate using the filtered data
+    v2_interpolated = np.interp(t2_stamps, t1_stamps, v1_no_nan)
+    
+    return v2_interpolated
