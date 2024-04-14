@@ -251,7 +251,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     return rnn_dat
 
 import pickle, datetime
-from utils import time_intp,str2time,check_increment_by_1_hour
+from utils import time_intp,str2time,check_increment
 
 def pkl2train(file_paths,fstep='f01',fprev='f00'):
     # in:
@@ -280,23 +280,28 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
                 'key': key,  # store the key inside the dictionary, subdictionary will be used separatedly
                 'path': file_path,
                 'loc': d[key]['loc']}
+                
                 hrrr_time=str2time(d[key]['HRRR']['time'])
-                check_increment_by_1_hour(hrrr_time,id='HRRR')
+                if check_increment(hrrr_time,id='HRRR') <= 0:
+                    raise(ValueError)
                 # build matrix of features - assuming all the same length
                 train[key]['time']=hrrr_time
                 fcst=d[key]['HRRR'][fstep]
                 columns=[fcst[i] for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]]
                 # is "rain" the same variable name as in HRRR?
-                columns.append( d[key]['HRRR'][fstep]['rain']- d[key]['HRRR'][fprev]['rain']) # add rain column
+                rain = d[key]['HRRR'][fstep]['rain']- d[key]['HRRR'][fprev]['rain']
+                logging.info('rain as difference %s minus %s: min %s max %s',fstep,fprev,np.min(rain),np.max(rain))
+                columns.append( rain ) # add rain column
                 train[key]['X'] = np.column_stack(columns)
-                logging.info(f"Created features matrix train[{key}]['X'] shape {train[key]['X'].shape}")
+                logging.info(f"Created feature matrix train[{key}]['X'] shape {train[key]['X'].shape}")
                 raws_time=str2time(d[key]['RAWS']['time']) # may not be the same as HRRR
                 logging.info('RAWS.time length is %s',len(d[key]['RAWS']['time']))
+                check_increment(raws_time,id='RAWS')
                 logging.info('RAWS.fm   length is %s',len(d[key]['RAWS']['fm']))
                 # interpolate RAWS sensors to HRRR time and over NaNs
                 train[key]['Y'] = time_intp(raws_time,d[key]['RAWS']['fm'],hrrr_time)
                 if  train[key]['Y'] is None:
-                    logging.error('Cannot create target matrix')
+                    logging.error('Cannot create target matrix for %s, putting in None',key)
                 else:
                     logging.info(f"Created target matrix train[{key}]['Y'] shape {train[key]['Y'].shape}")
                 

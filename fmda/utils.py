@@ -197,13 +197,17 @@ def str2time(strlist):
     # Convert array of strings to array of datetime objects
     return np.array([datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%SZ') for dt_str in strlist])
 
-def check_increment_by_1_hour(datetime_array,id=''):
+def check_increment(datetime_array,id=''):
     # Calculate time differences between consecutive datetime values
-    time_diffs = [b - a for a, b in zip(datetime_array[:-1], datetime_array[1:])]
-    
+    diffs = [b - a for a, b in zip(datetime_array[:-1], datetime_array[1:])]
+    diffs_hours = np.array([diff.total_seconds()/3600 for diff in diffs])
     # Check if all time differences are exactlyu 1 hour
-    if ( (diff.total_seconds() == 3600) for diff in time_diffs):
-        logging.info('%s time array incremented by 1 hour',id)
+    if all(diffs_hours == diffs_hours[0]):
+        logging.info('%s time array increments are %s hours',id,diffs_hours[0])
+        if diffs_hours[0] <= 0 : 
+            logging.error('%s time array increements are not positive',id)
+        return diffs_hours[0]
     else:
-        logging.fatal('%s time array not incremented by 1 hour',id)
-        raise ValueError()
+        logging.warning('%s time array incremented are min %s max $s',id,
+                        np.min(diffs_hours),np.max(diffs_hours))
+        return -1
