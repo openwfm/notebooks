@@ -164,8 +164,9 @@ def filter_nan_values(t1, v1):
     return t1_filtered, v1_filtered
 
 def time_intp(t1, v1, t2):
+    print('t1.dtype=',t1.dtype)
     t1_no_nan, v1_no_nan = filter_nan_values(t1, v1)
-    
+    print('t1_no_nan.dtype=',t1_no_nan.dtype)
     # Convert datetime objects to timestamps
     t1_stamps = np.array([t.timestamp() for t in t1_no_nan])
     t2_stamps = np.array([t.timestamp() for t in t2])
