@@ -114,8 +114,8 @@ def print_dict_summary(d,indent=0,print_first=[],first_num=3):
             if np.issubdtype(value.dtype, np.number):
                 print(f"{indent_str}{key}: NumPy array of shape {value.shape}, min: {value.min()}, max: {value.max()}")
             else:
-                # Handle non-numeric arrays differently
-                print(f"{indent_str}{key}: NumPy array of shape {value.shape}, contains non-numeric data")
+                # Handle non-numeric arrays differently 
+                print(f"{indent_str}{key}: NumPy array of shape {value.shape}, type {value.dtype}")
             if key in print_first:
                 print_first(value,first_num)
         elif hasattr(value, "__iter__") and not isinstance(value, str):  # Check for iterable that is not a string
@@ -174,3 +174,8 @@ def time_intp(t1, v1, t2):
     v2_interpolated = np.interp(t2_stamps, t1_stamps, v1_no_nan)
     
     return v2_interpolated
+
+
+def str2time(strlist):
+    # convert array of strings to array of datetime
+    return np.array([np.datetime64(dt_str) for dt_str in strlist])

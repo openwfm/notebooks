@@ -249,12 +249,13 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     return rnn_dat
 
-import pickle
-def pkl_2_train_data(file_paths,forecast_step='f01',tres=1):
+import pickle, datetime
+from utils import time_intp,str2time
+
+def pkl2train(file_paths,fstep='f01',fprev='f00'):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
     #   forecast_step   string - which forecast step to take atmospheric data from (best f03). the ino
-    #   tresh           number - time resolution in hours
     # return:
     #   train          dictionary with structure
     #                  {key : {'key' : key,    # copied subdict key
@@ -267,13 +268,28 @@ def pkl_2_train_data(file_paths,forecast_step='f01',tres=1):
     train = {}
     for file_path in file_paths:
         with open(file_path, 'rb') as file:
-            dict = pickle.load(file)
-        for key in dict:
+            d = pickle.load(file)
+        for key in d:
             if key in train:
-                print('duplicate key',key,'in',file_path)
+                print('skipping duplicate key',key,'in',file_path)
             else:
-                train.update({key:{'key':key, 'path':path, 'loc':dict[key]['loc']}})  # add new item with copy of key and h
-            
+                train[key] = {
+                'key': key,  # It's unusual to store the key inside the dictionary under the same key
+                'path': file_path,
+                'loc': d[key]['loc']}
+                hrrr_time=str2time(d[key]['HRRR']['time'])
+                # build matrix of features - assuming all the same length
+                train[key]['time']=hrrr_time
+                fcst=d[key]['HRRR'][fstep]
+                columns=[fcst[i] for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]]
+                # is "rain" the same variable name as in HRRR?
+                columns.append( d[key]['HRRR'][fstep]['rain']- d[key]['HRRR'][fprev]['rain']) # add rain column
+                train[key]['X'] = np.column_stack(columns)
+                raws_time=str2time(d[key]['RAWS']['time']) # may not be the same as HRRR
+                # interpolate RAWS sensors to HRRR time and over NaNs
+                train[key]['Y'] = time_intp(raws_time,d[key]['RAWS']['fm'],hrrr_time)
+                
+    return train
         
     
 
