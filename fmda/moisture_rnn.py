@@ -250,12 +250,30 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     return rnn_dat
 
 import pickle
-def read_fix_pkl(file_path):
-    with open(file_path, 'rb') as file:
-        dict = pickle.load(file)
-    for key in dict:
-        dict[key]['key']=key  # add key as item
-        for item in dict[key]
+def pkl_2_train_data(file_paths,forecast_step='f01',tres=1):
+    # in:
+    #   file_path       list of strings - files as in read_test_pkl
+    #   forecast_step   string - which forecast step to take atmospheric data from (best f03). the ino
+    #   tresh           number - time resolution in hours
+    # return:
+    #   train          dictionary with structure
+    #                  {key : {'key' : key,    # copied subdict key
+    #                          'loc' : {...},  # copied from in dict = {key : {'loc': ... }...}
+    #                         'time' : time,   # datetime vector, spacing tres
+    #                            'X' : fm      # target fuel moisture from the RAWS, interpolated to time
+    #                            'Y' : feat    # features from atmosphere and location
+    #                            
+    #
+    train = {}
+    for file_path in file_paths:
+        with open(file_path, 'rb') as file:
+            dict = pickle.load(file)
+        for key in dict:
+            if key in train:
+                print('duplicate key',key,'in',file_path)
+            else:
+                train.update({key:{'key':key, 'path':path, 'loc':dict[key]['loc']}})  # add new item with copy of key and h
+            
         
     
 
