@@ -289,12 +289,16 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
                 # is "rain" the same variable name as in HRRR?
                 columns.append( d[key]['HRRR'][fstep]['rain']- d[key]['HRRR'][fprev]['rain']) # add rain column
                 train[key]['X'] = np.column_stack(columns)
-                logging.info(f"Created features train[{key}]['X'] shape {train[key]['X'].shape}")
+                logging.info(f"Created features matrix train[{key}]['X'] shape {train[key]['X'].shape}")
                 raws_time=str2time(d[key]['RAWS']['time']) # may not be the same as HRRR
                 logging.info('RAWS.time length is %s',len(d[key]['RAWS']['time']))
                 logging.info('RAWS.fm   length is %s',len(d[key]['RAWS']['fm']))
                 # interpolate RAWS sensors to HRRR time and over NaNs
                 train[key]['Y'] = time_intp(raws_time,d[key]['RAWS']['fm'],hrrr_time)
+                if  train[key]['Y'] is None:
+                    logging.error('Cannot create target matrix')
+                else:
+                    logging.info(f"Created target matrix train[{key}]['Y'] shape {train[key]['Y'].shape}")
                 
     return train
         
