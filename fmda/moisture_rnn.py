@@ -304,7 +304,23 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
                     logging.error('Cannot create target matrix for %s, putting in None',key)
                 else:
                     logging.info(f"Created target matrix train[{key}]['Y'] shape {train[key]['Y'].shape}")
-                
+    
+    logging.info('Created a training dictionary with %s items',len(train))
+    
+    # clean up
+    
+    keys_to_delete = []
+    for key in train:
+        if train[key]['X'] is None or train[key]['Y'] is None:
+            logging.warning('Deleting training item %s because features X or target Y are None', key)
+            keys_to_delete.append(key)
+
+    # Delete the items from the dictionary
+    for key in keys_to_delete:
+        del train[key]
+               
+    logging.info('%s items in the training dictionary remaining',len(train))
+
     return train
         
     
