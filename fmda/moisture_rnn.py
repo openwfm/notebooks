@@ -17,6 +17,7 @@ import reproducibility
 from data_funcs import check_data, rmse_data, plot_data
 import moisture_models as mod
 import sys
+import logging
 
 
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
@@ -250,7 +251,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     return rnn_dat
 
 import pickle, datetime
-from utils import time_intp,str2time
+from utils import time_intp,str2time,check_increment_by_1_hour
 
 def pkl2train(file_paths,fstep='f01',fprev='f00'):
     # in:
@@ -268,16 +269,19 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
     train = {}
     for file_path in file_paths:
         with open(file_path, 'rb') as file:
+            logging.info("loading file %s", file_path)
             d = pickle.load(file)
         for key in d:
+            logging.info('Processing subdictionary at key %s',key)
             if key in train:
-                print('skipping duplicate key',key,'in',file_path)
+                logging.warning('skipping duplicate key %s',key)
             else:
                 train[key] = {
-                'key': key,  # It's unusual to store the key inside the dictionary under the same key
+                'key': key,  # store the key inside the dictionary, subdictionary will be used separatedly
                 'path': file_path,
                 'loc': d[key]['loc']}
                 hrrr_time=str2time(d[key]['HRRR']['time'])
+                check_increment_by_1_hour(hrrr_time,id='HRRR')
                 # build matrix of features - assuming all the same length
                 train[key]['time']=hrrr_time
                 fcst=d[key]['HRRR'][fstep]
@@ -285,7 +289,10 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
                 # is "rain" the same variable name as in HRRR?
                 columns.append( d[key]['HRRR'][fstep]['rain']- d[key]['HRRR'][fprev]['rain']) # add rain column
                 train[key]['X'] = np.column_stack(columns)
+                logging.info(f"Created features train[{key}]['X'] shape {train[key]['X'].shape}")
                 raws_time=str2time(d[key]['RAWS']['time']) # may not be the same as HRRR
+                logging.info('RAWS.time length is %s',len(d[key]['RAWS']['time']))
+                logging.info('RAWS.fm   length is %s',len(d[key]['RAWS']['fm']))
                 # interpolate RAWS sensors to HRRR time and over NaNs
                 train[key]['Y'] = time_intp(raws_time,d[key]['RAWS']['fm'],hrrr_time)
                 

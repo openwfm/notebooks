@@ -3,6 +3,10 @@ from functools import singledispatch
 import pandas as pd
 import numbers
 from datetime import datetime
+import logging
+
+def logging_setup():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 numeric_kinds = {'i', 'u', 'f', 'c'}
 
@@ -164,9 +168,19 @@ def filter_nan_values(t1, v1):
     return t1_filtered, v1_filtered
 
 def time_intp(t1, v1, t2):
-    print('t1.dtype=',t1.dtype)
+    # Check if t1 v1 t2 are 1D arrays
+    if t1.ndim != 1:
+        raise ValueError("Error: t1 is not a 1D array. Dimension:", t1.ndim)
+    if v1.ndim != 1:
+        raise ValueError("Error: v1 is not a 1D array. Dimension:", v1.ndim)
+    if t2.ndim != 1:
+        raise ValueError("Error: t2 is not a 1D array. Dimension:", t2.ndim)
+    # Check if t1 and v1 have the same length
+    if len(t1) != len(v1):
+        raise ValueError("Error: t1 and v1 have different lengths:",len(t1),len(v1))
+    # print('t1.dtype=',t1.dtype)
     t1_no_nan, v1_no_nan = filter_nan_values(t1, v1)
-    print('t1_no_nan.dtype=',t1_no_nan.dtype)
+    # print('t1_no_nan.dtype=',t1_no_nan.dtype)
     # Convert datetime objects to timestamps
     t1_stamps = np.array([t.timestamp() for t in t1_no_nan])
     t2_stamps = np.array([t.timestamp() for t in t2])
@@ -176,7 +190,17 @@ def time_intp(t1, v1, t2):
     
     return v2_interpolated
 
-
 def str2time(strlist):
-    # convert array of strings to array of datetime
-    return np.array([np.datetime64(dt_str) for dt_str in strlist])
+    # Convert array of strings to array of datetime objects
+    return np.array([datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%SZ') for dt_str in strlist])
+
+def check_increment_by_1_hour(datetime_array,id=''):
+    # Calculate time differences between consecutive datetime values
+    time_diffs = [b - a for a, b in zip(datetime_array[:-1], datetime_array[1:])]
+    
+    # Check if all time differences are exactlyu 1 hour
+    if ( (diff.total_seconds() == 3600) for diff in time_diffs):
+        logging.info('%s time array incremented by 1 hour',id)
+    else:
+        logging.fatal('%s time array not incremented by 1 hour',id)
+        raise ValueError()
