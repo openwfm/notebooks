@@ -12,7 +12,7 @@ import tensorflow as tf
 import keras.backend as K
 import tensorflow as tf
 import pandas as pd
-from utils import vprint, hash2, get_item
+from utils import vprint, hash2, get_item, print_dict_summary, print_first
 import reproducibility
 from data_funcs import check_data, rmse_data, plot_data
 import moisture_models as mod
@@ -276,29 +276,38 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
             if key in train:
                 logging.warning('skipping duplicate key %s',key)
             else:
+                subdict=d[key]    # subdictionary for this case
+                loc=subdict['loc']
                 train[key] = {
                 'key': key,  # store the key inside the dictionary, subdictionary will be used separatedly
                 'path': file_path,
-                'loc': d[key]['loc']}
-                
-                time_hrrr=str2time(d[key]['HRRR']['time'])
-                if check_increment(time_hrrr,id='HRRR.time') <= 0:
+                'loc': loc
+                }
+                time_hrrr=str2time(subdict['HRRR']['time'])
+                timesteps=len(time_hrrr)
+                if check_increment(time_hrrr,id=key+' HRRR.time') < 1:
                     raise(ValueError)
-                # build matrix of features - assuming all the same length
+                # build matrix of features - assuming all the same length, if not column_stack will fail
                 train[key]['time']=time_hrrr
-                fcst=d[key]['HRRR'][fstep]
-                columns=[fcst[i] for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]]
-                # is "rain" the same variable name as in HRRR?
-                rain = d[key]['HRRR'][fstep]['rain']- d[key]['HRRR'][fprev]['rain']
-                logging.info('rain as difference %s minus %s: min %s max %s',fstep,fprev,np.min(rain),np.max(rain))
-                columns.append( rain ) # add rain column
+                columns=[]
+                # location as features constant in time come first
+                columns.append(np.full(timesteps,loc['elev']))  
+                columns.append(np.full(timesteps,loc['lon']))
+                columns.append(np.full(timesteps,loc['lat']))
+                for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
+                    columns.append(subdict['HRRR'][fstep][i])   # add variables from HRRR forecast steps 
+                # compute rain as difference of accumulated precipitation
+                rain = subdict['HRRR'][fstep]['precip_accum']- subdict['HRRR'][fprev]['precip_accum']
+                logging.info('%s rain as difference %s minus %s: min %s max %s',key,fstep,fprev,np.min(rain),np.max(rain))
+                columns.append( rain ) # add rain feature
                 train[key]['X'] = np.column_stack(columns)
                 logging.info(f"Created feature matrix train[{key}]['X'] shape {train[key]['X'].shape}")
-                time_raws=str2time(d[key]['RAWS']['time_raws']) # may not be the same as HRRR
-                logging.info('RAWS.time_raws length is %s',len(time_raws))
-                check_increment(time_raws,id='RAWS.time_raws')
-                fm=d[key]['RAWS']['fm']
-                logging.info('RAWS.fm length is %s',len(fm))
+                time_raws=str2time(subdict['RAWS']['time_raws']) # may not be the same as HRRR
+                logging.info('%s RAWS.time_raws length is %s',key,len(time_raws))
+                check_increment(time_raws,id=key+' RAWS.time_raws')
+                # print_first(time_raws,num=5,id='RAWS.time_raws')
+                fm=subdict['RAWS']['fm']
+                logging.info('%s RAWS.fm length is %s',key,len(fm))
                 # interpolate RAWS sensors to HRRR time and over NaNs
                 train[key]['Y'] = time_intp(time_raws,fm,time_hrrr)
                 if  train[key]['Y'] is None:

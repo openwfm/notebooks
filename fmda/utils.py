@@ -4,10 +4,15 @@ import pandas as pd
 import numbers
 from datetime import datetime
 import logging
+import sys
 
 def logging_setup():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        stream=sys.stdout
+    )
+    
 numeric_kinds = {'i', 'u', 'f', 'c'}
 
 def is_numeric_ndarray(array):
@@ -99,7 +104,7 @@ def get_item(dict,var,**kwargs):
         print(caller_name,':',var,'=',value)
     return value
 
-def print_first(item_list,num=3,indent=0):
+def print_first(item_list,num=3,indent=0,id=None):
     """
     Print the first num items of the list followed by '...' 
 
@@ -107,6 +112,8 @@ def print_first(item_list,num=3,indent=0):
     :param num: number of items to list
     """
     indent_str = ' ' * indent
+    if id is not None:
+        print(indent_str, id)
     if len(item_list) > 0:
         print(indent_str,type(item_list[0]))
     for i in range(min(num,len(item_list))):
@@ -128,7 +135,7 @@ def print_dict_summary(d,indent=0,first=[],first_num=3):
         # Check if the value is list-like using a simple method check
         if isinstance(value, dict):
             print(f"{indent_str}{key}")
-            print_dict_summary(value,first=first,indent=indent+5)
+            print_dict_summary(value,first=first,indent=indent+5,first_num=first_num)
         elif isinstance(value,np.ndarray):
             if np.issubdtype(value.dtype, np.number):
                 print(f"{indent_str}{key}: NumPy array of shape {value.shape}, min: {value.min()}, max: {value.max()}")
