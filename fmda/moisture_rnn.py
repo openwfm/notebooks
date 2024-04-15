@@ -281,11 +281,11 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
                 'path': file_path,
                 'loc': d[key]['loc']}
                 
-                hrrr_time=str2time(d[key]['HRRR']['time'])
-                if check_increment(hrrr_time,id='HRRR') <= 0:
+                time_hrrr=str2time(d[key]['HRRR']['time'])
+                if check_increment(time_hrrr,id='HRRR.time') <= 0:
                     raise(ValueError)
                 # build matrix of features - assuming all the same length
-                train[key]['time']=hrrr_time
+                train[key]['time']=time_hrrr
                 fcst=d[key]['HRRR'][fstep]
                 columns=[fcst[i] for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]]
                 # is "rain" the same variable name as in HRRR?
@@ -294,14 +294,15 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
                 columns.append( rain ) # add rain column
                 train[key]['X'] = np.column_stack(columns)
                 logging.info(f"Created feature matrix train[{key}]['X'] shape {train[key]['X'].shape}")
-                raws_time=str2time(d[key]['RAWS']['time']) # may not be the same as HRRR
-                logging.info('RAWS.time length is %s',len(d[key]['RAWS']['time']))
-                check_increment(raws_time,id='RAWS')
-                logging.info('RAWS.fm   length is %s',len(d[key]['RAWS']['fm']))
+                time_raws=str2time(d[key]['RAWS']['time_raws']) # may not be the same as HRRR
+                logging.info('RAWS.time_raws length is %s',len(time_raws))
+                check_increment(time_raws,id='RAWS.time_raws')
+                fm=d[key]['RAWS']['fm']
+                logging.info('RAWS.fm length is %s',len(fm))
                 # interpolate RAWS sensors to HRRR time and over NaNs
-                train[key]['Y'] = time_intp(raws_time,d[key]['RAWS']['fm'],hrrr_time)
+                train[key]['Y'] = time_intp(time_raws,fm,time_hrrr)
                 if  train[key]['Y'] is None:
-                    logging.error('Cannot create target matrix for %s, putting in None',key)
+                    logging.error('Cannot create target matrix for %s, using None',key)
                 else:
                     logging.info(f"Created target matrix train[{key}]['Y'] shape {train[key]['Y'].shape}")
     
@@ -316,10 +317,11 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
             keys_to_delete.append(key)
 
     # Delete the items from the dictionary
-    for key in keys_to_delete:
-        del train[key]
-               
-    logging.info('%s items in the training dictionary remaining',len(train))
+    if len(keys_to_delete)>0:
+        for key in keys_to_delete:
+            del train[key]       
+        logging.warning('Deleted %s items with None for data. %s items remain in the training dictionary.',
+                        len(keys_to_delete),len(train))
 
     return train
         

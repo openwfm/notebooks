@@ -189,6 +189,8 @@ def time_intp(t1, v1, t2):
     
     # Interpolate using the filtered data
     v2_interpolated = np.interp(t2_stamps, t1_stamps, v1_no_nan)
+    if np.isnan(v2_interpolated).any():
+        logging.error('time_intp: interpolated output contains NaN')
     
     return v2_interpolated
 
@@ -207,6 +209,6 @@ def check_increment(datetime_array,id=''):
             logging.error('%s time array increements are not positive',id)
         return diffs_hours[0]
     else:
-        logging.warning('%s time array incremented are min %s max $s',id,
+        logging.info('%s time array increments are min %s max %s',id,
                         np.min(diffs_hours),np.max(diffs_hours))
         return -1
