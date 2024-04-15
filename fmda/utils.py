@@ -98,8 +98,23 @@ def get_item(dict,var,**kwargs):
     if verbose:
         print(caller_name,':',var,'=',value)
     return value
+
+def print_first(item_list,num=3,indent=0):
+    """
+    Print the first num items of the list followed by '...' 
+
+    :param item_list: List of items to be printed
+    :param num: number of items to list
+    """
+    indent_str = ' ' * indent
+    if len(item_list) > 0:
+        print(indent_str,type(item_list[0]))
+    for i in range(min(num,len(item_list))):
+        print(indent_str,item_list[i])
+    if len(item_list) > num:
+        print(indent_str,'...')
         
-def print_dict_summary(d,indent=0,print_first=[],first_num=3):
+def print_dict_summary(d,indent=0,first=[],first_num=3):
     """
     Prints a summary for each array in the dictionary, showing the key and the size of the array.
 
@@ -113,36 +128,20 @@ def print_dict_summary(d,indent=0,print_first=[],first_num=3):
         # Check if the value is list-like using a simple method check
         if isinstance(value, dict):
             print(f"{indent_str}{key}")
-            print_dict_summary(value,indent=indent+5)
+            print_dict_summary(value,first=first,indent=indent+5)
         elif isinstance(value,np.ndarray):
             if np.issubdtype(value.dtype, np.number):
                 print(f"{indent_str}{key}: NumPy array of shape {value.shape}, min: {value.min()}, max: {value.max()}")
             else:
                 # Handle non-numeric arrays differently 
                 print(f"{indent_str}{key}: NumPy array of shape {value.shape}, type {value.dtype}")
-            if key in print_first:
-                print_first(value,first_num)
         elif hasattr(value, "__iter__") and not isinstance(value, str):  # Check for iterable that is not a string
             print(f"{indent_str}{key}: Array of {len(value)} items")
-            if key in print_first:
-                print_first(value,first_num)
-
         else:
             print(indent_str,key,":",value)
+        if key in first:
+            print_first(value,num=first_num,indent=indent+5)
             
-def print_first(item_list,num=3):
-    """
-    Print the first num items of the list followed by '...' 
-
-    :param item_list: List of items to be printed
-    :param num: number of items to list
-    """
-    if len(item_list) > num:
-        print(type(item_list[0]))
-    for i in range(min(num,len(item_list))):
-        print(item_list[i])
-    if len(item_list) > num:
-        print('...')
                    
 from datetime import datetime
 
