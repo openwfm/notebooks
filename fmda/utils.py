@@ -5,11 +5,13 @@ import numbers
 from datetime import datetime
 import logging
 import sys
+import inspect
 
 def logging_setup():
+    caller_name = inspect.stack()[1][3]
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
+        format=caller_name + ' %(asctime)s - %(levelname)s - %(message)s',
         stream=sys.stdout
     )
     
@@ -91,17 +93,14 @@ def print_args_test():
     
 import inspect
 def get_item(dict,var,**kwargs):
-    caller_name = inspect.stack()[1][3]
     if var in dict:
         value = dict[var]
     elif 'default' in kwargs:
         value = kwargs['default']
-    try:
-        verbose
-    except NameError:
-        verbose = True
-    if verbose:
-        logging.info('%s : %s = %s',caller_name,var,value)
+    else:
+        logging.error('Variable %s not in the dictionary and no default',var)
+        raise NameError()
+    logging.info('%s = %s',var,value)
     return value
 
 def print_first(item_list,num=3,indent=0,id=None):

@@ -159,7 +159,7 @@ def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model
 
-def create_rnn_data(dat, params, hours=None, h2=None):
+def create_rnn_data_1(dat, params, hours=None, h2=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
     # Inputs:
     # dat: (dict) fmda dictionary
@@ -167,19 +167,14 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     # hours: (int) optional parameter to set total length of train+predict
     # h2: (int) optional parameter to set as length of training period (h2 = total - hours)
     # Returns: (dict) formatted datat used in RNN 
-    logging.info('create_rnn_data start')
+    logging.info('create_rnn_data_1 start')
     
     timesteps = params['timesteps']
     scale = params['scale']
     rain_do = params['rain_do']
     verbose = params['verbose']
-    batch_size = params['batch_size']
     
-    if hours is None:
-        hours = dat['hours']
-    if h2 is None:
-        h2 = dat['h2']
-    logging.info('create_rnn_data: hours=%s h2=%s',hours,h2)
+    logging.info('create_rnn_data_1: hours=%s h2=%s',hours,h2)
     # extract inputs the windown of interest
     Ew = dat['Ew']
     Ed = dat['Ed']
@@ -192,7 +187,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
 
     # Scale Data if required
     if scale:
-        logging.info('create_rnn_data: scaling to range 0 to %s',scale)
+        logging.info('create_rnn_data_1: scaling to range 0 to %s',scale)
         scale_fm=max(max(Ew),max(Ed),max(fm))/scale
         scale_rain=max(max(rain),0.01)/scale
         Ed = Ed/scale_fm
@@ -220,7 +215,32 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     logging.info('target  matrix Y shape %s',np.shape(Y))
     logging.info('features_list: %s',features_list)
     
+    rnn_dat={
+        'rain_do':rain_do,
+        'features_list':features_list,
+        'scale':scale,
+        'scale_fm':scale_fm,
+        'scale_rain':scale_rain}
     
+    return X, Y, rnn_dat
+    
+def create_rnn_data_2(X, Y, rnn_dat, dat, params, hours=None, h2=None):
+    
+    logging.info('create_rnn_data_2 start')
+    
+    timesteps = params['timesteps']
+    scale = params['scale']
+    verbose = params['verbose']
+    batch_size = params['batch_size']
+    
+    logging.info('create_rnn_data_2: hours=%s h2=%s',hours,h2)
+    
+    
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['h2'] 
+        
     logging.info('batch_size=%s',batch_size)
     if batch_size is None or batch_size is np.inf:
         x_train, y_train = staircase(X,Y,timesteps=timesteps,datapoints=h2,
@@ -239,7 +259,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     
     # Set up return dictionary
     
-    rnn_dat = {
+    rnn_dat.update({
         'case':dat['case'],
         'hours': hours,
         'x_train': x_train,
@@ -247,18 +267,14 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         'X': X,
         'samples': samples,
         'timesteps': timesteps,
-        'features': features,
+        'features':features,
         'h0': h0,
         'hours':hours,
-        'h2':h2,
-        'scale':scale,
-        'scale_fm':scale_fm,
-        'scale_rain':scale_rain,
-        'rain_do':rain_do,
-        'features_list':features_list
-    }
+        'h2':h2
+    })
     
-    logging.info('create_rnn_data done')
+    logging.info('create_rnn_data_2 done')
+    
     return rnn_dat
 
 
@@ -514,7 +530,8 @@ def run_rnn(case_data,params,fit=True,title2=''):
     verbose = params['verbose']
     
     reproducibility.set_seed() # Set seed for reproducibility
-    rnn_dat = create_rnn_data(case_data,params)
+    X, Y, rnn_dat = create_rnn_data_1(case_data,params)
+    rnn_dat = create_rnn_data_2(X,Y,rnn_dat,case_data,params)
     if params['verbose']:
         check_data(rnn_dat,case=0,name='rnn_dat')
     model_predict = train_rnn(
