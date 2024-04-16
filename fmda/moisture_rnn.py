@@ -207,30 +207,30 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
     
     if rain_do:
-        Et = np.vstack((Ed, Ew, rain)).T
+        X = np.vstack((Ed, Ew, rain)).T
         features_list = ['Ed', 'Ew', 'rain']
     else:
-        Et = np.vstack((Ed, Ew)).T        
+        X = np.vstack((Ed, Ew)).T        
         features_list = ['Ed', 'Ew']
-    datat = np.reshape(fm,[fm.shape[0],1])
-    print('feature matrix shape',np.shape(Et))
-    print('target  matrix shape',np.shape(datat))
+    Y = np.reshape(fm,[fm.shape[0],1])
+    print('feature matrix shape',np.shape(X))
+    print('target  matrix shape',np.shape(Y))
     
     # split data
     print('batch_size=',batch_size)
     if batch_size is None or batch_size is np.inf:
-        x_train, y_train = staircase(Et,datat,timesteps=timesteps,datapoints=h2,
+        x_train, y_train = staircase(X,Y,timesteps=timesteps,datapoints=h2,
                                  return_sequences=False, verbose = verbose)
         batches = None
     else:
-        x_train, y_train = staircase_2(Et,datat,timesteps,batch_size,trainsteps=h2,
+        x_train, y_train = staircase_2(X,Y,timesteps,batch_size,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
     
     vprint('x_train shape=',x_train.shape)
     vprint('y_train shape=',y_train.shape)    
     samples, timesteps, features = x_train.shape
     
-    h0 = tf.convert_to_tensor(datat[:samples],dtype=tf.float32)
+    h0 = tf.convert_to_tensor(X[:samples],dtype=tf.float32)
     
     # Set up return dictionary
     
@@ -239,7 +239,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         'hours': hours,
         'x_train': x_train,
         'y_train': y_train,
-        'Et': Et,
+        'X': X,
         'samples': samples,
         'timesteps': timesteps,
         'features': features,
@@ -558,7 +558,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                         dense_layers=params['dense_layers'],
                         verbose = verbose)
     
-    Et = rnn_dat['Et']
+    # X = rnn_dat['X']
     model_predict=create_RNN_2(hidden_units=params['hidden_units'], 
                         dense_units=params['dense_units'],  
                         input_shape=(hours,features),stateful = False,
@@ -740,7 +740,7 @@ def rnn_predict(model, params, rnn_dat):
     hours = rnn_dat['hours']
     
     # model.set_weights(w_fitted)
-    x_input=np.reshape(rnn_dat['Et'],(1, hours, features))
+    x_input=np.reshape(rnn_dat['X'],(1, hours, features))
     y_output = model.predict(x_input, verbose = verbose) - centering[1]
     
     vprint('x_input.shape=',x_input.shape,'y_output.shape=',y_output.shape)
