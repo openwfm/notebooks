@@ -100,9 +100,14 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
             del train[key]       
         logging.warning('Deleted %s items with None for data. %s items remain in the training dictionary.',
                         len(keys_to_delete),len(train))
+        
+    # output
 
-    with open(output_file_path, 'wb') as file:
-        logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
-        pickle.dump(train, file)
+    if output_file_path is not None:
+        with open(output_file_path, 'wb') as file:
+            logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
+            pickle.dump(train, file)
+    
+    logging.info('pkl2train done')
     
     return train
