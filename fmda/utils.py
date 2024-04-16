@@ -8,7 +8,7 @@ import sys
 
 def logging_setup():
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         stream=sys.stdout
     )
@@ -101,7 +101,7 @@ def get_item(dict,var,**kwargs):
     except NameError:
         verbose = True
     if verbose:
-        print(caller_name,':',var,'=',value)
+        logging.info('%s : %s = %s',caller_name,var,value)
     return value
 
 def print_first(item_list,num=3,indent=0,id=None):

@@ -167,6 +167,8 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     # hours: (int) optional parameter to set total length of train+predict
     # h2: (int) optional parameter to set as length of training period (h2 = total - hours)
     # Returns: (dict) formatted datat used in RNN 
+    logging.info('create_rnn_data start')
+    
     timesteps = params['timesteps']
     scale = params['scale']
     rain_do = params['rain_do']
@@ -177,7 +179,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         hours = dat['hours']
     if h2 is None:
         h2 = dat['h2']
-    vprint('create_rnn_data: hours=',hours,' h2=',h2)
+    logging.info('create_rnn_data: hours=%s h2=%s',hours,h2)
     # extract inputs the windown of interest
     Ew = dat['Ew']
     Ed = dat['Ed']
@@ -190,7 +192,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
 
     # Scale Data if required
     if scale:
-        print('scaling to range 0 to',scale)
+        logging.info('create_rnn_data: scaling to range 0 to %s',scale)
         scale_fm=max(max(Ew),max(Ed),max(fm))/scale
         scale_rain=max(max(rain),0.01)/scale
         Ed = Ed/scale_fm
@@ -202,7 +204,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         scale_rain=1.0
      
     if params['verbose_weights']:
-        print('scale_fm=',scale_fm,'scale_rain=',scale_rain)
+        logging.info('scale_fm=%s scale_rain=%s',scale_fm,scale_rain)
     
     # transform as 2D, (timesteps, features) and (timesteps, outputs)
     
@@ -213,11 +215,13 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         X = np.vstack((Ed, Ew)).T        
         features_list = ['Ed', 'Ew']
     Y = np.reshape(fm,[fm.shape[0],1])
-    print('feature matrix shape',np.shape(X))
-    print('target  matrix shape',np.shape(Y))
     
-    # split data
-    print('batch_size=',batch_size)
+    logging.info('feature matrix X shape %s',np.shape(X))
+    logging.info('target  matrix Y shape %s',np.shape(Y))
+    logging.info('features_list: %s',features_list)
+    
+    
+    logging.info('batch_size=%s',batch_size)
     if batch_size is None or batch_size is np.inf:
         x_train, y_train = staircase(X,Y,timesteps=timesteps,datapoints=h2,
                                  return_sequences=False, verbose = verbose)
@@ -226,8 +230,9 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         x_train, y_train = staircase_2(X,Y,timesteps,batch_size,trainsteps=h2,
                                  return_sequences=False, verbose = verbose)
     
-    vprint('x_train shape=',x_train.shape)
-    vprint('y_train shape=',y_train.shape)    
+    logging.info('x_train shape=%s',x_train.shape)
+    logging.info('y_train shape=%s',y_train.shape)
+    
     samples, timesteps, features = x_train.shape
     
     h0 = tf.convert_to_tensor(X[:samples],dtype=tf.float32)
@@ -253,6 +258,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         'features_list':features_list
     }
     
+    logging.info('create_rnn_data done')
     return rnn_dat
     
 
@@ -428,6 +434,8 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
 
     # operates on matrix input/output, identity of features not visible here
     
+    logging.info("train_rnn start, hours=%s fit=%s",hours,fit)
+    
     verbose = params['verbose']
     case = get_item(rnn_dat,'case')
     
@@ -445,7 +453,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     single_batch = batch_size is None or batch_size is np.inf
     if single_batch:
         batch_size=samples
-        print('replacing batch_size =',batch_size)
+        logging.info('replacing batch_size by %s',batch_size)
 
     epochs=get_item(params,'epochs')
     
@@ -662,6 +670,8 @@ def run_rnn(case_data,params,fit=True,title2=''):
     # fit: (bool) whether or not to fit RNN to data
     # title2: (str) title of RNN run to be joined to string with other info for plotting title
     # called from: run_case
+    
+    logging.info('run_rnn start')
     verbose = params['verbose']
     
     reproducibility.set_seed() # Set seed for reproducibility
@@ -696,6 +706,7 @@ def run_rnn(case_data,params,fit=True,title2=''):
     
     plot_data(case_data,title2=title2)
     plt.show()
+    logging.info('run_rnn end')
     return m, rmse_data(case_data)
     
     
