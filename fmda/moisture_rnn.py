@@ -253,10 +253,11 @@ def create_rnn_data(dat, params, hours=None, h2=None):
 import pickle, datetime
 from utils import time_intp,str2time,check_increment
 
-def pkl2train(file_paths,fstep='f01',fprev='f00'):
+def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
-    #   forecast_step   string - which forecast step to take atmospheric data from (best f03). the ino
+    #   forecast_step   string - which forecast step to take atmospheric data from (maybe 03, must be >0). 
+    #   fprev   strinh - the previous (
     # return:
     #   train          dictionary with structure
     #                  {key : {'key' : key,    # copied subdict key
@@ -266,23 +267,37 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
     #                            'Y' : feat    # features from atmosphere and location
     #                            
     #
+
+    if forecast_step > 0 and forecast_step < 100 and forecast_step == int(forecast_step):
+        fstep='f'+str(forecast_step).zfill(2)
+        fprev='f'+str(forecast_step-1).zfill(2)
+        logging.info('Using data from step %s',fstep)
+        logging.info('Using rain as the difference of accumulated precipitation between %s and %s',fstep,fprev)
+    else:
+        logging.critical('forecast_step must be integer between 1 and 99')
+        raise ValueError('bad forecast_step')
+        
     train = {}
-    for file_path in file_paths:
+    for file_path in input_file_paths:
         with open(file_path, 'rb') as file:
             logging.info("loading file %s", file_path)
             d = pickle.load(file)
         for key in d:
-            logging.info('Processing subdictionary at key %s',key)
+            logging.info('Processing subdictionary %s',key)
             if key in train:
                 logging.warning('skipping duplicate key %s',key)
             else:
                 subdict=d[key]    # subdictionary for this case
                 loc=subdict['loc']
                 train[key] = {
-                'key': key,  # store the key inside the dictionary, subdictionary will be used separatedly
-                'path': file_path,
+                'id': key,  # store the key inside the dictionary, subdictionary will be used separatedly
+                'case':key,
+                'filename': file_path,
                 'loc': loc
                 }
+                desc='descr'
+                if desc in subdict:
+                    train[desc]=subdict[desc]
                 time_hrrr=str2time(subdict['HRRR']['time'])
                 timesteps=len(time_hrrr)
                 if check_increment(time_hrrr,id=key+' HRRR.time') < 1:
@@ -315,7 +330,8 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
                 else:
                     logging.info(f"Created target matrix train[{key}]['Y'] shape {train[key]['Y'].shape}")
     
-    logging.info('Created a training dictionary with %s items',len(train))
+    logging.info('Created a "train" dictionary with %s items',len(train))
+ 
     
     # clean up
     
@@ -332,6 +348,10 @@ def pkl2train(file_paths,fstep='f01',fprev='f00'):
         logging.warning('Deleted %s items with None for data. %s items remain in the training dictionary.',
                         len(keys_to_delete),len(train))
 
+    with open(output_file_path, 'wb') as file:
+        logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
+        pickle.dump(train, file)
+    
     return train
         
     
