@@ -5,8 +5,8 @@ moisture_rnn.py:
     def run_case(case_data,params, check_data=False)
         
         calls run_rnn(case_data,params,...) 
-            calls create_rnn_data() to make single array with fetures and target <==== new version, mult. stretches
+            calls create_rnn_data() to make single array with fetures and target
             calls train_rnn (rnn_dat,params,hours,fit)
-                runs over one stretch <============ generalize to multiple atretches
+                runs over one stretch 
             calls rnn_predict(model, params, rnn_dat)
       

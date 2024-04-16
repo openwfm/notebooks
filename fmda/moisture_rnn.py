@@ -213,6 +213,8 @@ def create_rnn_data(dat, params, hours=None, h2=None):
         Et = np.vstack((Ed, Ew)).T        
         features_list = ['Ed', 'Ew']
     datat = np.reshape(fm,[fm.shape[0],1])
+    print('feature matrix shape',np.shape(Et))
+    print('target  matrix shape',np.shape(datat))
     
     # split data
     print('batch_size=',batch_size)
@@ -411,6 +413,7 @@ def create_rnn_data_pkl(dict,key,params, hours=None, h2=None):
         Et = np.vstack((Ed, Ew)).T        
         features_list = ['Ed', 'Ew']
     datat = np.reshape(fm,[fm.shape[0],1])
+
     
     # split data
     print('batch_size=',batch_size)
