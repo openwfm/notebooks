@@ -18,6 +18,9 @@ from data_funcs import check_data, rmse_data, plot_data
 import moisture_models as mod
 import sys
 import logging
+from utils import print_dict_summary, print_first, str2time, check_increment, time_intp
+import pickle
+import os.path as osp
 
 
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
@@ -249,9 +252,7 @@ def create_rnn_data(dat, params, hours=None, h2=None):
     }
     
     return rnn_dat
-
-import pickle, datetime
-from utils import time_intp,str2time,check_increment
+    
 
 def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     # in:
@@ -354,7 +355,6 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     
     return train
         
-    
 
 def create_rnn_data_pkl(dict,key,params, hours=None, h2=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
@@ -522,6 +522,8 @@ class ResetStatesCallback(Callback):
 
 def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
 
+    # operates on matrix input/output, identity of features not visible here
+    
     verbose = params['verbose']
     case = get_item(rnn_dat,'case')
     
@@ -755,6 +757,7 @@ def run_rnn(case_data,params,fit=True,title2=''):
     # params: (dict) collection of run options for model
     # fit: (bool) whether or not to fit RNN to data
     # title2: (str) title of RNN run to be joined to string with other info for plotting title
+    # called from: run_case
     verbose = params['verbose']
     
     reproducibility.set_seed() # Set seed for reproducibility
@@ -795,9 +798,13 @@ def run_rnn(case_data,params,fit=True,title2=''):
 def run_case(case_data,params, check_data=False):
     # Given a formatted FMDA dictionary of data, run RNN model using given run params
     # Inputs:
-    # case_data: (dict)
+    # case_data: (dict) one case
+    #      its name is in case_data['case']
+    #      check_data
     # params: (dict) collection of run options for model
     # Return: (dict) collection of RMSE error for RNN & EKF, for train and prediction periods
+    # called from fmda_rnn_rain
+    
     print('\n***** ',case_data['case'],' *****\n')
     case_data['rain'][np.isnan(case_data['rain'])] = 0
     print(params)
