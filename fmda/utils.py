@@ -8,10 +8,9 @@ import sys
 import inspect
 
 def logging_setup():
-    caller_name = inspect.stack()[1][3]
     logging.basicConfig(
         level=logging.INFO,
-        format=caller_name + ' %(asctime)s - %(levelname)s - %(message)s',
+        format='%(asctime)s - %(levelname)s - %(message)s',
         stream=sys.stdout
     )
     
