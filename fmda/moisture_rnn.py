@@ -220,7 +220,8 @@ def create_rnn_data_1(dat, params, hours=None, h2=None):
         'features_list':features_list,
         'scale':scale,
         'scale_fm':scale_fm,
-        'scale_rain':scale_rain}
+        'scale_rain':scale_rain,
+    }
     
     return X, Y, rnn_dat
     
@@ -234,7 +235,6 @@ def create_rnn_data_2(X, Y, rnn_dat, dat, params, hours=None, h2=None):
     batch_size = params['batch_size']
     
     logging.info('create_rnn_data_2: hours=%s h2=%s',hours,h2)
-    
     
     if hours is None:
         hours = dat['hours']

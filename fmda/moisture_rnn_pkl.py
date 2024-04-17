@@ -85,7 +85,6 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     
     logging.info('Created a "train" dictionary with %s items',len(train))
  
-    
     # clean up
     
     keys_to_delete = []
@@ -111,3 +110,33 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     logging.info('pkl2train done')
     
     return train
+
+def run_rnn_pkl(case_data,params,fit=True,title2=''):
+    # Run RNN on given a case subdictionary of the output of pkl2train
+    # Inputs:
+    # case_data: (dict) 
+    # fit: (bool) whether or not to fit RNN to data
+    # title2: (str) title of RNN run to be joined to string with other info for plotting title
+    # called from: top level
+    
+    logging.info('run_rnn start')
+    verbose = params['verbose']
+    
+    reproducibility.set_seed() # Set seed for reproducibility
+    
+    rnn_dat = create_rnn_data_2(X,Y,rnn_dat,case_data,params)
+  
+    model_predict = train_rnn(
+        rnn_dat,
+        params,
+        rnn_dat['hours'],
+        fit=fit
+    )
+
+    m = rnn_predict(model_predict, params, rnn_dat)
+    case_data['m'] = m
+    
+    plot_data(case_data,title2=title2)
+    plt.show()
+    logging.info('run_rnn end')
+    return m, rmse_data(case_data)
