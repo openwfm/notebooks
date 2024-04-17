@@ -215,17 +215,27 @@ def create_rnn_data_1(dat, params, hours=None, h2=None):
     logging.info('target  matrix Y shape %s',np.shape(Y))
     logging.info('features_list: %s',features_list)
     
+    if hours is None:
+        hours = dat['hours']
+    if h2 is None:
+        h2 = dat['h2'] 
+    
     rnn_dat={
+        'case':dat['case'],
+        'hours':hours,
+        'h2':h2,
         'rain_do':rain_do,
         'features_list':features_list,
         'scale':scale,
         'scale_fm':scale_fm,
         'scale_rain':scale_rain,
+        'X':X,
+        'Y':Y
     }
     
-    return X, Y, rnn_dat
+    return rnn_dat
     
-def create_rnn_data_2(X, Y, rnn_dat, dat, params, hours=None, h2=None):
+def create_rnn_data_2(rnn_dat, params):
     
     logging.info('create_rnn_data_2 start')
     
@@ -233,14 +243,10 @@ def create_rnn_data_2(X, Y, rnn_dat, dat, params, hours=None, h2=None):
     scale = params['scale']
     verbose = params['verbose']
     batch_size = params['batch_size']
-    
-    logging.info('create_rnn_data_2: hours=%s h2=%s',hours,h2)
-    
-    if hours is None:
-        hours = dat['hours']
-    if h2 is None:
-        h2 = dat['h2'] 
-        
+    X = rnn_dat['X']
+    Y = rnn_dat['Y']
+    h2= rnn_dat['h2']
+           
     logging.info('batch_size=%s',batch_size)
     if batch_size is None or batch_size is np.inf:
         x_train, y_train = staircase(X,Y,timesteps=timesteps,datapoints=h2,
@@ -260,22 +266,16 @@ def create_rnn_data_2(X, Y, rnn_dat, dat, params, hours=None, h2=None):
     # Set up return dictionary
     
     rnn_dat.update({
-        'case':dat['case'],
-        'hours': hours,
         'x_train': x_train,
         'y_train': y_train,
-        'X': X,
         'samples': samples,
         'timesteps': timesteps,
         'features':features,
-        'h0': h0,
-        'hours':hours,
-        'h2':h2
     })
     
     logging.info('create_rnn_data_2 done')
     
-    return rnn_dat
+    # return rnn_dat
 
 
 from tensorflow.keras.callbacks import Callback
@@ -530,8 +530,8 @@ def run_rnn(case_data,params,fit=True,title2=''):
     verbose = params['verbose']
     
     reproducibility.set_seed() # Set seed for reproducibility
-    X, Y, rnn_dat = create_rnn_data_1(case_data,params)
-    rnn_dat = create_rnn_data_2(X,Y,rnn_dat,case_data,params)
+    rnn_dat = create_rnn_data_1(case_data,params)
+    create_rnn_data_2(rnn_dat,params)
     if params['verbose']:
         check_data(rnn_dat,case=0,name='rnn_dat')
     model_predict = train_rnn(

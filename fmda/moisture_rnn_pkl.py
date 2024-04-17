@@ -5,6 +5,8 @@ import pickle
 import os.path as osp
 import pandas as pd
 import numpy as np
+import reproducibility
+from moisture_rnn import create_rnn_data_2, train_rnn, rnn_predict
 
 def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     # in:
@@ -57,6 +59,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                     raise(ValueError)
                 # build matrix of features - assuming all the same length, if not column_stack will fail
                 train[key]['time']=time_hrrr
+                
                 columns=[]
                 # location as features constant in time come first
                 columns.append(np.full(timesteps,loc['elev']))  
@@ -69,6 +72,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                 logging.info('%s rain as difference %s minus %s: min %s max %s',key,fstep,fprev,np.min(rain),np.max(rain))
                 columns.append( rain ) # add rain feature
                 train[key]['X'] = np.column_stack(columns)
+                
                 logging.info(f"Created feature matrix train[{key}]['X'] shape {train[key]['X'].shape}")
                 time_raws=str2time(subdict['RAWS']['time_raws']) # may not be the same as HRRR
                 logging.info('%s RAWS.time_raws length is %s',key,len(time_raws))
@@ -78,6 +82,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                 logging.info('%s RAWS.fm length is %s',key,len(fm))
                 # interpolate RAWS sensors to HRRR time and over NaNs
                 train[key]['Y'] = time_intp(time_raws,fm,time_hrrr)
+                
                 if  train[key]['Y'] is None:
                     logging.error('Cannot create target matrix for %s, using None',key)
                 else:
@@ -111,7 +116,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     
     return train
 
-def run_rnn_pkl(case_data,params,fit=True,title2=''):
+def run_rnn_pkl(rnn_dat,params,fit=True,title2=''):
     # Run RNN on given a case subdictionary of the output of pkl2train
     # Inputs:
     # case_data: (dict) 
@@ -124,7 +129,7 @@ def run_rnn_pkl(case_data,params,fit=True,title2=''):
     
     reproducibility.set_seed() # Set seed for reproducibility
     
-    rnn_dat = create_rnn_data_2(X,Y,rnn_dat,case_data,params)
+    create_rnn_data_2(rnn_dat,params)
   
     model_predict = train_rnn(
         rnn_dat,
