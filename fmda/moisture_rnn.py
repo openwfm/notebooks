@@ -511,8 +511,8 @@ def rnn_predict(model, params, rnn_dat):
     
     m = np.reshape(y_output,hours)
     # print('weights=',w)
-    if rnn_dat['scale']:
-        vprint('scaling')
+    if 'scale_fm' in rnn_dat:
+        vprint('scaling the output')
         m = m*rnn_dat['scale_fm']
     m = np.reshape(m,hours)
     return m

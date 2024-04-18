@@ -7,6 +7,10 @@ import pandas as pd
 import numpy as np
 import reproducibility
 from moisture_rnn import create_rnn_data_2, train_rnn, rnn_predict
+from data_funcs import plot_data,rmse_data
+import matplotlib.pyplot as plt
+
+# run this from test-pkl2train.ipynb
 
 def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     # in:
@@ -54,9 +58,17 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                 if desc in subdict:
                     train[desc]=subdict[desc]
                 time_hrrr=str2time(subdict['HRRR']['time'])
-                timesteps=len(time_hrrr)
-                if check_increment(time_hrrr,id=key+' HRRR.time') < 1:
+                # timekeeping
+                timesteps=len(train[key]['HRRR']['time'])
+                hours=timesteps
+                train[key]['hours']=hours
+                train[key]['h2']   =hours     # not doing prediction yet    
+                hrrr_increment = check_increment(time_hrrr,id=key+' HRRR.time')
+                logging.info('HRRR increment is %s h',hrrr_increment)
+                if  hrrr_increment < 1:
+                    logging.critical('HRRR increment is %s h must be at least 1 h',hrrr_increment)
                     raise(ValueError)
+
                 # build matrix of features - assuming all the same length, if not column_stack will fail
                 train[key]['time']=time_hrrr
                 
@@ -69,7 +81,8 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                     columns.append(subdict['HRRR'][fstep][i])   # add variables from HRRR forecast steps 
                 # compute rain as difference of accumulated precipitation
                 rain = subdict['HRRR'][fstep]['precip_accum']- subdict['HRRR'][fprev]['precip_accum']
-                logging.info('%s rain as difference %s minus %s: min %s max %s',key,fstep,fprev,np.min(rain),np.max(rain))
+                logging.info('%s rain as difference %s minus %s: min %s max %s',
+                             key,fstep,fprev,np.min(rain),np.max(rain))
                 columns.append( rain ) # add rain feature
                 train[key]['X'] = np.column_stack(columns)
                 
@@ -116,32 +129,41 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     
     return train
 
-def run_rnn_pkl(rnn_dat,params,fit=True,title2=''):
-    # Run RNN on given a case subdictionary of the output of pkl2train
+def run_rnn_pkl(case_data,params, title2=None):
+    # analogous to run_rnn after the create_rnn_data_1 stage
+    # instead, after pkl2train
     # Inputs:
-    # case_data: (dict) 
-    # fit: (bool) whether or not to fit RNN to data
-    # title2: (str) title of RNN run to be joined to string with other info for plotting title
+    # case_data: (dict) one case train[case] after pkl2train()
+    #    also plays the role of rnn_dat after create_rnn_data_1
+    # title2: (str) string to add to plot titles
     # called from: top level
     
     logging.info('run_rnn start')
     verbose = params['verbose']
     
+    if title2 is None:
+        title2=case_data['id']
+    
     reproducibility.set_seed() # Set seed for reproducibility
     
-    create_rnn_data_2(rnn_dat,params)
+    print('case_data at entry to run_rnn_pkl')
+    print_dict_summary(case_data)
+    
+    # add batched x_train, y_train
+    create_rnn_data_2(case_data,params)  
   
+    # train the rnn over period  create prediction model with optimized weights
     model_predict = train_rnn(
-        rnn_dat,
+        case_data,
         params,
-        rnn_dat['hours'],
-        fit=fit
+        case_data['hours']
     )
 
-    m = rnn_predict(model_predict, params, rnn_dat)
+    m = rnn_predict(model_predict, params, case_data)
     case_data['m'] = m
     
     plot_data(case_data,title2=title2)
     plt.show()
-    logging.info('run_rnn end')
-    return m, rmse_data(case_data)
+    logging.info('run_rnn_pkl end')
+    # return m, rmse_data(case_data)  # do not have a "measurements" field 
+    return m
