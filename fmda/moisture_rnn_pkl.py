@@ -76,6 +76,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                 columns.append(np.full(timesteps,loc['elev']))  
                 columns.append(np.full(timesteps,loc['lon']))
                 columns.append(np.full(timesteps,loc['lat']))
+                # TODO: test with features just Ed and Ew for reproducibillity. Perhaps pretrain on E's only
                 for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
                     columns.append(subdict['HRRR'][fstep][i])   # add variables from HRRR forecast steps 
                 # compute rain as difference of accumulated precipitation
