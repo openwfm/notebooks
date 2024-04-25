@@ -15,8 +15,7 @@ import matplotlib.pyplot as plt
 def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
-    #   forecast_step   string - which forecast step to take atmospheric data from (maybe 03, must be >0). 
-    #   fprev   strinh - the previous (
+    #   forecast_step   int - which forecast step to take atmospheric data from (maybe 03, must be >0). 
     # return:
     #   train          dictionary with structure
     #                  {key : {'key' : key,    # copied subdict key
