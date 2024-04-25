@@ -94,6 +94,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                 logging.info('%s RAWS.fm length is %s',key,len(fm))
                 # interpolate RAWS sensors to HRRR time and over NaNs
                 train[key]['Y'] = time_intp(time_raws,fm,time_hrrr)
+                # TODO: check endpoint interpolation when RAWS data sparse, and bail out if not enough data
                 
                 if  train[key]['Y'] is None:
                     logging.error('Cannot create target matrix for %s, using None',key)
