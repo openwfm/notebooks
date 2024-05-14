@@ -58,7 +58,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                     train[desc]=subdict[desc]
                 time_hrrr=str2time(subdict['HRRR']['time'])
                 # timekeeping
-                timesteps=len(train[key]['HRRR']['time'])
+                timesteps=len(d[key]['HRRR']['time'])
                 hours=timesteps
                 train[key]['hours']=hours
                 train[key]['h2']   =hours     # not doing prediction yet    
