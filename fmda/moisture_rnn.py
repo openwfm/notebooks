@@ -86,7 +86,24 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
     #     batch 1: [3 4 5]   [4 5 6]   [5 6 7] 
     #     batch 2: [6 7 8]   [7 8 9]    when runs out this is the last batch, can be shorter
     #
-    #     the first sequence in batch j starts from timesteps*j and ends with timesteps*(j+1)-1
+    #     the first sample in batch j starts from timesteps*j and ends with timesteps*(j+1)-1
+    #     e.g. the final hidden state of the rnn after the sequence of steps [0 1 2] in batch 0
+    #     becomes the starting hidden state of the rnn in the sequence of steps [3 4 5] in batch 1, etc.
+    #     
+    #     sample [0 1 2] means the rnn is used twice to map state 0 -> 1 -> 2
+    #     the state at time 0 is fixed but the state is considered a variable at times 1 and 2 
+    #     the loss is computed from the output at time 2 and the gradient of the loss function by chain rule which ends at time 0 because the state there is a constant -> derivative is zero
+    #     sample [3 4 5] means the rnn is used twice to map state 3 -> 4 -> 5    #     the state at time 3 is fixed to the output of the first sequence [0 1 2]
+    #     the loss is computed from the output at time 5 and the gradient of the loss function by chain rule which ends at time 3 because the state there is considered constant -> derivative is zero
+    #     how is the gradient computed? I suppose keras adds gradient wrt the weights at 2 5 8 ... 3 6 9... 4 7 ... and uses that to update the weights
+    #     there is only one set of weights   h(2) = f(h(1),w)  h(1) = f(h(0),w)   but w is always the same 
+    #     each column is a one successive evaluation of h(n+1) = f(h(n),w)  for n = n_startn n_start+1,... 
+    #     the cannot be evaluated efficiently on gpu because gpu is a parallel processor
+    #     this of it as each column served by one thread, and the threads are independent because they execute in parallel, there needs to be large number of threads (32 is a good number)\
+    #     each batch consists of independent calculations
+    #     but it can depend on the result of the previous batch (that's the recurrent parr)
+    
+    
     
     max_batches = datapoints // timesteps
     max_sequences = max_batches * batch_size
