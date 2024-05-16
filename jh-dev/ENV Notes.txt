@@ -1,7 +1,0 @@
-xarray
-pandas
-numpy
-netcdf4
-
-
-SEE FMR environment
