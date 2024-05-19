@@ -1,0 +1,30 @@
+# File used to store hyperparameters.
+
+# Stateless RNN, batch_size declared at fit step
+rnn_stateless:
+  batch_size: 32
+  optimizer: adam
+  epochs: 100
+  rnn_units: 6
+  activation: ['linear', 'linear']
+  dropout: 0.2
+  recurrent_dropout: 0.2
+  learning_rate: 0.001
+
+# Stateful RNN, batch_input_shape used
+rnn_stateful:
+  batch_size: 32
+  optimizer: adam
+  epochs: 100
+  rnn_units: 6
+  activation: ['linear', 'linear']
+  dropout: 0.2
+  recurrent_dropout: 0.2
+  learning_rate: 0.001
+
+
+
+
+
+
+  
