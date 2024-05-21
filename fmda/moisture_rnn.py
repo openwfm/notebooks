@@ -374,6 +374,8 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
         history = None
         # model_fit.set_weights(w)
         if single_batch:
+            print("~"*50)
+            print('single batch train')
             history = model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=epochs,
@@ -610,6 +612,7 @@ def run_case(case_data,params, check_data=False):
     rmse =      {'Augmented KF':rmse_data(case_data)}
     del case_data['Ec']  # cleanup
     rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')[1]})
+    print("~"*50)
     rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')[1]})
     return rmse
 
