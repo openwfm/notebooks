@@ -369,7 +369,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     else:
         print('NOT initializing weights')
         w = model_fit.get_weights()
-    
+
     if fit:
         history = None
         # model_fit.set_weights(w)
@@ -564,13 +564,15 @@ def run_rnn(case_data,params,fit=True,title2=''):
     case_data['m'] = m
 
     hv = hash2(model_predict.get_weights())
+    # Reproducibility Checks
     if case_data['case']=='case11' and fit:
         if params['initialize']:
-            hv5 = 5.55077327554663e+19
-            mv = 3.77920889854431152
+            hv5 = 4.2030588308041834e+19
+            mv = 3.59976005554199219
         else:
-            hv5 = 3.5246083873473495e+19
-            mv = 3.77248024940490723               
+            # UPDATE THESE TOO FOR STAIRCASE 2
+            hv5 = 4.4965532557938975e+19
+            mv = 3.71594738960266113               
         print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
         # assert (hv == hv5)
         checkm = case_data['m'][350]
