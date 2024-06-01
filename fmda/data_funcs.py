@@ -177,7 +177,7 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
         elif type=='scatter':
             plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
             
-def plot_data(dat,title=None,title2=None,hmin=0,h2=None,hmax=None,xlabel=None,ylabel=None):
+def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
@@ -201,12 +201,16 @@ def plot_data(dat,title=None,title2=None,hmin=0,h2=None,hmax=None,xlabel=None,yl
     plot_one(hmin,hmax,dat,'y',linestyle='-',c='k',label='y truth')
     plot_one(hmin,hmax,dat,'z',linestyle='-',c='r',label='z output')
 
-    if h2 is not None:
+    if 'h2' in dat.keys():
+        h2 = dat["h2"]
+    else:
+        h2 = None
+    if (h2 is not None) and ('m' in dat.keys()):
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Note: the code within the tildes here makes a more complex, annotated plot
         plt.axvline(dat['h2'], linestyle=':', c='k', alpha=.8)
         yy = plt.ylim() # used to format annotations
-        plt.annotate('', xy=(yy[0], yy[0]),xytext=(dat['h2'],yy[0]),                  
+        plt.annotate('', xy=(0, yy[0]),xytext=(dat['h2'],yy[0]),                  
                 arrowprops=dict(arrowstyle='<-', linewidth=2),
                 annotation_clip=False)
         plt.annotate('(Training)',xy=(np.ceil(dat['h2']/2),yy[1]),xytext=(np.ceil(dat['h2']/2),yy[1]+1),
