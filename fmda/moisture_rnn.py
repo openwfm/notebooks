@@ -563,8 +563,8 @@ def run_rnn(case_data,params,fit=True,title2=''):
     m = rnn_predict(model_predict, params, rnn_dat)
     case_data['m'] = m
 
-    hv = hash2(model_predict.get_weights())
     # Reproducibility Checks
+    hv = hash2(model_predict.get_weights())
     if case_data['case']=='case11' and fit:
         if params['initialize']:
             hv5 = 4.2030588308041834e+19
@@ -603,7 +603,7 @@ def run_case(case_data,params, check_data=False):
     if check_data:
         check_data(case_data)
     hours=case_data['hours']
-    if 'train_frac' in params:
+    if ('train_frac' in params) and ('h2' not in case_data):
         case_data['h2'] = round(hours * params['train_frac'])
     h2=case_data['h2']
     plot_data(case_data,title2='case data on input')
