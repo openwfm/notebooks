@@ -1,6 +1,6 @@
 import sys
 import logging
-from utils import print_dict_summary, print_first, str2time, check_increment, time_intp
+from utils import print_dict_summary, print_first, str2time, check_increment, time_intp, hash2
 import pickle
 import os.path as osp
 import pandas as pd
@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 
 # run this from test-pkl2train.ipynb
 
-def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
+def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1, atm_dict="HRRR"):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
     #   forecast_step   int - which forecast step to take atmospheric data from (maybe 03, must be >0). 
+    #   atm_dict        str - name of subdict where atmospheric vars are located
     # return:
     #   train          dictionary with structure
     #                  {key : {'key' : key,    # copied subdict key
@@ -41,6 +42,10 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
             logging.info("loading file %s", file_path)
             d = pickle.load(file)
         for key in d:
+            if key == "reproducibility":
+                atm_dict = "RAWS"
+            else:
+                atm_dict = "HRRR"
             logging.info('Processing subdictionary %s',key)
             if key in train:
                 logging.warning('skipping duplicate key %s',key)
@@ -56,33 +61,52 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                 desc='descr'
                 if desc in subdict:
                     train[desc]=subdict[desc]
-                time_hrrr=str2time(subdict['HRRR']['time'])
+                time_hrrr=str2time(subdict[atm_dict]['time'])
                 # timekeeping
-                timesteps=len(d[key]['HRRR']['time'])
+                timesteps=len(d[key][atm_dict]['time'])
                 hours=timesteps
                 train[key]['hours']=hours
                 train[key]['h2']   =hours     # not doing prediction yet    
-                hrrr_increment = check_increment(time_hrrr,id=key+' HRRR.time')
-                logging.info('HRRR increment is %s h',hrrr_increment)
+                hrrr_increment = check_increment(time_hrrr,id=key+f' {atm_dict}.time')
+                logging.info(f'{atm_dict} increment is %s h',hrrr_increment)
                 if  hrrr_increment < 1:
                     logging.critical('HRRR increment is %s h must be at least 1 h',hrrr_increment)
                     raise(ValueError)
-
+                
                 # build matrix of features - assuming all the same length, if not column_stack will fail
                 train[key]['time']=time_hrrr
-                
+
+                # Set up static vars, but not for repro case
                 columns=[]
-                # location as features constant in time come first
-                columns.append(np.full(timesteps,loc['elev']))  
-                columns.append(np.full(timesteps,loc['lon']))
-                columns.append(np.full(timesteps,loc['lat']))
+                # if not key == "reproducibility":
+                #     # location as features constant in time come first
+                #     columns.append(np.full(timesteps,loc['elev']))  
+                #     columns.append(np.full(timesteps,loc['lon']))
+                #     columns.append(np.full(timesteps,loc['lat']))
+
+                # NOTE: for reproducibility scale is based on max fm over whole period. This is not right statistically as it uses data from training period
+                # TODO: update scaling
+                if True and (key == "reproducibility"):
+                    scale_fm=max(max(subdict[atm_dict]["Ew"]),max(subdict[atm_dict]["Ed"]),max(subdict[atm_dict]["fm"]))/1
+                else:
+                    scale_fm = 1
+                train[key]["scale_fm"] = scale_fm
+                
                 # TODO: test with features just Ed and Ew for reproducibillity. Perhaps pretrain on E's only
-                for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
-                    columns.append(subdict['HRRR'][fstep][i])   # add variables from HRRR forecast steps 
+                # for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
+                for i in ["Ed","Ew"]:
+                    # Use forcase steps if data from HRRR, not if from RAWS
+                    if atm_dict == "HRRR":
+                        columns.append(subdict[atm_dict][fstep][i]/scale_fm)   # add variables from HRRR forecast steps 
+                    elif atm_dict == "RAWS":
+                        columns.append(subdict[atm_dict][i]/scale_fm)
                 # compute rain as difference of accumulated precipitation
-                rain = subdict['HRRR'][fstep]['precip_accum']- subdict['HRRR'][fprev]['precip_accum']
-                logging.info('%s rain as difference %s minus %s: min %s max %s',
+                if atm_dict == "HRRR":
+                    rain = subdict[atm_dict][fstep]['precip_accum']- subdict[atm_dict][fprev]['precip_accum']
+                    logging.info('%s rain as difference %s minus %s: min %s max %s',
                              key,fstep,fprev,np.min(rain),np.max(rain))
+                elif atm_dict == "RAWS":
+                    rain = subdict[atm_dict]['rain']
                 columns.append( rain ) # add rain feature
                 train[key]['X'] = np.column_stack(columns)
                 
@@ -94,7 +118,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1):
                 fm=subdict['RAWS']['fm']
                 logging.info('%s RAWS.fm length is %s',key,len(fm))
                 # interpolate RAWS sensors to HRRR time and over NaNs
-                train[key]['Y'] = time_intp(time_raws,fm,time_hrrr)
+                train[key]['Y'] = time_intp(time_raws,fm,time_hrrr) / scale_fm
                 # TODO: check endpoint interpolation when RAWS data sparse, and bail out if not enough data
                 
                 if  train[key]['Y'] is None:
@@ -162,9 +186,15 @@ def run_rnn_pkl(case_data,params, title2=None):
 
     m = rnn_predict(model_predict, params, case_data)
     case_data['m'] = m
-    
+    print(f"Model outputs hash: {hash2(m)}")
+
+    # Plot data needs certain names
+    # TODO: make plot_data specific to this context
+    case_data.update({"fm": case_data["Y"]*case_data['scale_fm']})
     plot_data(case_data,title2=title2)
     plt.show()
+
     logging.info('run_rnn_pkl end')
+    # Print and return Errors
     # return m, rmse_data(case_data)  # do not have a "measurements" field 
-    return m
+    return m, rmse_data(case_data)
