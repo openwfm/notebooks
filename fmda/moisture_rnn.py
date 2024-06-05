@@ -604,6 +604,7 @@ def run_case(case_data,params, check_data=False):
         check_data(case_data)
     hours=case_data['hours']
     if ('train_frac' in params) and ('h2' not in case_data):
+    # if 'train_frac' in params:
         case_data['h2'] = round(hours * params['train_frac'])
     h2=case_data['h2']
     plot_data(case_data,title2='case data on input')
