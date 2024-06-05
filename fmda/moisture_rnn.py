@@ -338,7 +338,8 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
                         activation=params['activation'],
                         dense_layers=params['dense_layers'],
                         verbose = verbose)
-    
+    if verbose: print(model_fit.summary())
+        
     # X = rnn_dat['X']
     model_predict=create_RNN_2(hidden_units=params['hidden_units'], 
                         dense_units=params['dense_units'],  
@@ -570,7 +571,6 @@ def run_rnn(case_data,params,fit=True,title2=''):
             hv5 = 4.2030588308041834e+19
             mv = 3.59976005554199219
         else:
-            # UPDATE THESE TOO FOR STAIRCASE 2
             hv5 = 4.4965532557938975e+19
             mv = 3.71594738960266113               
         print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
