@@ -369,11 +369,13 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
     else:
         print('NOT initializing weights')
         w = model_fit.get_weights()
-    
+
     if fit:
         history = None
         # model_fit.set_weights(w)
         if single_batch:
+            print("~"*50)
+            print('single batch train')
             history = model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=epochs,
@@ -561,14 +563,16 @@ def run_rnn(case_data,params,fit=True,title2=''):
     m = rnn_predict(model_predict, params, rnn_dat)
     case_data['m'] = m
 
+    # Reproducibility Checks
     hv = hash2(model_predict.get_weights())
     if case_data['case']=='case11' and fit:
         if params['initialize']:
-            hv5 = 5.55077327554663e+19
-            mv = 3.77920889854431152
+            hv5 = 4.2030588308041834e+19
+            mv = 3.59976005554199219
         else:
-            hv5 = 3.5246083873473495e+19
-            mv = 3.77248024940490723               
+            # UPDATE THESE TOO FOR STAIRCASE 2
+            hv5 = 4.4965532557938975e+19
+            mv = 3.71594738960266113               
         print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
         # assert (hv == hv5)
         checkm = case_data['m'][350]
@@ -599,7 +603,8 @@ def run_case(case_data,params, check_data=False):
     if check_data:
         check_data(case_data)
     hours=case_data['hours']
-    if 'train_frac' in params:
+    if ('train_frac' in params) and ('h2' not in case_data):
+    # if 'train_frac' in params:
         case_data['h2'] = round(hours * params['train_frac'])
     h2=case_data['h2']
     plot_data(case_data,title2='case data on input')
@@ -610,6 +615,7 @@ def run_case(case_data,params, check_data=False):
     rmse =      {'Augmented KF':rmse_data(case_data)}
     del case_data['Ec']  # cleanup
     rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')[1]})
+    print("~"*50)
     rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')[1]})
     return rmse
 
