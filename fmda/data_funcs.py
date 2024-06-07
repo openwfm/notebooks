@@ -307,6 +307,7 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     all = rmse(m[:hours], fm[:hours])
     print(case,'Training 1 to',h2,'hours RMSE:   ' + str(np.round(train, 4)))
     print(case,'Prediction',h2+1,'to',hours,'hours RMSE: ' + str(np.round(predict, 4)))
+    print(f"All predictions hash: {hash2(m)}")
     
     return {'train':train, 'predict':predict, 'all':all}
 
