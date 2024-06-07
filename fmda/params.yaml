@@ -11,6 +11,7 @@ rnn_stateless:
   dense_layers: 1
   dense_units: 1
   activation: ['linear', 'linear']
+  centering: [0.0,0.0]
   # dropout: 0.2
   epochs: 200
   learning_rate: 0.001
