@@ -1,7 +1,7 @@
 # File used to store hyperparameters.
 
 # Stateless RNN, batch_size declared at fit step
-rnn_stateless:
+rnn:
   batch_size: 32
   timesteps: 5
   optimizer: adam
@@ -12,33 +12,16 @@ rnn_stateless:
   dense_units: 1
   activation: ['linear', 'linear']
   centering: [0.0,0.0]
-  # dropout: 0.2
+  #'dropout': [0.2, 0.2] # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
+  #'recurrent_dropout': 0.2 # Length must match number of recurrent layers
   epochs: 200
   learning_rate: 0.001
   phys_initialize: False # physics initialization
-  stateful: False
-  verbose_weights: True
-  verbose_fit: True
-
-# Stateful RNN, batch_input_shape used
-rnn_stateful:
-  batch_size: 32
-  timesteps: 5
-  optimizer: adam
-  epochs: 100
-  rnn_layers: 1
-  rnn_units: 20
-  dense_layers: 1
-  dense_units: 1
-  activation: ['linear', 'linear']
-  # dropout: 0.2
-  # recurrent_dropout: 0.2
-  epochs: 200
-  learning_rate: 0.001
-  phys_initialize: False
   stateful: True
-  verbose_weights: True
-  verbose_fit: True
+  verbose_weights: True # Prints out hashs of weights for tracking reproducibility
+  verbose_fit: False # Prints out all training epochs, makes computation much slower
+
+
 
 
 
