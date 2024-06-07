@@ -376,7 +376,10 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
         # model_fit.set_weights(w)
         if single_batch:
             print("~"*50)
-            print('single batch train')
+            print(f'single batch train with \n epochs={epochs} \n batch_size={samples} \n callbacks={callbacks} \n batch_shape = {model_fit.input_shape}')
+            print(f"x_train hash: {hash2(x_train)}")
+            print(f"y_train hash: {hash2(y_train)}")
+            print(f"Initial Weights hash: {hash2(model_fit.get_weights())}")
             history = model_fit.fit(x_train, 
                       y_train + centering[1] , 
                       epochs=epochs,
@@ -451,7 +454,7 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
            
         w_fitted=model_fit.get_weights()
         print('fitted weights hash =',hash2(w_fitted))
-        if params['verbose_weights']:
+        if params['verbose_weights'] and params["initialize"]:
             for i in range(len(w_fitted)):
                 print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
                   'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
@@ -460,6 +463,8 @@ def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
         w_fitted=w
         
     model_predict.set_weights(w_fitted)
+    if params['verbose_weights']:
+        print(f"model_predict weights hash: {hash2(model_predict.get_weights())}")
     
     return model_predict
 
@@ -580,6 +585,9 @@ def run_rnn(case_data,params,fit=True,title2=''):
         print('params:',params)
     else:
         print('check - hash weights:',hv)
+
+    # Print model output hash
+    print(f"Model Output Hash: {hash2(m)}")
     
     plot_data(case_data,title2=title2)
     plt.show()
