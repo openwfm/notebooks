@@ -6,6 +6,7 @@ from numpy.random import rand
 from MesoPy import Meso
 import tensorflow as tf
 import pickle, os
+from sklearn.metrics import mean_squared_error
 
 import matplotlib.pyplot as plt
 from moisture_models import model_decay, model_moisture
@@ -248,9 +249,8 @@ def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=Non
         plt.ylabel(ylabel)
     plt.legend(loc="upper left")
     
-# Calculate mean squared error
 def rmse(a, b):
-    return np.sqrt(((a - b)**2).mean())
+    return np.sqrt(mean_squared_error(a.flatten(), b.flatten()))
 
 def rmse_skip_nan(x, y):
     mask = ~np.isnan(x) & ~np.isnan(y)
