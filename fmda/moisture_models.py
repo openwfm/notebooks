@@ -1,7 +1,6 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-from utils import vprint
 
 
 def model_decay(m0,E,partials=0,T1=0.1,tlen=1):  

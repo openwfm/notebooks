@@ -14,7 +14,7 @@ rnn:
   centering: [0.0,0.0]
   dropout: [0.2, 0.2] # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
-  reset_states: False # reset hidden states after training epoch, triggers reset_states() via callbacks
+  reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
   epochs: 200
   learning_rate: 0.001
   phys_initialize: False # physics initialization
