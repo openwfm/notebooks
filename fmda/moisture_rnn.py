@@ -14,8 +14,8 @@ from utils import print_dict_summary
 from data_funcs import load_and_fix_data, rmse
 from abc import ABC, abstractmethod
 from utils import hash2
-from data_funcs import rmse
-
+from data_funcs import rmse, plot_data
+import copy
 
 
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
@@ -157,19 +157,19 @@ def create_rnn_data(dict1, params, atm_dict="HRRR", verbose=False, train_ind=Non
     # Returns: (dict) formatted data used in RNN 
     logging.info('create_rnn_data start')
     # Copy Dictionary 
-    d=dict1.copy()
+    d=copy.deepcopy(dict1)
     scale = params['scale']
     features_list = params["features_list"]
 
     # Check if reproducibility case
-    if dict1['case']=="reproducibility":
+    if d['case']=="reproducibility":
         params.update({'scale':1})
         atm_dict="RAWS"
     
     # Scale Data if required
     if scale:
         scale=1
-        if dict1['case']=="reproducibility":
+        if d['case']=="reproducibility":
             # Note: this was calculated from the max observed fm, Ed, Ew in a whole timeseries originally with using data from test period
             scale_fm = 17.076346687085564
             logging.info("REPRODUCIBILITY scaling moisture features: using %s", scale_fm)
@@ -291,8 +291,13 @@ class RNNModel(ABC):
         # run through training to get hidden state set proporly for forecast period
         X = np.concatenate((X_train, X_test))
         y = np.concatenate((y_train, y_test)).flatten()
+        # Predict
         print(f"Predicting Training through Test \n features hash: {hash2(X)} \n response hash: {hash2(y)} ")
         m = self.predict(X).flatten()
+        dict1['m']=m
+        # Plot final fit and data
+        # TODO: make plot_data specific to this context
+
         # Calculate Errors
         err = rmse(m, y)
         h2 = X_train.shape[0] # index of final training set value
@@ -366,10 +371,12 @@ class RNN(RNNModel):
         # there would be a bunch of different verbose params
         print(f"Training simple RNN with params: {self.params}")
         X_train, y_train = self.format_train_data(X_train, y_train)
-        if validation_data is not None:
-            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
         print(f"X_train hash: {hash2(X_train)}")
         print(f"y_train hash: {hash2(y_train)}")
+        if validation_data is not None:
+            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
+            print(f"X_val hash: {hash2(X_val)}")
+            print(f"y_val hash: {hash2(y_val)}")
         print(f"Initial weights before training hash: {hash2(self.model_fit.get_weights())}")
         # Setup callbacks
         if self.params["reset_states"]:
