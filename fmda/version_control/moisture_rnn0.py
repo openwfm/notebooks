@@ -14,7 +14,7 @@ import tensorflow as tf
 import pandas as pd
 from utils import vprint, hash2, get_item, print_dict_summary, print_first
 import reproducibility
-from data_funcs import check_data, rmse_data, plot_data
+from data_funcs0 import check_data, rmse_data, plot_data
 import moisture_models as mod
 import sys
 import logging

@@ -14,7 +14,7 @@ from utils import print_dict_summary
 from data_funcs import load_and_fix_data, rmse
 from abc import ABC, abstractmethod
 from utils import hash2
-from data_funcs import rmse, plot_data
+from data_funcs import rmse, plot_data, compare_dicts
 import copy
 
 
@@ -177,6 +177,8 @@ def create_rnn_data(dict1, params, atm_dict="HRRR", verbose=False, train_ind=Non
             d[atm_dict]['Ed'] = d[atm_dict]['Ed'] / scale_fm
             d[atm_dict]['Ew'] = d[atm_dict]['Ew'] / scale_fm
             d[atm_dict]['fm'] = d[atm_dict]['fm'] / scale_fm
+            scaler = 'reproducibility'
+            
     else:
         scale_fm=1.0
         scaler=None
@@ -237,6 +239,8 @@ def create_rnn_data(dict1, params, atm_dict="HRRR", verbose=False, train_ind=Non
         'X_test': X_test,
         'y_test': y_test      
     }
+    if rnn_dat['scaler'] == "reproducibility":
+        rnn_dat['scale_fm']=17.076346687085564
     if X_val.shape[0] > 0:
             rnn_dat.update({
                 'X_val': X_val,
@@ -253,17 +257,51 @@ def create_rnn_data(dict1, params, atm_dict="HRRR", verbose=False, train_ind=Non
     params.update({
             'features': features,
             'batch_shape': (params["batch_size"],params["timesteps"],features),
-            'pred_input_shape': (hours, features)
+            'pred_input_shape': (hours, features),
+            'scaler': scaler
         })
+    if params['scaler'] == "reproducibility":
+        params['scale_fm']=17.076346687085564    
 
     
     logging.info('create_rnn_data_2 done')
     return rnn_dat
 
-class ResetStatesCallback(Callback):
-    def on_epoch_end(self, epoch, logs=None):
-        self.model.reset_states()
     
+repro_hashes = {
+    'phys_initialize': {
+        'fitted_weight_hash' : 4.2030588308041834e+19,
+        'predictions_hash' :3.59976005554199219
+    },
+    'rand_initialize': {
+        'fitted_weight_hash' : 4.4965532557938975e+19,
+        'predictions_hash' : 3.71594738960266113
+    },
+    'params':{'id':0,
+        'purpose':'reproducibility',
+        'batch_size':32,
+        'training':5,
+        'cases':['case11'],
+        'scale':1,        # every feature in [0, scale]
+        'rain_do':True,
+        'verbose':False,
+        'timesteps':5,
+        'activation':['linear','linear'],
+        'hidden_units':20,  
+        'dense_units':1,    # do not change
+        'dense_layers':1,   # do not change
+        'centering':[0.0,0.0],  # should be activation at 0
+        'DeltaE':[0,-1],    # bias correction
+        'synthetic':False,  # run also synthetic cases
+        'T1': 0.1,          # 1/fuel class (10)
+        'fm_raise_vs_rain': 0.2,         # fm increase per mm rain 
+        'train_frac':0.5,  # time fraction to spend on training
+        'epochs':200,
+        'verbose_fit':0,
+        'verbose_weights':False,
+        'initialize': True
+        }
+}
 
 
 class RNNModel(ABC):
@@ -295,9 +333,32 @@ class RNNModel(ABC):
         print(f"Predicting Training through Test \n features hash: {hash2(X)} \n response hash: {hash2(y)} ")
         m = self.predict(X).flatten()
         dict1['m']=m
+        if self.params['scale']:
+            print(f"Rescaling data using {self.params['scaler']}")
+            if self.params['scaler'] == "reproducibility":
+                m  *= self.params['scale_fm']
+                y  *= self.params['scale_fm']
+                y_train *= self.params['scale_fm']
+                y_test *= self.params['scale_fm']
+        # Check Reproducibility, TODO: old dict calls it hidden_units not rnn_units, so this doens't check that
+        if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale']):
+            print("Checking Reproducibility")
+            checkm = m[350]
+            hv = hash2(self.model_predict.get_weights())
+            if self.params['phys_initialize']:
+                hv5 = 4.2030588308041834e+19
+                mv = 3.59976005554199219
+            else:
+                hv5 = 4.4965532557938975e+19
+                mv = 3.71594738960266113                
+            
+            print(f"Fitted weights hash: {hv}, Reproducibility weights hash: {hv5}, Error: {hv5-hv}")
+            print(f"Model predictions hash: {checkm}, Reproducibility preds hash: {mv}, Error: {mv-checkm}")
+        
         # Plot final fit and data
         # TODO: make plot_data specific to this context
-
+        
+        
         # Calculate Errors
         err = rmse(m, y)
         h2 = X_train.shape[0] # index of final training set value
@@ -313,6 +374,7 @@ class RNNModel(ABC):
 class ResetStatesCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.model.reset_states()
+
 
 class RNN(RNNModel):
     def __init__(self, params, loss='mean_squared_error'):
@@ -337,9 +399,9 @@ class RNN(RNNModel):
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
         model.compile(loss='mean_squared_error', optimizer=optimizer)
+        
         if self.params["verbose_weights"]:
             print(f"Initial Weights Hash: {hash2(model.get_weights())}")
-        
         return model
     def _build_model_predict(self, return_sequences=True):
         
