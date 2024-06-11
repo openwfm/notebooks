@@ -188,16 +188,11 @@ def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=Non
     # Inputs:
     # dat: FMDA dictionary
     # Returns: none
-    print("******DEBUG******")
     if 'hours' in dat:
         if hmax is None:
             hmax = dat['hours']
         else:
             hmax = min(hmax, dat['hours'])
-
-    # Extract feature names
-    if 'features_list' in dat:
-        if 'Ed' in dat['features_list']: 
     
     plt.figure(figsize=(16,4))
     # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
