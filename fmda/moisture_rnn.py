@@ -299,7 +299,8 @@ repro_hashes = {
         'epochs':200,
         'verbose_fit':0,
         'verbose_weights':False,
-        'initialize': True
+        'initialize': True,
+        'learning_rate': 0.001 # default learning rate
         }
 }
 
@@ -344,7 +345,7 @@ class RNNModel(ABC):
                 y_train *= self.params['scale_fm']
                 y_test *= self.params['scale_fm']
         # Check Reproducibility, TODO: old dict calls it hidden_units not rnn_units, so this doens't check that
-        if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale']):
+        if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale', 'activation', 'learning_rate']):
             print("Checking Reproducibility")
             checkm = m[350]
             hv = hash2(self.model_predict.get_weights())
