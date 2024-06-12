@@ -271,29 +271,29 @@ def rmse_skip_nan(x, y):
     
 def rmse_str(a,b):
     rmse = rmse_skip_nan(a,b)
-    return "RMSE " + "{:.2f}".format(rmse)
+    return "RMSE " + "{:.3f}".format(rmse)
 
-def rmse_data_str(dat, predict=True, hours = None, h2 = None):
+def rmse_data_str(dat, predict=True, hours = None, test_ind = None):
     # Return RMSE for model object in formatted string. Used within plotting
     # Inputs:
     # dat: (dict) fmda dictionary 
     # predict: (bool) Whether to return prediction period RMSE. Default True 
     # hours: (int) total number of modeled time periods
-    # h2: (int) end of training period
+    # test_ind: (int) start of test period
     # Return: (str) RMSE value
     
     if hours is None:
         if 'hours' in dat:
             hours = dat['hours']               
-    if h2 is None:
-        if 'h2' in dat:
-            h2 = dat['h2']
+    if test_ind is None:
+        if 'test_ind' in dat:
+            test_ind = dat['test_ind']
     
-    if 'm' in dat and 'fm' in dat:
-        if predict and hours is not None and h2 is not None:
-            return rmse_str(dat['m'][h2:hours],dat['fm'][h2:hours])
+    if 'm' in dat and 'y' in dat:
+        if predict and hours is not None and test_ind is not None:
+            return rmse_str(dat['m'][test_ind:hours],dat['y'].flatten()[test_ind:hours])
         else: 
-            return rmse_str(dat['m'],dat['fm'])
+            return rmse_str(dat['m'],dat['y'].flatten())
     else:
         return ''
                     

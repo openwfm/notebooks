@@ -352,12 +352,13 @@ class RNNModel(ABC):
                 hv5 = 4.4965532557938975e+19
                 mv = 3.71594738960266113                
             
-            print(f"Fitted weights hash: {hv}, Reproducibility weights hash: {hv5}, Error: {hv5-hv}")
+            print(f"Fitted weights hash (check 5): {hv}, Reproducibility weights hash: {hv5}, Error: {hv5-hv}")
             print(f"Model predictions hash: {checkm}, Reproducibility preds hash: {mv}, Error: {mv-checkm}")
         
         # Plot final fit and data
         # TODO: make plot_data specific to this context
-        
+
+        plot_data(dict1, title="RNN", title2=dict1['case'])
         
         # Calculate Errors
         err = rmse(m, y)
