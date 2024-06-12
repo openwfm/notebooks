@@ -319,9 +319,11 @@ class RNNModel(ABC):
     def predict(self, X):
         pass
 
-    def run_model(self, dict1):
+    def run_model(self, dict0):
+        # Make copy to prevent changing in place
+        dict1 = copy.deepcopy(dict0)
         # Extract Fields
-        X_train, y_train, X_test, y_test = dict1['X_train'], dict1['y_train'], dict1["X_test"], dict1['y_test']
+        X_train, y_train, X_test, y_test = dict1['X_train'].copy(), dict1['y_train'].copy(), dict1["X_test"].copy(), dict1['y_test'].copy()
         case_id = dict1['case']
         # Fit model
         self.fit(X_train, y_train)
@@ -333,6 +335,7 @@ class RNNModel(ABC):
         print(f"Predicting Training through Test \n features hash: {hash2(X)} \n response hash: {hash2(y)} ")
         m = self.predict(X).flatten()
         dict1['m']=m
+        dict0['m']=m # add to outside env dictionary, should be only place this happens
         if self.params['scale']:
             print(f"Rescaling data using {self.params['scaler']}")
             if self.params['scaler'] == "reproducibility":
@@ -346,18 +349,18 @@ class RNNModel(ABC):
             checkm = m[350]
             hv = hash2(self.model_predict.get_weights())
             if self.params['phys_initialize']:
-                hv5 = 4.2030588308041834e+19
-                mv = 3.59976005554199219
+                hv5 = repro_hashes['phys_initialize']['fitted_weight_hash']
+                mv = repro_hashes['phys_initialize']['predictions_hash']
             else:
-                hv5 = 4.4965532557938975e+19
-                mv = 3.71594738960266113                
+                hv5 = repro_hashes['rand_initialize']['fitted_weight_hash']
+                mv = repro_hashes['rand_initialize']['predictions_hash']           
             
             print(f"Fitted weights hash (check 5): {hv}, Reproducibility weights hash: {hv5}, Error: {hv5-hv}")
             print(f"Model predictions hash: {checkm}, Reproducibility preds hash: {mv}, Error: {mv-checkm}")
         
         # Plot final fit and data
         # TODO: make plot_data specific to this context
-
+        dict1['y'] = y
         plot_data(dict1, title="RNN", title2=dict1['case'])
         
         # Calculate Errors
