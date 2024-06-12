@@ -12,6 +12,7 @@ from moisture_models import model_decay, model_moisture
 from datetime import datetime, timedelta
 from utils import  is_numeric_ndarray, hash2
 import json
+import copy
 
 
 def compare_dicts(dict1, dict2, keys):
@@ -183,17 +184,20 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
         elif type=='scatter':
             plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
             
-def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
+def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
     # Returns: none
+
+    dat = copy.deepcopy(dat0)
+    
     if 'hours' in dat:
         if hmax is None:
             hmax = dat['hours']
         else:
             hmax = min(hmax, dat['hours'])
-            
+    
     plt.figure(figsize=(16,4))
     # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
     plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
@@ -205,27 +209,28 @@ def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=Non
     # for test
     # plot_one(hmin,hmax,dat,'x',linestyle='-',c='g',label='x input')
     # plot_one(hmin,hmax,dat,'y',linestyle='-',c='k',label='y truth')
+    plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
     # plot_one(hmin,hmax,dat,'z',linestyle='-',c='r',label='z output')
 
-    if 'h2' in dat.keys():
-        h2 = dat["h2"]
+    if 'test_ind' in dat.keys():
+        test_ind = dat["test_ind"]
     else:
-        h2 = None
-    if (h2 is not None) and ('m' in dat.keys()):
+        test_ind = None
+    if (test_ind is not None) and ('m' in dat.keys()):
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Note: the code within the tildes here makes a more complex, annotated plot
-        plt.axvline(dat['h2'], linestyle=':', c='k', alpha=.8)
+        plt.axvline(dat['test_ind'], linestyle=':', c='k', alpha=.8)
         yy = plt.ylim() # used to format annotations
-        plt.annotate('', xy=(0, yy[0]),xytext=(dat['h2'],yy[0]),                  
+        plt.annotate('', xy=(0, yy[0]),xytext=(dat['test_ind'],yy[0]),                  
                 arrowprops=dict(arrowstyle='<-', linewidth=2),
                 annotation_clip=False)
-        plt.annotate('(Training)',xy=(np.ceil(dat['h2']/2),yy[1]),xytext=(np.ceil(dat['h2']/2),yy[1]+1),
+        plt.annotate('(Training)',xy=(np.ceil(dat['test_ind']/2),yy[1]),xytext=(np.ceil(dat['test_ind']/2),yy[1]+1),
                 annotation_clip=False, alpha=.8)
-        plt.annotate('', xy=(dat['h2'], yy[0]),xytext=(dat['hours'],yy[0]),                  
+        plt.annotate('', xy=(dat['test_ind'], yy[0]),xytext=(dat['hours'],yy[0]),                  
                 arrowprops=dict(arrowstyle='<-', linewidth=2),
                 annotation_clip=False)
-        plt.annotate('(Forecast)',xy=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]),
-                     xytext=(np.ceil(dat['h2']+(dat['hours']-dat['h2'])/2),yy[1]+1),
+        plt.annotate('(Forecast)',xy=(np.ceil(dat['test_ind']+(dat['hours']-dat['test_ind'])/2),yy[1]),
+                     xytext=(np.ceil(dat['test_ind']+(dat['hours']-dat['test_ind'])/2),yy[1]+1),
                 annotation_clip=False, alpha=.8)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
@@ -316,167 +321,7 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
     
     return {'train':train, 'predict':predict, 'all':all}
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-## RAWS Data Functions
-
-def format_raws(stn, fixnames = True):
-    # Given RAWS station, format and clean data
-    # Inputs: 
-    # stn: (dict) part of output of MesoPy query
-    # fixnames: (bool) whether or not to change input names from the MesoPy format. Default T as it simplifies the names
-    # Return: formatted dict 
-    
-    raws_dat = stn['OBSERVATIONS'].copy() # bug fix for in-place changing of dictionary outside of func call
-    # Convert to Numpy arrays, check data type for floats
-    for key in [*stn['OBSERVATIONS'].keys()]:
-        if type(stn['OBSERVATIONS'][key][0]) is float:
-            raws_dat[key] = np.array(stn['OBSERVATIONS'][key], dtype = 'float64')
-        else:
-            raws_dat[key] = np.array(stn['OBSERVATIONS'][key])
-    
-    # Transform Data
-    raws_dat['air_temp_set_1'] = raws_dat['air_temp_set_1'] + 273.15 ## convert C to K
-    if 'precip_accum_set_1' in raws_dat.keys():
-        raws_dat['precip_accum_set_1'] = format_precip(raws_dat['precip_accum_set_1']) ## format precip data, accumulated to hourly
-    
-    
-    # Calculate Equilibrium Temps
-    raws_dat['Ed'] = 0.924*raws_dat['relative_humidity_set_1']**0.679 + 0.000499*np.exp(0.1*raws_dat['relative_humidity_set_1']) + 0.18*(21.1 + 273.15 - raws_dat['air_temp_set_1'])*(1 - np.exp(-0.115*raws_dat['relative_humidity_set_1']))
-    raws_dat['Ew'] = 0.618*raws_dat['relative_humidity_set_1']**0.753 + 0.000454*np.exp(0.1*raws_dat['relative_humidity_set_1']) + 0.18*(21.1 + 273.15 - raws_dat['air_temp_set_1'])*(1 - np.exp(-0.115*raws_dat['relative_humidity_set_1']))
-    
-    # Fix nan values
-    for key in [*raws_dat.keys()]:
-        if type(raws_dat[key][0]) is float:
-            raws_dat[key] = fixnan(raws_dat[key], 2)
-    
-    # Add station id
-    raws_dat['STID'] = stn['STID']
-    
-    # Add lat/lon
-    raws_dat['LATITUDE'] = stn['LATITUDE']
-    raws_dat['LONGITUDE'] = stn['LONGITUDE']
-    
-    # Simplify names 
-    if fixnames:
-        var_mapping = {
-            'date_time': 'time', 'precip_accum': 'rain', 'solar_radiation': 'solar',
-            'fuel_moisture': 'fm', 'relative_humidity': 'rh',
-            'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew', 'STID': 'STID',
-            'LONGITUDE': 'lon', 'LATITUDE': 'lat'
-            }
-        old_keys = [*raws_dat.keys()]
-        old_keys = [k.replace("_set_1", "") for k in old_keys]
-        new_keys = []
-        for key in old_keys:
-            new_keys.append(var_mapping.get(key, key))
-        old_keys = [*raws_dat.keys()]
-        old_keys = [k.replace("_set_1", "") for k in old_keys]
-        new_keys = []
-        for key in old_keys:
-            new_keys.append(var_mapping.get(key, key))
-        raws_dat2 = dict(zip(new_keys, list(raws_dat.values())))
-        return raws_dat2
-    
-    else: return raws_dat
-
-def format_rtma(rtma):
-    td = np.array(rtma['td'])
-    t2 = np.array(rtma['temp'])
-    rain=np.array(rtma['precipa'])
-    # compute relative humidity
-    rh = 100*np.exp(17.625*243.04*(td - t2) / (243.04 + t2 - 273.15) / (243.0 + td - 273.15))
-    Ed = 0.924*rh**0.679 + 0.000499*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - t2)*(1 - np.exp(-0.115*rh))
-    Ew = 0.618*rh**0.753 + 0.000454*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - t2)*(1 - np.exp(-0.115*rh))
-
-    rtma_dict = {
-        'time': rtma['time_str'],
-        'rain': format_precip(rtma['precipa']),
-        'rh' : rh,
-        'temp' : t2,
-        'rh' : rh,
-        'Ed' : Ed,
-        'Ew' : Ew,
-        'lat' : rtma['obs_lat'], 
-        'lon' : rtma['obs_lon']
-    }
-    
-    return rtma_dict
-
-def format_precip(precipa):
-    # Converts accumulated precipitation (typically units of in or mm) to rainfall (mm/hr)
-    # Inputs: 
-    # precipa: numpy array of accumulated precip values 
-    # Returns:
-    # rainfall (typically hourly based on data products)
-    
-    rain=np.array(precipa, dtype = 'float64')
-    rain = np.diff(rain) # first difference to convert accumulated to hourly
-    rain = np.insert(rain, 0, [np.NaN]) # add NaN entry to account for diff
-    rain[rain > 1000] = np.NaN # filter out erroneously high
-    rain[rain < 0] = np.NaN # filter out negative, results from diff function after precipa goes to zero
-    return rain
-
-def fixnan(a,n=99999): # size of gaps we can fill
-    if a.ndim > 1:
-        print('fixnan: input has',a.ndim,'dimensions, only one supported')
-        raise ValueError
-    for c in range(n):   
-        # try fixing isolated nans first, replace by average
-        for i in np.where(np.isnan(a))[0]:
-            if i==0:  
-                a[i] = a[i+1]
-            elif i==len(a)-1:
-                a[i] = a[i-1]
-            elif not np.isnan(a[i-1]) and not np.isnan(a[i+1]):
-                a[i] = 0.5*(a[i-1]+a[i+1])
-            elif not np.isnan(a[i-1]):
-                a[i] = a[i-1]
-            elif not np.isnan(a[i+1]):
-                a[i] = a[i+1]
-        if not any(np.isnan(a)):
-            break
-    if any(np.isnan(a)):
-        a = np.nan_to_num(a, nan=0.0)
-
-def retrieve_raws(mes, stid, raws_vars, time1, time2):
-    meso_ts = mes.timeseries(time1, time2, 
-                       stid=stid, vars=raws_vars)
-    station = meso_ts['STATION'][0]
-    
-    raws_dat = format_raws(station)
-    
-    return station, raws_dat
-    
-def raws_data(start=None, hours=None, h2=None, stid=None,meso_token=None):
-    # input:
-    #   start YYYYMMDDhhmm
-    #   hours legth of the period
-    #   h2 (optional) length of the training period
-    #   stid  the station id
-    time_start=start
-    time_end = datetime.strptime(start, "%Y%m%d%H%M") + timedelta(hours = hours+1) # end time, plus a buffer to control for time shift
-    time_end = str(int(time_end.strftime("%Y%m%d%H%M")))
-    print('data_raws: Time Parameters:')
-    print('-'*50)
-    print('Time Start:', datetime.strptime(time_start, "%Y%m%d%H%M").strftime("%Y/%M/%d %H:%M"))
-    print('Time End:', datetime.strptime(time_end, "%Y%m%d%H%M").strftime("%Y/%M/%d %H:%M"))
-    print('Total Runtime:', hours, 'hours')
-    print('Training Time:', h2, 'hours')
-    print('-'*50)
-    raws_vars='air_temp,relative_humidity,precip_accum,fuel_moisture'
-    m=Meso(meso_token)
-    station, raws_dat = retrieve_raws(m, stid, raws_vars, time_start, time_end)
-    raws_dat['title']='RAWS data station ' + stid
-    raws_dat.update({'hours':hours,'h2':h2,'station':station})
-    print('Data Read:')
-    print('-'*50)
-    print('Station ID:', station['STID'])
-    print('Lat / Lon:', station['LATITUDE'],', ',station['LONGITUDE'])
-    if(station['QC_FLAGGED']): print('WARNING: station flagged for QC')
-    print('-'*50)
-    raws_dat.update({'hours':hours,'h2':h2})
-    return raws_dat
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def load_and_fix_data(filename):
