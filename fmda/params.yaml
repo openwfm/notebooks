@@ -22,7 +22,7 @@ rnn:
   verbose_weights: True # Prints out hashs of weights for tracking reproducibility
   verbose_fit: False # Prints out all training epochs, makes computation much slower
   features_list: ['Ed', 'Ew', 'rain']
-  scale: False
+  scale: True
   train_frac: 0.5
   val_frac: 0
 

@@ -146,6 +146,120 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
 
     return x_train, y_train
 
+def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None, scaler=None):
+    # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
+    # Inputs:
+    # d: (dict) fmda dictionary
+    # params: (dict) hyperparameters
+    # atm_dict: (str) string specifying name of subdictionary for atmospheric vars
+    # train_frac: (float) fraction of data to use for training (starting from time 0)
+    # val_frac: (float) fraction of data to use for validation data (starting from end of train)
+    # Returns: (dict) formatted data used in RNN 
+    logging.info('create_rnn_data start')
+    # Copy Dictionary 
+    d=copy.deepcopy(dict1)
+    scale = params['scale']
+    features_list = params["features_list"]
+
+    
+    # Scale Data if required
+    # TODO: Reconcile scaling with moisture_rnn_pkl
+    if scale:
+        scale=1
+        if d['case']=="reproducibility":
+            scale_fm = 17.076346687085564
+            scaler = 'reproducibility'
+    else:
+        scale_fm=1.0
+        scaler=None
+        
+    # Extract desired features based on params, combine into matrix
+    # Extract response vector 
+    fm = d['y']
+    y = np.reshape(fm,[fm.shape[0],1])
+    # Extract Features matrix
+    X = d['X']
+
+    # Check total observed hours
+    hours=d['hours']    
+    assert hours == y.shape[0] # Check that it matches response
+    
+    logging.info('create_rnn_data: total_hours=%s',hours)
+    logging.info('feature matrix X shape %s',np.shape(X))
+    logging.info('target  matrix Y shape %s',np.shape(y))
+    logging.info('features_list: %s',features_list)
+
+    logging.info('splitting train/val/test')
+    if train_ind is None:
+        train_ind = round(hours * params['train_frac']) # index of last training observation
+    test_ind= train_ind + round(hours * params['val_frac'])# index of first test observation, if no validation data it is equal to train_ind
+    logging.info('Final index of training data=%s',train_ind)
+    logging.info('First index of Test data=%s',test_ind)
+    # Training data from 0 to train_ind
+    X_train = X[:train_ind]
+    y_train = y[:train_ind].reshape(-1,1)
+    # Validation data from train_ind to test_ind
+    X_val = X[train_ind:test_ind]
+    y_val = y[train_ind:test_ind].reshape(-1,1)
+    # Test data from test_ind to end
+    X_test = X[test_ind:]
+    y_test = y[test_ind:].reshape(-1,1)
+    
+    logging.info('x_train shape=%s',X_train.shape)
+    logging.info('y_train shape=%s',y_train.shape)
+    if test_ind == train_ind:
+        logging.info('No validation data')
+    elif X_val.shape[0]!= 0:
+        logging.info('X_val shape=%s',X_val.shape)
+        logging.info('y_val shape=%s',y_val.shape)    
+    logging.info('X_test shape=%s',X_test.shape)
+    logging.info('y_test shape=%s',y_test.shape)
+    
+    # Set up return dictionary
+    rnn_dat={
+        'case':d['case'],
+        'hours':hours,
+        'features_list':features_list,
+        'features': len(features_list),
+        'scaler':scaler,
+        'train_ind':train_ind,
+        'test_ind':test_ind,
+        'X':X,
+        'y':y,
+        'X_train': X_train,
+        'y_train': y_train,
+        'X_test': X_test,
+        'y_test': y_test
+    }
+    if rnn_dat['scaler'] == "reproducibility":
+        rnn_dat['scale_fm']=17.076346687085564
+    if X_val.shape[0] > 0:
+            rnn_dat.update({
+                'X_val': X_val,
+                'y_val': y_val
+            })
+
+    # Update RNN params using data attributes
+    logging.info('Updating model params based on data')
+    timesteps = params['timesteps']
+    batch_size = params['batch_size']
+    logging.info('batch_size=%s',batch_size)
+    logging.info('timesteps=%s',timesteps)
+    features = len(features_list)
+    params.update({
+            'features': features,
+            'batch_shape': (params["batch_size"],params["timesteps"],features),
+            'pred_input_shape': (hours, features),
+            'scaler': scaler
+        })
+    if params['scaler'] == "reproducibility":
+        params['scale_fm']=17.076346687085564    
+
+    
+    logging.info('create_rnn_data_2 done')
+    return rnn_dat
+
+
 def create_rnn_data(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None, scaler=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
     # Inputs:
