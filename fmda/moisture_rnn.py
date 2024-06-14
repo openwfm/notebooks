@@ -76,10 +76,26 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
     # sequence j in a given batch is assumed to be the continuation of sequence j in the previous batch
     # https://www.tensorflow.org/guide/keras/working_with_rnns Cross-batch statefulness
     
-    # example with timesteps=3 batch_size=3 datapoints=10
-    #     batch 0: [0 1 2]   [1 2 3]   [2 3 4]  
-    #     batch 1: [3 4 5]   [4 5 6]   [5 6 7] 
-    #     batch 2: [6 7 8]   [7 8 9]    when runs out this is the last batch, can be shorter
+    # example with timesteps=3 batch_size=3 datapoints=15
+    #     batch 0: [0 1 2]      [1 2 3]      [2 3 4]  
+    #     batch 1: [3 4 5]      [4 5 6]      [5 6 7] 
+    #     batch 2: [6 7 8]      [7 8 9]      [8 9 10] 
+    #     batch 3: [9 10 11]    [10 11 12]   [11 12 13] 
+    #     batch 4: [12 13 14]   [13 14 15]    when runs out this is the last batch, can be shorter
+    #
+    # TODO: implement for multiple locations, same starting time for each batch
+    #              Loc 1         Loc 2       Loc 3
+    #     batch 0: [0 1 2]      [0 1 2]      [0 1 2]  
+    #     batch 1: [3 4 5]      [3 4 5]      [3 4 5] 
+    #     batch 2: [6 7 8]      [6 7 8]      [6 7 8] 
+    # TODO: second epoch shift starting time at batch 0 in time
+    
+    # TODO: implement for multiple locations, different starting times for each batch
+    #              Loc 1       Loc 2       Loc 3
+    #     batch 0: [0 1 2]   [1 2 3]      [2 3 4]  
+    #     batch 1: [3 4 5]   [4 5 6]      [5 6 57 
+    #     batch 2: [6 7 8]   [7 8 9]      [8 9 10] 
+    
     #
     #     the first sample in batch j starts from timesteps*j and ends with timesteps*(j+1)-1
     #     e.g. the final hidden state of the rnn after the sequence of steps [0 1 2] in batch 0
@@ -498,10 +514,10 @@ class ResetStatesCallback(Callback):
 class RNN(RNNModel):
     def __init__(self, params, loss='mean_squared_error'):
         super().__init__(params)
-        self.model_fit = self._build_model_fit()
+        self.model_train = self._build_model_train()
         self.model_predict = self._build_model_predict()
 
-    def _build_model_fit(self, return_sequences=False):
+    def _build_model_train(self, return_sequences=False):
         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
         x = inputs
         for i in range(self.params['rnn_layers']):
@@ -535,8 +551,8 @@ class RNN(RNNModel):
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
         model.compile(loss='mean_squared_error', optimizer=optimizer)  
 
-        # Set Weights to model_fit
-        w_fitted = self.model_fit.get_weights()
+        # Set Weights to model_train
+        w_fitted = self.model_train.get_weights()
         model.set_weights(w_fitted)
         
         return model
@@ -558,7 +574,7 @@ class RNN(RNNModel):
             X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
             print(f"X_val hash: {hash2(X_val)}")
             print(f"y_val hash: {hash2(y_val)}")
-        print(f"Initial weights before training hash: {hash2(self.model_fit.get_weights())}")
+        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
         # Setup callbacks
         if self.params["reset_states"]:
             callbacks=callbacks+[ResetStatesCallback()]
@@ -568,9 +584,9 @@ class RNN(RNNModel):
             verbose_fit = self.params['verbose_fit']
         # Evaluate Model once to set nonzero initial state
         if self.params["batch_size"]>= X_train.shape[0]:
-            self.model_fit(X_train)
+            self.model_train(X_train)
         if validation_data is not None:
-            history = self.model_fit.fit(
+            history = self.model_train.fit(
                 X_train, y_train+self.params['centering'][1], 
                 epochs=self.params['epochs'], 
                 batch_size=self.params['batch_size'],
@@ -580,7 +596,7 @@ class RNN(RNNModel):
                 *args, **kwargs
             )
         else:
-            history = self.model_fit.fit(
+            history = self.model_train.fit(
                 X_train, y_train+self.params['centering'][1], 
                 epochs=self.params['epochs'], 
                 batch_size=self.params['batch_size'],
@@ -591,10 +607,10 @@ class RNN(RNNModel):
         if plot:
             self.plot_history(history,plot_title)
         if self.params["verbose_weights"]:
-            print(f"Fitted Weights Hash: {hash2(self.model_fit.get_weights())}")
+            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
 
         # Update Weights for Prediction Model
-        w_fitted = self.model_fit.get_weights()
+        w_fitted = self.model_train.get_weights()
         self.model_predict.set_weights(w_fitted)
     def predict(self, X_test):
         print("Predicting with simple RNN")
