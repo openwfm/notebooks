@@ -185,9 +185,9 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         if d['case']=="reproducibility":
             scale_fm = 17.076346687085564
             scaler = 'reproducibility'
-    else:
-        scale_fm=1.0
-        scaler=None
+        else:
+            scale_fm=1.0
+            scaler=None
         
     # Extract desired features based on params, combine into matrix
     # Extract response vector 
@@ -247,8 +247,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         'X_test': X_test,
         'y_test': y_test
     }
-    if rnn_dat['scaler'] == "reproducibility":
-        rnn_dat['scale_fm']=17.076346687085564
+
     if X_val.shape[0] > 0:
             rnn_dat.update({
                 'X_val': X_val,
@@ -266,11 +265,9 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
             'features': features,
             'batch_shape': (params["batch_size"],params["timesteps"],features),
             'pred_input_shape': (hours, features),
-            'scaler': scaler
+            'scaler': scaler,
+            'scale_fm': scale_fm
         })
-    if params['scaler'] == "reproducibility":
-        params['scale_fm']=17.076346687085564    
-
     
     logging.info('create_rnn_data_2 done')
     return rnn_dat
@@ -522,7 +519,7 @@ class RNN(RNNModel):
         x = inputs
         for i in range(self.params['rnn_layers']):
             x = SimpleRNN(
-                self.params['rnn_units'],
+                units=self.params['rnn_units'],
                 activation=self.params['activation'][0],
                 dropout=self.params["dropout"][0],
                 stateful=self.params['stateful'],
