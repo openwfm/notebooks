@@ -270,7 +270,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         })
     rnn_dat.update({'scaler': scaler, 'scale_fm': scale_fm})
     
-    logging.info('create_rnn_data_2 done')
+    logging.info('create_rnn_data2 done')
     return rnn_dat
 
 
@@ -453,13 +453,24 @@ class RNNModel(ABC):
         dict1 = copy.deepcopy(dict0)
         # Extract Fields
         X_train, y_train, X_test, y_test = dict1['X_train'].copy(), dict1['y_train'].copy(), dict1["X_test"].copy(), dict1['y_test'].copy()
+        if 'X_val' in dict1:
+            X_val, y_val = dict1['X_val'].copy(), dict1['y_val'].copy()
+        else:
+            X_val = None
         case_id = dict1['case']
         # Fit model
-        self.fit(X_train, y_train)
+        if X_val is None:
+            self.fit(X_train, y_train)
+        else:
+            self.fit(X_train, y_train, validation_data = (X_val, y_val))
         # Generate Predictions, 
         # run through training to get hidden state set proporly for forecast period
-        X = np.concatenate((X_train, X_test))
-        y = np.concatenate((y_train, y_test)).flatten()
+        if X_val is None:
+            X = np.concatenate((X_train, X_test))
+            y = np.concatenate((y_train, y_test)).flatten()
+        else:
+            X = np.concatenate((X_train, X_val, X_test))
+            y = np.concatenate((y_train, y_val, y_test)).flatten()
         # Predict
         print(f"Predicting Training through Test \n features hash: {hash2(X)} \n response hash: {hash2(y)} ")
         m = self.predict(X).flatten()
@@ -486,7 +497,9 @@ class RNNModel(ABC):
             
             print(f"Fitted weights hash (check 5): {hv}, Reproducibility weights hash: {hv5}, Error: {hv5-hv}")
             print(f"Model predictions hash: {checkm}, Reproducibility preds hash: {mv}, Error: {mv-checkm}")
-        
+
+        print("*******DEBUG*******")
+        # print(dict1.keys())
         # Plot final fit and data
         # TODO: make plot_data specific to this context
         dict1['y'] = y
@@ -494,9 +507,10 @@ class RNNModel(ABC):
         
         # Calculate Errors
         err = rmse(m, y)
-        h2 = X_train.shape[0] # index of final training set value
-        err_train = rmse(m[:h2], y_train.flatten())
-        err_pred = rmse(m[h2:], y_test.flatten())
+        train_ind = dict1["train_ind"] # index of final training set value
+        test_ind = dict1["test_ind"] # index of first test set value
+        err_train = rmse(m[:train_ind], y_train.flatten())
+        err_pred = rmse(m[test_ind:], y_test.flatten())
         rmse_dict = {
             'all': err, 
             'training': err_train, 
@@ -618,6 +632,7 @@ class RNN(RNNModel):
 
 
     def plot_history(self, history, plot_title):
+        plt.figure()
         plt.semilogy(history.history['loss'], label='Training loss')
         if 'val_loss' in history.history:
             plt.semilogy(history.history['val_loss'], label='Validation loss')
