@@ -448,6 +448,12 @@ class RNNModel(ABC):
     def predict(self, X):
         pass
 
+    def format_train_data(self, X, y, verbose=False):
+        X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
+        return X, y
+    def format_pred_data(self, X):
+        return np.reshape(X,(1, X.shape[0], self.params['features']))
+
     def plot_history(self, history, plot_title):
         plt.figure()
         plt.semilogy(history.history['loss'], label='Training loss')
@@ -579,11 +585,7 @@ class RNN(RNNModel):
         model.set_weights(w_fitted)
         
         return model
-    def format_train_data(self, X, y, verbose=False):
-        X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
-        return X, y
-    def format_pred_data(self, X):
-        return np.reshape(X,(1, X.shape[0], self.params['features']))
+
     def fit(self, X_train, y_train, plot=True, plot_title = '', 
             weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
         # verbose_fit argument is for printing out update after each epoch, which gets very long
@@ -691,11 +693,7 @@ class RNN_LSTM(RNNModel):
         model.set_weights(w_fitted)
         
         return model
-    def format_train_data(self, X, y, verbose=False):
-        X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
-        return X, y
-    def format_pred_data(self, X):
-        return np.reshape(X,(1, X.shape[0], self.params['features']))
+
     def fit(self, X_train, y_train, plot=True, plot_title = '', 
             weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
         # verbose_fit argument is for printing out update after each epoch, which gets very long
