@@ -448,6 +448,17 @@ class RNNModel(ABC):
     def predict(self, X):
         pass
 
+    def plot_history(self, history, plot_title):
+        plt.figure()
+        plt.semilogy(history.history['loss'], label='Training loss')
+        if 'val_loss' in history.history:
+            plt.semilogy(history.history['val_loss'], label='Validation loss')
+        plt.title(f'{plot_title} Model loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.legend(loc='upper left')
+        plt.show()
+
     def run_model(self, dict0):
         # Make copy to prevent changing in place
         dict1 = copy.deepcopy(dict0)
@@ -631,17 +642,6 @@ class RNN(RNNModel):
         return preds
 
 
-    def plot_history(self, history, plot_title):
-        plt.figure()
-        plt.semilogy(history.history['loss'], label='Training loss')
-        if 'val_loss' in history.history:
-            plt.semilogy(history.history['val_loss'], label='Validation loss')
-        plt.title(f'{plot_title} Model loss')
-        plt.ylabel('Loss')
-        plt.xlabel('Epoch')
-        plt.legend(loc='upper left')
-        plt.show()
-
 
 class RNN_LSTM(RNNModel):
     def __init__(self, params, loss='mean_squared_error'):
@@ -753,13 +753,3 @@ class RNN_LSTM(RNNModel):
         preds = self.model_predict.predict(X_test).flatten()
         return preds
 
-
-    def plot_history(self, history, plot_title):
-        plt.semilogy(history.history['loss'], label='Training loss')
-        if 'val_loss' in history.history:
-            plt.semilogy(history.history['val_loss'], label='Validation loss')
-        plt.title(f'{plot_title} Model loss')
-        plt.ylabel('Loss')
-        plt.xlabel('Epoch')
-        plt.legend(loc='upper left')
-        plt.show()
