@@ -444,9 +444,11 @@ class RNNModel(ABC):
     def fit(self, X_train, y_train, weights=None):
         pass
 
-    @abstractmethod
-    def predict(self, X):
-        pass
+    def predict(self, X_test):
+        print("Predicting with simple RNN")
+        X_test = self.format_pred_data(X_test)
+        preds = self.model_predict.predict(X_test).flatten()
+        return preds
 
     def format_train_data(self, X, y, verbose=False):
         X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
@@ -637,11 +639,6 @@ class RNN(RNNModel):
         # Update Weights for Prediction Model
         w_fitted = self.model_train.get_weights()
         self.model_predict.set_weights(w_fitted)
-    def predict(self, X_test):
-        print("Predicting with simple RNN")
-        X_test = self.format_pred_data(X_test)
-        preds = self.model_predict.predict(X_test).flatten()
-        return preds
 
 
 
@@ -745,9 +742,5 @@ class RNN_LSTM(RNNModel):
         # Update Weights for Prediction Model
         w_fitted = self.model_train.get_weights()
         self.model_predict.set_weights(w_fitted)
-    def predict(self, X_test):
-        print("Predicting with simple RNN")
-        X_test = self.format_pred_data(X_test)
-        preds = self.model_predict.predict(X_test).flatten()
-        return preds
+
 
