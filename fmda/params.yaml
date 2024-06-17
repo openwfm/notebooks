@@ -5,7 +5,6 @@ rnn:
   batch_size: 32
   timesteps: 5
   optimizer: adam
-  epochs: 100
   rnn_layers: 1
   rnn_units: 6
   dense_layers: 1
@@ -15,7 +14,7 @@ rnn:
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-  epochs: 200
+  epochs: 100
   learning_rate: 0.001
   phys_initialize: False # physics initialization
   stateful: True
@@ -24,7 +23,33 @@ rnn:
   features_list: ['Ed', 'Ew', 'rain']
   scale: True
   train_frac: 0.5
-  val_frac: 0
+  val_frac: 0.1
+
+# NOTE: as of 16-6-24 only param difference with simple rnn is recurrent_activation param
+lstm:
+  batch_size: 32
+  timesteps: 5
+  optimizer: adam
+  rnn_layers: 1
+  rnn_units: 6
+  dense_layers: 1
+  dense_units: 1
+  activation: ['linear', 'linear']
+  recurrent_activation: 'sigmoid'
+  centering: [0.0,0.0]
+  dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
+  recurrent_dropout: 0.2 # Length must match number of recurrent layers
+  reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
+  epochs: 100
+  learning_rate: 0.001
+  phys_initialize: False # physics initialization
+  stateful: True
+  verbose_weights: True # Prints out hashs of weights for tracking reproducibility
+  verbose_fit: False # Prints out all training epochs, makes computation much slower
+  features_list: ['Ed', 'Ew', 'rain']
+  scale: True
+  train_frac: 0.5
+  val_frac: 0.1
 
 physics_initializer:
   DeltaE: [0,-1]                # bias correction
