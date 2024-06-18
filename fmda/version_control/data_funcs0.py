@@ -3,7 +3,6 @@
 
 import numpy as np, random
 from numpy.random import rand
-from MesoPy import Meso
 import tensorflow as tf
 import pickle, os
 from sklearn.metrics import mean_squared_error
