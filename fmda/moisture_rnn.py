@@ -181,6 +181,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     # Scale Data if required
     # TODO: Reconcile scaling with moisture_rnn_pkl
     if scale:
+        print("Scaling Feature Data")
         scale=1
         if d['case']=="reproducibility":
             scale_fm = 17.076346687085564
@@ -188,6 +189,10 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         else:
             scale_fm=1.0
             scaler=None
+    else:
+        print("Not scaling data")
+        scale_fm=1.0
+        scaler=None
         
     # Extract desired features based on params, combine into matrix
     # Extract response vector 
