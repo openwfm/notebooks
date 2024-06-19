@@ -179,47 +179,47 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
     
     return train
 
-# def run_rnn_pkl(case_data,params, title2=None):
-#     # analogous to run_rnn after the create_rnn_data_1 stage
-#     # instead, after pkl2train
-#     # Inputs:
-#     # case_data: (dict) one case train[case] after pkl2train()
-#     #    also plays the role of rnn_dat after create_rnn_data_1
-#     # title2: (str) string to add to plot titles
-#     # called from: top level
+def run_rnn_pkl(case_data,params, title2=None):
+    # analogous to run_rnn after the create_rnn_data_1 stage
+    # instead, after pkl2train
+    # Inputs:
+    # case_data: (dict) one case train[case] after pkl2train()
+    #    also plays the role of rnn_dat after create_rnn_data_1
+    # title2: (str) string to add to plot titles
+    # called from: top level
     
-#     logging.info('run_rnn start')
-#     verbose = params['verbose']
+    logging.info('run_rnn start')
+    verbose = params['verbose']
     
-#     if title2 is None:
-#         title2=case_data['id']
+    if title2 is None:
+        title2=case_data['id']
     
-#     reproducibility.set_seed() # Set seed for reproducibility
+    reproducibility.set_seed() # Set seed for reproducibility
     
-#     print('case_data at entry to run_rnn_pkl')
-#     print_dict_summary(case_data)
+    print('case_data at entry to run_rnn_pkl')
+    print_dict_summary(case_data)
     
-#     # add batched x_train, y_train
-#     create_rnn_data_2(case_data,params)  
+    # add batched x_train, y_train
+    create_rnn_data_2(case_data,params)  
   
-#     # train the rnn over period  create prediction model with optimized weights
-#     model_predict = train_rnn(
-#         case_data,
-#         params,
-#         case_data['hours']
-#     )
+    # train the rnn over period  create prediction model with optimized weights
+    model_predict = train_rnn(
+        case_data,
+        params,
+        case_data['hours']
+    )
 
-#     m = rnn_predict(model_predict, params, case_data)
-#     case_data['m'] = m
-#     print(f"Model outputs hash: {hash2(m)}")
+    m = rnn_predict(model_predict, params, case_data)
+    case_data['m'] = m
+    print(f"Model outputs hash: {hash2(m)}")
 
-#     # Plot data needs certain names
-#     # TODO: make plot_data specific to this context
-#     case_data.update({"fm": case_data["Y"]*case_data['scale_fm']})
-#     plot_data(case_data,title2=title2)
-#     plt.show()
+    # Plot data needs certain names
+    # TODO: make plot_data specific to this context
+    case_data.update({"fm": case_data["Y"]*case_data['scale_fm']})
+    plot_data(case_data,title2=title2)
+    plt.show()
 
-#     logging.info('run_rnn_pkl end')
-#     # Print and return Errors
-#     # return m, rmse_data(case_data)  # do not have a "measurements" field 
-#     return m, rmse_data(case_data)
+    logging.info('run_rnn_pkl end')
+    # Print and return Errors
+    # return m, rmse_data(case_data)  # do not have a "measurements" field 
+    return m, rmse_data(case_data)
