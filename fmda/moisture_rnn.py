@@ -646,7 +646,6 @@ class RNN(RNNModel):
         self.model_predict.set_weights(w_fitted)
 
 
-
 class RNN_LSTM(RNNModel):
     def __init__(self, params, loss='mean_squared_error'):
         super().__init__(params)
