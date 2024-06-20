@@ -446,8 +446,64 @@ class RNNModel(ABC):
         super().__init__()
 
     @abstractmethod
-    def fit(self, X_train, y_train, weights=None):
+    def _build_model_train(self, return_sequences=False):
         pass
+
+    @abstractmethod
+    def _build_model_predict(self, return_sequences=True):
+        pass
+    
+    def fit(self, X_train, y_train, plot=True, plot_title = '', 
+            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
+        # verbose_fit argument is for printing out update after each epoch, which gets very long
+        # These print statements at the top could be turned off with a verbose argument, but then
+        # there would be a bunch of different verbose params
+        print(f"Training simple RNN with params: {self.params}")
+        X_train, y_train = self.format_train_data(X_train, y_train)
+        print(f"X_train hash: {hash2(X_train)}")
+        print(f"y_train hash: {hash2(y_train)}")
+        if validation_data is not None:
+            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
+            print(f"X_val hash: {hash2(X_val)}")
+            print(f"y_val hash: {hash2(y_val)}")
+        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
+        # Setup callbacks
+        if self.params["reset_states"]:
+            callbacks=callbacks+[ResetStatesCallback()]
+        
+        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
+        if verbose_fit is None:
+            verbose_fit = self.params['verbose_fit']
+        # Evaluate Model once to set nonzero initial state
+        if self.params["batch_size"]>= X_train.shape[0]:
+            self.model_train(X_train)
+        if validation_data is not None:
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                validation_data = (X_val, y_val),
+                *args, **kwargs
+            )
+        else:
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                *args, **kwargs
+            )
+        if plot:
+            self.plot_history(history,plot_title)
+        if self.params["verbose_weights"]:
+            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
+
+        # Update Weights for Prediction Model
+        w_fitted = self.model_train.get_weights()
+        self.model_predict.set_weights(w_fitted)
 
     def predict(self, X_test):
         print("Predicting with simple RNN")
@@ -593,58 +649,6 @@ class RNN(RNNModel):
         
         return model
 
-    def fit(self, X_train, y_train, plot=True, plot_title = '', 
-            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
-        # verbose_fit argument is for printing out update after each epoch, which gets very long
-        # These print statements at the top could be turned off with a verbose argument, but then
-        # there would be a bunch of different verbose params
-        print(f"Training simple RNN with params: {self.params}")
-        X_train, y_train = self.format_train_data(X_train, y_train)
-        print(f"X_train hash: {hash2(X_train)}")
-        print(f"y_train hash: {hash2(y_train)}")
-        if validation_data is not None:
-            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
-            print(f"X_val hash: {hash2(X_val)}")
-            print(f"y_val hash: {hash2(y_val)}")
-        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
-        # Setup callbacks
-        if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback()]
-        
-        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
-        if verbose_fit is None:
-            verbose_fit = self.params['verbose_fit']
-        # Evaluate Model once to set nonzero initial state
-        if self.params["batch_size"]>= X_train.shape[0]:
-            self.model_train(X_train)
-        if validation_data is not None:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                validation_data = (X_val, y_val),
-                *args, **kwargs
-            )
-        else:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                *args, **kwargs
-            )
-        if plot:
-            self.plot_history(history,plot_title)
-        if self.params["verbose_weights"]:
-            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
-
-        # Update Weights for Prediction Model
-        w_fitted = self.model_train.get_weights()
-        self.model_predict.set_weights(w_fitted)
-
 
 class RNN_LSTM(RNNModel):
     def __init__(self, params, loss='mean_squared_error'):
@@ -695,56 +699,6 @@ class RNN_LSTM(RNNModel):
         
         return model
 
-    def fit(self, X_train, y_train, plot=True, plot_title = '', 
-            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
-        # verbose_fit argument is for printing out update after each epoch, which gets very long
-        # These print statements at the top could be turned off with a verbose argument, but then
-        # there would be a bunch of different verbose params
-        print(f"Training simple RNN with params: {self.params}")
-        X_train, y_train = self.format_train_data(X_train, y_train)
-        print(f"X_train hash: {hash2(X_train)}")
-        print(f"y_train hash: {hash2(y_train)}")
-        if validation_data is not None:
-            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
-            print(f"X_val hash: {hash2(X_val)}")
-            print(f"y_val hash: {hash2(y_val)}")
-        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
-        # Setup callbacks
-        if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback()]
-        
-        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
-        if verbose_fit is None:
-            verbose_fit = self.params['verbose_fit']
-        # Evaluate Model once to set nonzero initial state
-        if self.params["batch_size"]>= X_train.shape[0]:
-            self.model_train(X_train)
-        if validation_data is not None:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                validation_data = (X_val, y_val),
-                *args, **kwargs
-            )
-        else:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                *args, **kwargs
-            )
-        if plot:
-            self.plot_history(history,plot_title)
-        if self.params["verbose_weights"]:
-            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
 
-        # Update Weights for Prediction Model
-        w_fitted = self.model_train.get_weights()
-        self.model_predict.set_weights(w_fitted)
 
 
