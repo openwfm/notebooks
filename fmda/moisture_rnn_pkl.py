@@ -6,17 +6,18 @@ import os.path as osp
 import pandas as pd
 import numpy as np
 import reproducibility
-from moisture_rnn import create_rnn_data_2, train_rnn, rnn_predict
+# from moisture_rnn import create_rnn_data_2, train_rnn, rnn_predict
 from data_funcs import plot_data,rmse_data
 import matplotlib.pyplot as plt
 
 # run this from test-pkl2train.ipynb
 
-def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1, atm_dict="HRRR"):
+def pkl2train(input_file_paths,output_file_path='train.pkl',
+              forecast_step=1, atm="HRRR",features_list=['Ed', 'Ew', 'rain']):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
     #   forecast_step   int - which forecast step to take atmospheric data from (maybe 03, must be >0). 
-    #   atm_dict        str - name of subdict where atmospheric vars are located
+    #   atm_dict0        str - name of subdict where atmospheric vars are located
     # return:
     #   train          dictionary with structure
     #                  {key : {'key' : key,    # copied subdict key
@@ -45,7 +46,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1, atm
             if key == "reproducibility":
                 atm_dict = "RAWS"
             else:
-                atm_dict = "HRRR"
+                atm_dict = atm
             logging.info('Processing subdictionary %s',key)
             if key in train:
                 logging.warning('skipping duplicate key %s',key)
@@ -94,21 +95,45 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1, atm
                 
                 # TODO: test with features just Ed and Ew for reproducibillity. Perhaps pretrain on E's only
                 # for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
-                for i in ["Ed","Ew"]:
-                    # Use forcase steps if data from HRRR, not if from RAWS
-                    if atm_dict == "HRRR":
-                        columns.append(subdict[atm_dict][fstep][i]/scale_fm)   # add variables from HRRR forecast steps 
-                    elif atm_dict == "RAWS":
-                        columns.append(subdict[atm_dict][i]/scale_fm)
+                # List of HRRR features in fstep subdicts, EXCLUDING rain which needs separate calculation
+                hfeats = ['temp', 'rh', 'wind', 'solar', 'soilm', 'canopyw', 'groundflux', 'Ed', 'Ew']
+                # for i in ["Ed","Ew"]:
+                    # # Use forcase steps if data from HRRR, not if from RAWS
+                    # if atm_dict == "HRRR":
+                    #     columns.append(subdict[atm_dict][fstep][i]/scale_fm)   # add variables from HRRR forecast steps 
+                    # elif atm_dict == "RAWS":
+                    #     columns.append(subdict[atm_dict][i]/scale_fm)
+                for feat in features_list:
+                    if feat in hfeats:
+                        # Use forcase steps if data from HRRR, not if from RAWS
+                        if atm_dict == "HRRR":
+                            vec = subdict[atm_dict][fstep][feat]
+                            if feat in ['Ed', 'Ew']:
+                                vec = vec / scale_fm
+                            columns.append(vec)   # add variables from HRRR forecast steps 
+                        elif atm_dict == "RAWS":
+                            if feat in subdict[atm_dict]:
+                                vec = subdict[atm_dict][feat]
+                                if feat in ['Ed', 'Ew']:
+                                    vec = vec / scale_fm                        
+                                columns.append(vec)                    
+                            else:
+                                logging.info('No %s data found in RAWS subdictionary %s', feat, key)
+
                 # compute rain as difference of accumulated precipitation
-                if atm_dict == "HRRR":
-                    rain = subdict[atm_dict][fstep]['precip_accum']- subdict[atm_dict][fprev]['precip_accum']
-                    logging.info('%s rain as difference %s minus %s: min %s max %s',
-                             key,fstep,fprev,np.min(rain),np.max(rain))
-                elif atm_dict == "RAWS":
-                    rain = subdict[atm_dict]['rain']
-                columns.append( rain ) # add rain feature
+                if 'rain' in features_list:
+                    if atm_dict == "HRRR":
+                        rain = subdict[atm_dict][fstep]['precip_accum']- subdict[atm_dict][fprev]['precip_accum']
+                        logging.info('%s rain as difference %s minus %s: min %s max %s',
+                                 key,fstep,fprev,np.min(rain),np.max(rain))
+                    elif atm_dict == "RAWS":
+                        if 'rain' in subdict[atm_dict]:
+                            rain = subdict[atm_dict]['rain']
+                        else:
+                            logging.info('No rain data found in RAWS subdictionary %s', key)
+                    columns.append( rain ) # add rain feature
                 train[key]['X'] = np.column_stack(columns)
+                train[key]['features_list'] = features_list
                 
                 logging.info(f"Created feature matrix train[{key}]['X'] shape {train[key]['X'].shape}")
                 time_raws=str2time(subdict['RAWS']['time_raws']) # may not be the same as HRRR
@@ -118,13 +143,13 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1, atm
                 fm=subdict['RAWS']['fm']
                 logging.info('%s RAWS.fm length is %s',key,len(fm))
                 # interpolate RAWS sensors to HRRR time and over NaNs
-                train[key]['Y'] = time_intp(time_raws,fm,time_hrrr) / scale_fm
+                train[key]['y'] = time_intp(time_raws,fm,time_hrrr) / scale_fm
                 # TODO: check endpoint interpolation when RAWS data sparse, and bail out if not enough data
                 
-                if  train[key]['Y'] is None:
+                if  train[key]['y'] is None:
                     logging.error('Cannot create target matrix for %s, using None',key)
                 else:
-                    logging.info(f"Created target matrix train[{key}]['Y'] shape {train[key]['Y'].shape}")
+                    logging.info(f"Created target matrix train[{key}]['y'] shape {train[key]['y'].shape}")
     
     logging.info('Created a "train" dictionary with %s items',len(train))
  
@@ -132,7 +157,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',forecast_step=1, atm
     
     keys_to_delete = []
     for key in train:
-        if train[key]['X'] is None or train[key]['Y'] is None:
+        if train[key]['X'] is None or train[key]['y'] is None:
             logging.warning('Deleting training item %s because features X or target Y are None', key)
             keys_to_delete.append(key)
 

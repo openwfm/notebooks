@@ -1,26 +1,21 @@
+# Environment
 import numpy as np
-import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN
-# from keras.utils.vis_utils import plot_model
-from keras.utils import plot_model
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error
-import math
-import matplotlib.pyplot as plt
-import tensorflow as tf
-import keras.backend as K
-import tensorflow as tf
 import pandas as pd
-from utils import vprint, hash2, get_item, print_dict_summary, print_first
-import reproducibility
-from data_funcs import check_data, rmse_data, plot_data
-import moisture_models as mod
+import tensorflow as tf
+import matplotlib.pyplot as plt
 import sys
+from tensorflow.keras.callbacks import Callback
+from sklearn.metrics import mean_squared_error
 import logging
-from utils import print_dict_summary, print_first, str2time, check_increment, time_intp
-import pickle
-import os.path as osp
+from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
+# Local modules
+import reproducibility
+from utils import print_dict_summary
+from data_funcs import load_and_fix_data, rmse
+from abc import ABC, abstractmethod
+from utils import hash2
+from data_funcs import rmse, plot_data, compare_dicts
+import copy
 
 
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
@@ -28,25 +23,25 @@ def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
     # y [datapoints,outputs]
     # timesteps: split x and y into samples length timesteps, shifted by 1
     # datapoints: number of timesteps to use for training, no more than y.shape[0]
-    vprint('staircase: shape x = ',x.shape)
-    vprint('staircase: shape y = ',y.shape)
-    vprint('staircase: timesteps=',timesteps)
-    vprint('staircase: datapoints=',datapoints)
-    vprint('staircase: return_sequences=',return_sequences)
+    print('staircase: shape x = ',x.shape)
+    print('staircase: shape y = ',y.shape)
+    print('staircase: timesteps=',timesteps)
+    print('staircase: datapoints=',datapoints)
+    print('staircase: return_sequences=',return_sequences)
     outputs = y.shape[1]
     features = x.shape[1]
     samples = datapoints-timesteps+1
-    vprint('staircase: samples=',samples,'timesteps=',timesteps,'features=',features)
+    print('staircase: samples=',samples,'timesteps=',timesteps,'features=',features)
     x_train = np.empty([samples, timesteps, features])
     if return_sequences:
-        vprint('returning all timesteps in a sample')
+        print('returning all timesteps in a sample')
         y_train = np.empty([samples, timesteps, outputs])  # all
         for i in range(samples):
             for k in range(timesteps):
                 x_train[i,k,:] = x[i+k,:]
                 y_train[i,k,:] = y[i+k,:]
     else:
-        vprint('returning only the last timestep in a sample')
+        print('returning only the last timestep in a sample')
         y_train = np.empty([samples, outputs])
         for i in range(samples):
             for k in range(timesteps):
@@ -55,7 +50,7 @@ def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
 
     return x_train, y_train
 
-def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences=False, verbose = True):
+def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences=False, verbose = False):
     # create RNN training data in multiple batches
     # input:
     #     x (,features)  
@@ -81,10 +76,26 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
     # sequence j in a given batch is assumed to be the continuation of sequence j in the previous batch
     # https://www.tensorflow.org/guide/keras/working_with_rnns Cross-batch statefulness
     
-    # example with timesteps=3 batch_size=3 datapoints=10
-    #     batch 0: [0 1 2]   [1 2 3]   [2 3 4]  
-    #     batch 1: [3 4 5]   [4 5 6]   [5 6 7] 
-    #     batch 2: [6 7 8]   [7 8 9]    when runs out this is the last batch, can be shorter
+    # example with timesteps=3 batch_size=3 datapoints=15
+    #     batch 0: [0 1 2]      [1 2 3]      [2 3 4]  
+    #     batch 1: [3 4 5]      [4 5 6]      [5 6 7] 
+    #     batch 2: [6 7 8]      [7 8 9]      [8 9 10] 
+    #     batch 3: [9 10 11]    [10 11 12]   [11 12 13] 
+    #     batch 4: [12 13 14]   [13 14 15]    when runs out this is the last batch, can be shorter
+    #
+    # TODO: implement for multiple locations, same starting time for each batch
+    #              Loc 1         Loc 2       Loc 3
+    #     batch 0: [0 1 2]      [0 1 2]      [0 1 2]  
+    #     batch 1: [3 4 5]      [3 4 5]      [3 4 5] 
+    #     batch 2: [6 7 8]      [6 7 8]      [6 7 8] 
+    # TODO: second epoch shift starting time at batch 0 in time
+    
+    # TODO: implement for multiple locations, different starting times for each batch
+    #              Loc 1       Loc 2       Loc 3
+    #     batch 0: [0 1 2]   [1 2 3]      [2 3 4]  
+    #     batch 1: [3 4 5]   [4 5 6]      [5 6 57 
+    #     batch 2: [6 7 8]   [7 8 9]      [8 9 10] 
+    
     #
     #     the first sample in batch j starts from timesteps*j and ends with timesteps*(j+1)-1
     #     e.g. the final hidden state of the rnn after the sequence of steps [0 1 2] in batch 0
@@ -125,7 +136,8 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
             next  = begin + timesteps
             if next > datapoints:
                 break
-            vprint('sequence',k,'batch',i,'sample',j,'data',begin,'to',next-1)
+            if verbose:
+                print('sequence',k,'batch',i,'sample',j,'data',begin,'to',next-1)
             x_train[k,:,:] = x[begin:next,:]
             if return_sequences:
                  y_train[k,:,:] = y[begin:next,:]
@@ -150,475 +162,589 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
 
     return x_train, y_train
 
-def create_RNN_2(hidden_units, dense_units, activation, stateful=False,
-                 batch_shape=None, input_shape=None, dense_layers=1,
-                 rnn_layers=1,return_sequences=False,
-                 initial_state=None, verbose = True):
-    if verbose:
-        print("Function: moisture_rnn.create_RNN_2")
-        print("Arguments:")
-        arg_dict = locals().copy()
-        for arg in arg_dict:
-            if arg != "self":
-                print(f"  {arg} = {arg_dict[arg]}")
-    if stateful:
-        inputs = tf.keras.Input(batch_shape=batch_shape)
-    else:
-        inputs = tf.keras.Input(shape=input_shape)
-    # https://stackoverflow.com/questions/43448029/how-can-i-print-the-values-of-keras-tensors
-    x = inputs
-    for i in range(rnn_layers):
-        x = tf.keras.layers.SimpleRNN(hidden_units,activation=activation[0],
-              stateful=stateful,return_sequences=return_sequences)(x)
-    for i in range(dense_layers):
-        x = tf.keras.layers.Dense(dense_units, activation=activation[1])(x)
-    model = tf.keras.Model(inputs=inputs, outputs=x)
-    model.compile(loss='mean_squared_error', optimizer='adam')
-    return model
-
-def create_rnn_data_1(dat, params, hours=None, h2=None):
+def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None, scaler=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
     # Inputs:
-    # dat: (dict) fmda dictionary
+    # d: (dict) fmda dictionary
     # params: (dict) hyperparameters
-    # hours: (int) optional parameter to set total length of train+predict
-    # h2: (int) optional parameter to set as length of training period (h2 = total - hours)
-    # Returns: (dict) formatted datat used in RNN 
-    logging.info('create_rnn_data_1 start')
-    
-    timesteps = params['timesteps']
+    # atm_dict: (str) string specifying name of subdictionary for atmospheric vars
+    # train_frac: (float) fraction of data to use for training (starting from time 0)
+    # val_frac: (float) fraction of data to use for validation data (starting from end of train)
+    # Returns: (dict) formatted data used in RNN 
+    logging.info('create_rnn_data start')
+    # Copy Dictionary 
+    d=copy.deepcopy(dict1)
     scale = params['scale']
-    rain_do = params['rain_do']
-    verbose = params['verbose']
-    
-    logging.info('create_rnn_data_1: hours=%s h2=%s',hours,h2)
-    # extract inputs the windown of interest
-    Ew = dat['Ew']
-    Ed = dat['Ed']
-    rain = dat['rain']
-    fm = dat['fm']
-    # temp = dat['temp']
-    
-    # Average Equilibrium
-    # E = (Ed + Ew)/2         # why?
+    features_list = params["features_list"]
 
+    
     # Scale Data if required
+    # TODO: Reconcile scaling with moisture_rnn_pkl
     if scale:
-        logging.info('create_rnn_data_1: scaling to range 0 to %s',scale)
-        scale_fm=max(max(Ew),max(Ed),max(fm))/scale
-        scale_rain=max(max(rain),0.01)/scale
-        Ed = Ed/scale_fm
-        Ew = Ew/scale_fm
-        fm = fm/scale_fm
-        rain = rain/scale_rain
+        print("Scaling Feature Data")
+        scale=1
+        if d['case']=="reproducibility":
+            scale_fm = 17.076346687085564
+            scaler = 'reproducibility'
+        else:
+            scale_fm=1.0
+            scaler=None
     else:
+        print("Not scaling data")
         scale_fm=1.0
-        scale_rain=1.0
-     
-    if params['verbose_weights']:
-        logging.info('scale_fm=%s scale_rain=%s',scale_fm,scale_rain)
+        scaler=None
+        
+    # Extract desired features based on params, combine into matrix
+    # Extract response vector 
+    fm = d['y']
+    y = np.reshape(fm,[fm.shape[0],1])
+    # Extract Features matrix
+    X = d['X']
+
+    # Check total observed hours
+    hours=d['hours']    
+    assert hours == y.shape[0] # Check that it matches response
     
-    # transform as 2D, (timesteps, features) and (timesteps, outputs)
-    
-    if rain_do:
-        X = np.vstack((Ed, Ew, rain)).T
-        features_list = ['Ed', 'Ew', 'rain']
-    else:
-        X = np.vstack((Ed, Ew)).T        
-        features_list = ['Ed', 'Ew']
-    Y = np.reshape(fm,[fm.shape[0],1])
-    
+    logging.info('create_rnn_data: total_hours=%s',hours)
     logging.info('feature matrix X shape %s',np.shape(X))
-    logging.info('target  matrix Y shape %s',np.shape(Y))
+    logging.info('target  matrix Y shape %s',np.shape(y))
     logging.info('features_list: %s',features_list)
+
+    logging.info('splitting train/val/test')
+    if train_ind is None:
+        train_ind = round(hours * params['train_frac']) # index of last training observation
+    test_ind= train_ind + round(hours * params['val_frac'])# index of first test observation, if no validation data it is equal to train_ind
+    logging.info('Final index of training data=%s',train_ind)
+    logging.info('First index of Test data=%s',test_ind)
+    # Training data from 0 to train_ind
+    X_train = X[:train_ind]
+    y_train = y[:train_ind].reshape(-1,1)
+    # Validation data from train_ind to test_ind
+    X_val = X[train_ind:test_ind]
+    y_val = y[train_ind:test_ind].reshape(-1,1)
+    # Test data from test_ind to end
+    X_test = X[test_ind:]
+    y_test = y[test_ind:].reshape(-1,1)
     
-    if hours is None:
-        hours = dat['hours']
-    if h2 is None:
-        h2 = dat['h2'] 
-    
-    rnn_dat={
-        'case':dat['case'],
-        'hours':hours,
-        'h2':h2,
-        'rain_do':rain_do,
-        'features_list':features_list,
-        'scale':scale,
-        'scale_fm':scale_fm,
-        'scale_rain':scale_rain,
-        'X':X,
-        'Y':Y
-    }
-    
-    return rnn_dat
-    
-def create_rnn_data_2(rnn_dat, params):
-    
-    logging.info('create_rnn_data_2 start')
-    
-    timesteps = params['timesteps']
-    scale = params['scale']
-    verbose = params['verbose']
-    batch_size = params['batch_size']
-    X = rnn_dat['X']
-    Y = rnn_dat['Y']
-    h2= rnn_dat['h2']
-           
-    logging.info('batch_size=%s',batch_size)
-    if batch_size is None or batch_size is np.inf:
-        x_train, y_train = staircase(X,Y,timesteps=timesteps,datapoints=h2,
-                                 return_sequences=False, verbose = verbose)
-        batches = None
-    else:
-        x_train, y_train = staircase_2(X,Y,timesteps,batch_size,trainsteps=h2,
-                                 return_sequences=False, verbose = verbose)
-    
-    logging.info('x_train shape=%s',x_train.shape)
+    logging.info('x_train shape=%s',X_train.shape)
     logging.info('y_train shape=%s',y_train.shape)
-    
-    samples, timesteps, features = x_train.shape
-    
-    h0 = tf.convert_to_tensor(X[:samples],dtype=tf.float32)
+    if test_ind == train_ind:
+        logging.info('No validation data')
+    elif X_val.shape[0]!= 0:
+        logging.info('X_val shape=%s',X_val.shape)
+        logging.info('y_val shape=%s',y_val.shape)    
+    logging.info('X_test shape=%s',X_test.shape)
+    logging.info('y_test shape=%s',y_test.shape)
     
     # Set up return dictionary
-    
-    rnn_dat.update({
-        'x_train': x_train,
+    rnn_dat={
+        'case':d['case'],
+        'hours':hours,
+        'features_list':features_list,
+        'features': len(features_list),
+        'scaler':scaler,
+        'train_ind':train_ind,
+        'test_ind':test_ind,
+        'X':X,
+        'y':y,
+        'X_train': X_train,
         'y_train': y_train,
-        'samples': samples,
-        'timesteps': timesteps,
-        'features':features,
-    })
+        'X_test': X_test,
+        'y_test': y_test
+    }
+
+    if X_val.shape[0] > 0:
+            rnn_dat.update({
+                'X_val': X_val,
+                'y_val': y_val
+            })
+
+    # Update RNN params using data attributes
+    logging.info('Updating model params based on data')
+    timesteps = params['timesteps']
+    batch_size = params['batch_size']
+    logging.info('batch_size=%s',batch_size)
+    logging.info('timesteps=%s',timesteps)
+    features = len(features_list)
+    params.update({
+            'features': features,
+            'batch_shape': (params["batch_size"],params["timesteps"],features),
+            'pred_input_shape': (hours, features),
+            'scaler': scaler,
+            'scale_fm': scale_fm
+        })
+    rnn_dat.update({'scaler': scaler, 'scale_fm': scale_fm})
     
-    logging.info('create_rnn_data_2 done')
+    logging.info('create_rnn_data2 done')
+    return rnn_dat
+
+
+# def create_rnn_data(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None, scaler=None):
+#     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
+#     # Inputs:
+#     # d: (dict) fmda dictionary
+#     # params: (dict) hyperparameters
+#     # atm_dict: (str) string specifying name of subdictionary for atmospheric vars
+#     # train_frac: (float) fraction of data to use for training (starting from time 0)
+#     # val_frac: (float) fraction of data to use for validation data (starting from end of train)
+#     # Returns: (dict) formatted data used in RNN 
+#     logging.info('create_rnn_data start')
+#     # Copy Dictionary 
+#     d=copy.deepcopy(dict1)
+#     scale = params['scale']
+#     features_list = params["features_list"]
+
+#     # Check if reproducibility case
+#     if d['case']=="reproducibility":
+#         params.update({'scale':1})
+#         atm_dict="RAWS"
     
-    # return rnn_dat
+#     # Scale Data if required
+#     if scale:
+#         scale=1
+#         if d['case']=="reproducibility":
+#             # Note: this was calculated from the max observed fm, Ed, Ew in a whole timeseries originally with using data from test period
+#             scale_fm = 17.076346687085564
+#             logging.info("REPRODUCIBILITY scaling moisture features: using %s", scale_fm)
+#             logging.info('create_rnn_data: scaling to range 0 to 1')
+#             d[atm_dict]['Ed'] = d[atm_dict]['Ed'] / scale_fm
+#             d[atm_dict]['Ew'] = d[atm_dict]['Ew'] / scale_fm
+#             d[atm_dict]['fm'] = d[atm_dict]['fm'] / scale_fm
+#             scaler = 'reproducibility'
+            
+#     else:
+#         scale_fm=1.0
+#         scaler=None
+#     # Extract desired features based on params, combine into matrix
+#     fm = d[atm_dict]['fm']
+#     values = [d[atm_dict][key] for key in features_list]
+#     X = np.vstack(values).T
+#     # Extract response vector 
+#     y = np.reshape(fm,[fm.shape[0],1])
+#     # Calculate total observed hours
+#     hours = X.shape[0]
+#     assert hours == y.shape[0] # Check that it matches response
+    
+#     logging.info('create_rnn_data: total_hours=%s',hours)
+#     logging.info('feature matrix X shape %s',np.shape(X))
+#     logging.info('target  matrix Y shape %s',np.shape(y))
+#     logging.info('features_list: %s',features_list)
+
+#     logging.info('splitting train/val/test')
+#     if train_ind is None:
+#         train_ind = round(hours * params['train_frac']) # index of last training observation
+#     test_ind= train_ind + round(hours * params['val_frac'])# index of first test observation, if no validation data it is equal to train_ind
+#     logging.info('Final index of training data=%s',train_ind)
+#     logging.info('First index of Test data=%s',test_ind)
+#     # Training data from 0 to train_ind
+#     X_train = X[:train_ind]
+#     y_train = y[:train_ind].reshape(-1,1)
+#     # Validation data from train_ind to test_ind
+#     X_val = X[train_ind:test_ind]
+#     y_val = y[train_ind:test_ind].reshape(-1,1)
+#     # Test data from test_ind to end
+#     X_test = X[test_ind:]
+#     y_test = y[test_ind:].reshape(-1,1)
+    
+#     logging.info('x_train shape=%s',X_train.shape)
+#     logging.info('y_train shape=%s',y_train.shape)
+#     if test_ind == train_ind:
+#         logging.info('No validation data')
+#     elif X_val.shape[0]!= 0:
+#         logging.info('X_val shape=%s',X_val.shape)
+#         logging.info('y_val shape=%s',y_val.shape)    
+#     logging.info('X_test shape=%s',X_test.shape)
+#     logging.info('y_test shape=%s',y_test.shape)
+    
+#     # Set up return dictionary
+#     rnn_dat={
+#         'case':d['case'],
+#         'hours':hours,
+#         'features_list':features_list,
+#         'features': len(features_list),
+#         'scaler':scaler,
+#         'train_ind':train_ind,
+#         'test_ind':test_ind,
+#         'X':X,
+#         'y':y,
+#         'X_train': X_train,
+#         'y_train': y_train,
+#         'X_test': X_test,
+#         'y_test': y_test      
+#     }
+#     if rnn_dat['scaler'] == "reproducibility":
+#         rnn_dat['scale_fm']=17.076346687085564
+#     if X_val.shape[0] > 0:
+#             rnn_dat.update({
+#                 'X_val': X_val,
+#                 'y_val': y_val
+#             })
+
+#     # Update RNN params using data attributes
+#     logging.info('Updating model params based on data')
+#     timesteps = params['timesteps']
+#     batch_size = params['batch_size']
+#     logging.info('batch_size=%s',batch_size)
+#     logging.info('timesteps=%s',timesteps)
+#     features = len(features_list)
+#     params.update({
+#             'features': features,
+#             'batch_shape': (params["batch_size"],params["timesteps"],features),
+#             'pred_input_shape': (hours, features),
+#             'scaler': scaler
+#         })
+#     if params['scaler'] == "reproducibility":
+#         params['scale_fm']=17.076346687085564    
+
+    
+#     logging.info('create_rnn_data_2 done')
+#     return rnn_dat
+
+    
+repro_hashes = {
+    'phys_initialize': {
+        'fitted_weight_hash' : 4.2030588308041834e+19,
+        'predictions_hash' :3.59976005554199219
+    },
+    'rand_initialize': {
+        'fitted_weight_hash' : 4.4965532557938975e+19,
+        'predictions_hash' : 3.71594738960266113
+    },
+    'params':{'id':0,
+        'purpose':'reproducibility',
+        'batch_size':32,
+        'training':5,
+        'cases':['case11'],
+        'scale':1,        # every feature in [0, scale]
+        'rain_do':True,
+        'verbose':False,
+        'timesteps':5,
+        'activation':['linear','linear'],
+        'hidden_units':20,  
+        'dense_units':1,    # do not change
+        'dense_layers':1,   # do not change
+        'centering':[0.0,0.0],  # should be activation at 0
+        'DeltaE':[0,-1],    # bias correction
+        'synthetic':False,  # run also synthetic cases
+        'T1': 0.1,          # 1/fuel class (10)
+        'fm_raise_vs_rain': 0.2,         # fm increase per mm rain 
+        'train_frac':0.5,  # time fraction to spend on training
+        'epochs':200,
+        'verbose_fit':0,
+        'verbose_weights':False,
+        'initialize': True,
+        'learning_rate': 0.001 # default learning rate
+        }
+}
 
 
-from tensorflow.keras.callbacks import Callback
+class RNNModel(ABC):
+    def __init__(self, params: dict):
+        self.params = params
+        if type(self) is RNNModel:
+            raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
+        super().__init__()
 
+    @abstractmethod
+    def fit(self, X_train, y_train, weights=None):
+        pass
+
+    def predict(self, X_test):
+        print("Predicting with simple RNN")
+        X_test = self.format_pred_data(X_test)
+        preds = self.model_predict.predict(X_test).flatten()
+        return preds
+
+    def format_train_data(self, X, y, verbose=False):
+        X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
+        return X, y
+    def format_pred_data(self, X):
+        return np.reshape(X,(1, X.shape[0], self.params['features']))
+
+    def plot_history(self, history, plot_title):
+        plt.figure()
+        plt.semilogy(history.history['loss'], label='Training loss')
+        if 'val_loss' in history.history:
+            plt.semilogy(history.history['val_loss'], label='Validation loss')
+        plt.title(f'{plot_title} Model loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.legend(loc='upper left')
+        plt.show()
+
+    def run_model(self, dict0):
+        # Make copy to prevent changing in place
+        dict1 = copy.deepcopy(dict0)
+        # Extract Fields
+        X_train, y_train, X_test, y_test = dict1['X_train'].copy(), dict1['y_train'].copy(), dict1["X_test"].copy(), dict1['y_test'].copy()
+        if 'X_val' in dict1:
+            X_val, y_val = dict1['X_val'].copy(), dict1['y_val'].copy()
+        else:
+            X_val = None
+        case_id = dict1['case']
+
+        # Fit model
+        if X_val is None:
+            self.fit(X_train, y_train)
+        else:
+            self.fit(X_train, y_train, validation_data = (X_val, y_val))
+        # Generate Predictions, 
+        # run through training to get hidden state set proporly for forecast period
+        if X_val is None:
+            X = np.concatenate((X_train, X_test))
+            y = np.concatenate((y_train, y_test)).flatten()
+        else:
+            X = np.concatenate((X_train, X_val, X_test))
+            y = np.concatenate((y_train, y_val, y_test)).flatten()
+        # Predict
+        print(f"Predicting Training through Test \n features hash: {hash2(X)} \n response hash: {hash2(y)} ")
+        m = self.predict(X).flatten()
+        dict1['m']=m
+        dict0['m']=m # add to outside env dictionary, should be only place this happens
+        if self.params['scale']:
+            print(f"Rescaling data using {self.params['scaler']}")
+            if self.params['scaler'] == "reproducibility":
+                m  *= self.params['scale_fm']
+                y  *= self.params['scale_fm']
+                y_train *= self.params['scale_fm']
+                y_test *= self.params['scale_fm']
+        # Check Reproducibility, TODO: old dict calls it hidden_units not rnn_units, so this doens't check that
+        if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale', 'activation', 'learning_rate']):
+            print("Checking Reproducibility")
+            checkm = m[350]
+            hv = hash2(self.model_predict.get_weights())
+            if self.params['phys_initialize']:
+                hv5 = repro_hashes['phys_initialize']['fitted_weight_hash']
+                mv = repro_hashes['phys_initialize']['predictions_hash']
+            else:
+                hv5 = repro_hashes['rand_initialize']['fitted_weight_hash']
+                mv = repro_hashes['rand_initialize']['predictions_hash']           
+            
+            print(f"Fitted weights hash (check 5): {hv} \n Reproducibility weights hash: {hv5} \n Error: {hv5-hv}")
+            print(f"Model predictions hash: {checkm} \n Reproducibility preds hash: {mv} \n Error: {mv-checkm}")
+
+        # print(dict1.keys())
+        # Plot final fit and data
+        # TODO: make plot_data specific to this context
+        dict1['y'] = y
+        plot_data(dict1, title="RNN", title2=dict1['case'])
+        
+        # Calculate Errors
+        err = rmse(m, y)
+        train_ind = dict1["train_ind"] # index of final training set value
+        test_ind = dict1["test_ind"] # index of first test set value
+        err_train = rmse(m[:train_ind], y_train.flatten())
+        err_pred = rmse(m[test_ind:], y_test.flatten())
+        rmse_dict = {
+            'all': err, 
+            'training': err_train, 
+            'prediction': err_pred
+        }
+        return rmse_dict
+        
 class ResetStatesCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.model.reset_states()
 
 
-def train_rnn(rnn_dat, params,hours, fit=True, callbacks=[]):
+class RNN(RNNModel):
+    def __init__(self, params, loss='mean_squared_error'):
+        super().__init__(params)
+        self.model_train = self._build_model_train()
+        self.model_predict = self._build_model_predict()
 
-    # operates on matrix input/output, identity of features not visible here
-    
-    logging.info("train_rnn start, hours=%s fit=%s",hours,fit)
-    
-    verbose = params['verbose']
-    case = get_item(rnn_dat,'case')
-    
-    if hours is None:
-        hours = get_item(rnn_dat,'hours')
-    
-    samples = get_item(rnn_dat,'samples')
-    features = get_item(rnn_dat,'features')
-    timesteps = get_item(rnn_dat,'timesteps')
-    centering = get_item(params,'centering')
-    training = get_item(params,'training')
-    batch_size = get_item(params,'batch_size')
-    initialize=get_item(params,'initialize',default=1)
-
-    single_batch = batch_size is None or batch_size is np.inf
-    if single_batch:
-        batch_size=samples
-        logging.info('replacing batch_size by %s',batch_size)
-
-    epochs=get_item(params,'epochs')
-    
-    model_fit=create_RNN_2(hidden_units=params['hidden_units'], 
-                        dense_units=params['dense_units'], 
-                        batch_shape=(batch_size,timesteps,features),
-                        stateful=True,
-                        return_sequences=False,
-                        # initial_state=h0,
-                        activation=params['activation'],
-                        dense_layers=params['dense_layers'],
-                        verbose = verbose)
-    
-    # X = rnn_dat['X']
-    model_predict=create_RNN_2(hidden_units=params['hidden_units'], 
-                        dense_units=params['dense_units'],  
-                        input_shape=(hours,features),stateful = False,
-                        return_sequences=True,
-                        activation=params['activation'],
-                        dense_layers=params['dense_layers'],
-                        verbose = verbose)
-    
-    if verbose: print(model_predict.summary())
-    
-    x_train = rnn_dat['x_train']
-    y_train = rnn_dat['y_train']
-    
-    print('x_train shape =',x_train.shape)
-    print('y_train shape =',y_train.shape)
-    print('x_train hash =',hash2(x_train))
-    print('y_train hash =',hash2(y_train))
-
-    if single_batch:
-         model_fit(x_train) ## evalue the model once to set nonzero initial state for compatibility
-    
-    if initialize:
-        print('initializing weights')
-        w, w_name=get_initial_weights(model_fit, params, rnn_dat)
-        print('initial weights hash =',hash2(w))
-        model_fit.set_weights(w)
-    else:
-        print('NOT initializing weights')
-        w = model_fit.get_weights()
-
-    if fit:
-        history = None
-        # model_fit.set_weights(w)
-        if single_batch:
-            print("~"*50)
-            print('single batch train')
-            history = model_fit.fit(x_train, 
-                      y_train + centering[1] , 
-                      epochs=epochs,
-                      batch_size=samples,
-                      callbacks = callbacks,
-                      verbose=get_item(params,'verbose_fit')
-                      )
-        else:
-            if training == 1:
-                print('training by batches')
-                batches = samples // batch_size
-                for i in range(epochs):
-                    for j in range(batches):
-                        batch = slice(j*batch_size, (j+1)*batch_size)
-                        model_fit.fit(x_train[batch], 
-                              y_train[batch] + centering[1] , 
-                              epochs=1,
-                              callbacks = callbacks,
-                              verbose=params['verbose_fit'])  
-                        model_fit.reset_states()
-                        print('epoch',i,'batch j','done') 
-                    print('epoch',i,'done')
-            elif training==2:
-                print('training by epoch, resetting state after each epoch')
-                for i in range(epochs):
-                    model_fit.fit(x_train, 
-                        y_train + centering[1] , 
-                        epochs=1, 
-                        batch_size=samples,
-                        callbacks = callbacks,
-                        verbose=params['verbose_fit'])  
-                    model_fit.reset_states()
-                    print('epoch',i,'done')
-            elif training==3:
-                print('training by epoch, not resetting state after each epoch')
-                for i in range(epochs):
-                    model_fit.fit(x_train, 
-                        y_train + centering[1] , 
-                        epochs=1, 
-                        batch_size=samples,
-                        callbacks = callbacks,
-                        verbose=params['verbose_fit'])  
-                    print('epoch',i,'done')
-            elif training==4:
-                print('training in one pass, not resetting state after each epoch')
-                history = model_fit.fit(x_train, 
-                    y_train + centering[1] , 
-                    epochs=epochs, 
-                    batch_size=batch_size,
-                    callbacks = callbacks,
-                    verbose=params['verbose_fit'])
-                
-            elif training==5:
-                print('training in one pass, resetting state after each epoch by callback')
-                history = model_fit.fit(x_train, 
-                    y_train + centering[1] , 
-                    epochs=epochs, 
-                    batch_size=batch_size,
-                    callbacks = callbacks + [ResetStatesCallback()],
-                    verbose=params['verbose_fit'])
-
-        if history is not None:
-            plt.semilogy(history.history['loss'], label='Training loss')
-            if 'val_loss' in history.history:
-                plt.semilogy(history.history['val_loss'], label='Validation loss')
-            plt.title(case + ' Model loss')
-            plt.ylabel('Loss')
-            plt.xlabel('Epoch')
-            plt.legend(loc='upper left')
-            plt.show()
-
-           
-        w_fitted=model_fit.get_weights()
-        print('fitted weights hash =',hash2(w_fitted))
-        if params['verbose_weights']:
-            for i in range(len(w_fitted)):
-                print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
-                  'fitted: sum',np.sum(w_fitted[i],axis=0),'\nentries',w_fitted[i])
-    else:
-        print('Fitting skipped, using initial weights')
-        w_fitted=w
+    def _build_model_train(self, return_sequences=False):
+        inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
+        x = inputs
+        for i in range(self.params['rnn_layers']):
+            x = SimpleRNN(
+                units=self.params['rnn_units'],
+                activation=self.params['activation'][0],
+                dropout=self.params["dropout"][0],
+                stateful=self.params['stateful'],
+                return_sequences=return_sequences)(x)
+        if self.params["dropout"][1] > 0:
+            x = Dropout(self.params["dropout"][1])(x)            
+        for i in range(self.params['dense_layers']):
+            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x)
+        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        model.compile(loss='mean_squared_error', optimizer=optimizer)
         
-    model_predict.set_weights(w_fitted)
-    
-    return model_predict
+        if self.params["verbose_weights"]:
+            print(f"Initial Weights Hash: {hash2(model.get_weights())}")
+        return model
+    def _build_model_predict(self, return_sequences=True):
+        
+        inputs = tf.keras.Input(shape=self.params['pred_input_shape'])
+        x = inputs
+        for i in range(self.params['rnn_layers']):
+            x = SimpleRNN(self.params['rnn_units'],activation=self.params['activation'][0],
+                  stateful=False,return_sequences=return_sequences)(x)
+        for i in range(self.params['dense_layers']):
+            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x)
+        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        model.compile(loss='mean_squared_error', optimizer=optimizer)  
 
-def get_initial_weights(model_fit,params,rnn_dat):
-    # Given a RNN architecture and hyperparameter dictionary, return array of physics-initiated weights
-    # Inputs:
-    # model_fit: output of create_RNN_2 with no training
-    # params: (dict) dictionary of hyperparameters
-    # rnn_dat: (dict) data dictionary, output of create_rnn_dat
-    # Returns: numpy ndarray of weights that should be a rough solution to the moisture ODE
-    DeltaE = params['DeltaE']
-    T1 = params['T1']
-    fmr = params['fm_raise_vs_rain']
-    centering = params['centering']  # shift activation down
-    
-    w0_initial={'Ed':(1.-np.exp(-T1))/2, 
-                'Ew':(1.-np.exp(-T1))/2,
-                'rain':fmr * rnn_dat['scale_fm']/rnn_dat['scale_rain']}   # wx - input feature
-                                 #  wh      wb   wd    bd = bias -1
-    
-    w_initial=np.array([np.nan, np.exp(-0.1), DeltaE[0]/rnn_dat['scale_fm'], # layer 0
-                        1.0, -centering[0] + DeltaE[1]/rnn_dat['scale_fm']])                 # layer 1
-    if params['verbose_weights']:
-        print('Equilibrium moisture correction bias',DeltaE[0],
-              'in the hidden layer and',DeltaE[1],' in the output layer')
-    
-    w_name = ['wx','wh','bh','wd','bd']
-                        
-    w=model_fit.get_weights()
-    for j in range(w[0].shape[0]):
-            feature = rnn_dat['features_list'][j]
-            for k in range(w[0].shape[1]):
-                    w[0][j][k]=w0_initial[feature]
-    for i in range(1,len(w)):            # number of the weight
-        for j in range(w[i].shape[0]):   # number of the inputs
-            if w[i].ndim==2:
-                # initialize all entries of the weight matrix to the same number
-                for k in range(w[i].shape[1]):
-                    w[i][j][k]=w_initial[i]/w[i].shape[0]
-            elif w[i].ndim==1:
-                w[i][j]=w_initial[i]
-            else:
-                print('weight',i,'shape',w[i].shape)
-                raise ValueError("Only 1 or 2 dimensions supported")
-        if params['verbose_weights']:
-            print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
-                  'initial: sum',np.sum(w[i],axis=0),'\nentries',w[i])
-    
-    return w, w_name
+        # Set Weights to model_train
+        w_fitted = self.model_train.get_weights()
+        model.set_weights(w_fitted)
+        
+        return model
 
-def rnn_predict(model, params, rnn_dat):
-    # Given compiled model, hyperparameters, and data dictionary, return array of predicted values.
-    # NOTE: this does not distinguish in-sample vs out-of-sample data, it just fits the model to the given data
-    # Inputs:
-    # model: compiled moisture model
-    # params: (dict) dictionary of hyperparameters
-    # rnn_dat: (dict) dictionary of data to fit model to, output of create_rnn_dat
-    # Returns: numpy array of fitted moisture values
-    verbose = params['verbose']
-    centering = params['centering']
-    features = rnn_dat['features']
-    hours = rnn_dat['hours']
-    
-    # model.set_weights(w_fitted)
-    x_input=np.reshape(rnn_dat['X'],(1, hours, features))
-    y_output = model.predict(x_input, verbose = verbose) - centering[1]
-    
-    vprint('x_input.shape=',x_input.shape,'y_output.shape=',y_output.shape)
-    
-    m = np.reshape(y_output,hours)
-    # print('weights=',w)
-    if 'scale_fm' in rnn_dat:
-        vprint('scaling the output')
-        m = m*rnn_dat['scale_fm']
-    m = np.reshape(m,hours)
-    return m
-
-def run_rnn(case_data,params,fit=True,title2=''):
-    # Run RNN on given case dictionary of FMDA data with certain params. Used internally in run_case
-    # Inputs:
-    # case_data: (dict) collection of cases with FMDA data. Cases are different locations and times, or synthetic data
-    # params: (dict) collection of run options for model
-    # fit: (bool) whether or not to fit RNN to data
-    # title2: (str) title of RNN run to be joined to string with other info for plotting title
-    # called from: run_case
-    
-    logging.info('run_rnn start')
-    verbose = params['verbose']
-    
-    reproducibility.set_seed() # Set seed for reproducibility
-    rnn_dat = create_rnn_data_1(case_data,params)
-    create_rnn_data_2(rnn_dat,params)
-    if params['verbose']:
-        check_data(rnn_dat,case=0,name='rnn_dat')
-    model_predict = train_rnn(
-        rnn_dat,
-        params,
-        rnn_dat['hours'],
-        fit=fit
-    )
-
-    m = rnn_predict(model_predict, params, rnn_dat)
-    case_data['m'] = m
-
-    # Reproducibility Checks
-    hv = hash2(model_predict.get_weights())
-    if case_data['case']=='case11' and fit:
-        if params['initialize']:
-            hv5 = 4.2030588308041834e+19
-            mv = 3.59976005554199219
+    def fit(self, X_train, y_train, plot=True, plot_title = '', 
+            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
+        # verbose_fit argument is for printing out update after each epoch, which gets very long
+        # These print statements at the top could be turned off with a verbose argument, but then
+        # there would be a bunch of different verbose params
+        print(f"Training simple RNN with params: {self.params}")
+        X_train, y_train = self.format_train_data(X_train, y_train)
+        print(f"X_train hash: {hash2(X_train)}")
+        print(f"y_train hash: {hash2(y_train)}")
+        if validation_data is not None:
+            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
+            print(f"X_val hash: {hash2(X_val)}")
+            print(f"y_val hash: {hash2(y_val)}")
+        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
+        # Setup callbacks
+        if self.params["reset_states"]:
+            callbacks=callbacks+[ResetStatesCallback()]
+        
+        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
+        if verbose_fit is None:
+            verbose_fit = self.params['verbose_fit']
+        # Evaluate Model once to set nonzero initial state
+        if self.params["batch_size"]>= X_train.shape[0]:
+            self.model_train(X_train)
+        if validation_data is not None:
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                validation_data = (X_val, y_val),
+                *args, **kwargs
+            )
         else:
-            # UPDATE THESE TOO FOR STAIRCASE 2
-            hv5 = 4.4965532557938975e+19
-            mv = 3.71594738960266113               
-        print('check 5:',hv, 'should be',hv5,'error',hv-hv5)
-        # assert (hv == hv5)
-        checkm = case_data['m'][350]
-        print('checkm=',format(checkm, '.17f'),' error',checkm-mv)
-        print('params:',params)
-    else:
-        print('check - hash weights:',hv)
-    
-    plot_data(case_data,title2=title2)
-    plt.show()
-    logging.info('run_rnn end')
-    return m, rmse_data(case_data)
-    
-    
-def run_case(case_data,params, check_data=False):
-    # Given a formatted FMDA dictionary of data, run RNN model using given run params
-    # Inputs:
-    # case_data: (dict) one case
-    #      its name is in case_data['case']
-    #      check_data
-    # params: (dict) collection of run options for model
-    # Return: (dict) collection of RMSE error for RNN & EKF, for train and prediction periods
-    # called from fmda_rnn_rain
-    
-    print('\n***** ',case_data['case'],' *****\n')
-    case_data['rain'][np.isnan(case_data['rain'])] = 0
-    print(params)
-    if check_data:
-        check_data(case_data)
-    hours=case_data['hours']
-    if ('train_frac' in params) and ('h2' not in case_data):
-    # if 'train_frac' in params:
-        case_data['h2'] = round(hours * params['train_frac'])
-    h2=case_data['h2']
-    plot_data(case_data,title2='case data on input')
-    m,Ec = mod.run_augmented_kf(case_data)  # extract from state
-    case_data['m']=m
-    case_data['Ec']=Ec
-    plot_data(case_data,title2='augmented KF')
-    rmse =      {'Augmented KF':rmse_data(case_data)}
-    del case_data['Ec']  # cleanup
-    rmse.update({'RNN initial':run_rnn(case_data,params,fit=False,title2='with initial weights, no fit')[1]})
-    print("~"*50)
-    rmse.update({'RNN trained':run_rnn(case_data,params,fit=True,title2='with trained RNN')[1]})
-    return rmse
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                *args, **kwargs
+            )
+        if plot:
+            self.plot_history(history,plot_title)
+        if self.params["verbose_weights"]:
+            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
+
+        # Update Weights for Prediction Model
+        w_fitted = self.model_train.get_weights()
+        self.model_predict.set_weights(w_fitted)
 
 
+class RNN_LSTM(RNNModel):
+    def __init__(self, params, loss='mean_squared_error'):
+        super().__init__(params)
+        self.model_train = self._build_model_train()
+        self.model_predict = self._build_model_predict()
+
+    def _build_model_train(self, return_sequences=False):
+        inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
+        x = inputs
+        for i in range(self.params['rnn_layers']):
+            x = LSTM(
+                units=self.params['rnn_units'],
+                activation=self.params['activation'][0],
+                dropout=self.params["dropout"][0],
+                recurrent_activation=self.params["recurrent_activation"],
+                stateful=self.params['stateful'],
+                return_sequences=return_sequences)(x)
+        if self.params["dropout"][1] > 0:
+            x = Dropout(self.params["dropout"][1])(x)            
+        for i in range(self.params['dense_layers']):
+            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x)
+        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        model.compile(loss='mean_squared_error', optimizer=optimizer)
+        
+        if self.params["verbose_weights"]:
+            print(f"Initial Weights Hash: {hash2(model.get_weights())}")
+        return model
+    def _build_model_predict(self, return_sequences=True):
+        
+        inputs = tf.keras.Input(shape=self.params['pred_input_shape'])
+        x = inputs
+        for i in range(self.params['rnn_layers']):
+            x = LSTM(
+                units=self.params['rnn_units'],
+                activation=self.params['activation'][0],
+                stateful=False,return_sequences=return_sequences)(x)
+        for i in range(self.params['dense_layers']):
+            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x)
+        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        model.compile(loss='mean_squared_error', optimizer=optimizer)  
+
+        # Set Weights to model_train
+        w_fitted = self.model_train.get_weights()
+        model.set_weights(w_fitted)
+        
+        return model
+
+    def fit(self, X_train, y_train, plot=True, plot_title = '', 
+            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
+        # verbose_fit argument is for printing out update after each epoch, which gets very long
+        # These print statements at the top could be turned off with a verbose argument, but then
+        # there would be a bunch of different verbose params
+        print(f"Training simple RNN with params: {self.params}")
+        X_train, y_train = self.format_train_data(X_train, y_train)
+        print(f"X_train hash: {hash2(X_train)}")
+        print(f"y_train hash: {hash2(y_train)}")
+        if validation_data is not None:
+            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
+            print(f"X_val hash: {hash2(X_val)}")
+            print(f"y_val hash: {hash2(y_val)}")
+        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
+        # Setup callbacks
+        if self.params["reset_states"]:
+            callbacks=callbacks+[ResetStatesCallback()]
+        
+        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
+        if verbose_fit is None:
+            verbose_fit = self.params['verbose_fit']
+        # Evaluate Model once to set nonzero initial state
+        if self.params["batch_size"]>= X_train.shape[0]:
+            self.model_train(X_train)
+        if validation_data is not None:
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                validation_data = (X_val, y_val),
+                *args, **kwargs
+            )
+        else:
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                *args, **kwargs
+            )
+        if plot:
+            self.plot_history(history,plot_title)
+        if self.params["verbose_weights"]:
+            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
+
+        # Update Weights for Prediction Model
+        w_fitted = self.model_train.get_weights()
+        self.model_predict.set_weights(w_fitted)
 
 
