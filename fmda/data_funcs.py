@@ -182,7 +182,22 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
             plt.plot(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
         elif type=='scatter':
             plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
-            
+
+# Lookup table for plotting features
+plot_styles = {
+    'Ed': {'color': '#EF847C', 'linestyle': '--', 'alpha':.8, 'label': 'drying EQ'},
+    'Ew': {'color': '#7CCCEF', 'linestyle': '--', 'alpha':.8, 'label': 'wetting EQ'},
+    'rain': {'color': 'b', 'linestyle': '-', 'alpha':.9, 'label': 'Rain'}
+}
+def plot_feature(x, y, feature_name):
+    style = plot_styles.get(feature_name, {})
+    plt.plot(x, y, **style)
+    
+def plot_features(hmin,hmax,dat,feat_list,linestyle,c,label,alpha=1):
+    hour = np.array(range(hmin,hmax))
+    for i,feat in enumerate(feat_list):
+        plot_feature(x=hour, y=dat["X"][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
+        
 def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
@@ -197,18 +212,27 @@ def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=No
         else:
             hmax = min(hmax, dat['hours'])
     
+    
+    
     plt.figure(figsize=(16,4))
-    # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
-    plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
-    plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='#7CCCEF',label='wetting EQ', alpha=.8)
-    plot_one(hmin,hmax,dat,'fm',linestyle='-',c='#468a29',label='FM Observed')
+    plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
-    plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
-    plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
+    
+    if 'features_list' in dat:
+        feat_list = dat['features_list']
+        plot_features(hmin,hmax,dat,feat_list,linestyle='-',c='k',label='FM Model')
+    
+    # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
+    # plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
+    # plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='#7CCCEF',label='wetting EQ', alpha=.8)
+    # plot_one(hmin,hmax,dat,'fm',linestyle='-',c='#468a29',label='FM Observed')
+    # plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
+    # plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
+    # plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
     # for test
     # plot_one(hmin,hmax,dat,'x',linestyle='-',c='g',label='x input')
     # plot_one(hmin,hmax,dat,'y',linestyle='-',c='k',label='y truth')
-    plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
+    
     # plot_one(hmin,hmax,dat,'z',linestyle='-',c='r',label='z output')
 
     if 'test_ind' in dat.keys():
