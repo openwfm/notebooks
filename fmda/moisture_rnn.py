@@ -596,7 +596,7 @@ class RNNModel(ABC):
             'training': err_train, 
             'prediction': err_pred
         }
-        return rmse_dict
+        return m, rmse_dict
         
 class ResetStatesCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
@@ -632,7 +632,7 @@ class RNN(RNNModel):
         return model
     def _build_model_predict(self, return_sequences=True):
         
-        inputs = tf.keras.Input(shape=self.params['pred_input_shape'])
+        inputs = tf.keras.Input(shape=(None,self.params['features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
             x = SimpleRNN(self.params['rnn_units'],activation=self.params['activation'][0],
@@ -680,7 +680,7 @@ class RNN_LSTM(RNNModel):
         return model
     def _build_model_predict(self, return_sequences=True):
         
-        inputs = tf.keras.Input(shape=self.params['pred_input_shape'])
+        inputs = tf.keras.Input(shape=(None,self.params['features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
             x = LSTM(
