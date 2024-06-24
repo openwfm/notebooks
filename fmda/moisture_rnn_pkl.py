@@ -9,6 +9,7 @@ import reproducibility
 # from moisture_rnn import create_rnn_data_2, train_rnn, rnn_predict
 from data_funcs import plot_data,rmse_data
 import matplotlib.pyplot as plt
+import sys
 
 # run this from test-pkl2train.ipynb
 
@@ -28,6 +29,10 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
     #                            
     #
 
+    # TODO: fix this
+    if 'rain' in features_list and (not features_list[-1]=='rain'):
+        raise ValueError(f"Make rain in features list last element since (working on fix as of 24-6-24), given features list: {features_list}")
+    
     if forecast_step > 0 and forecast_step < 100 and forecast_step == int(forecast_step):
         fstep='f'+str(forecast_step).zfill(2)
         fprev='f'+str(forecast_step-1).zfill(2)
@@ -119,7 +124,6 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
                                 columns.append(vec)                    
                             else:
                                 logging.info('No %s data found in RAWS subdictionary %s', feat, key)
-
                 # compute rain as difference of accumulated precipitation
                 if 'rain' in features_list:
                     if atm_dict == "HRRR":
@@ -131,7 +135,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
                             rain = subdict[atm_dict]['rain']
                         else:
                             logging.info('No rain data found in RAWS subdictionary %s', key)
-                    columns.append( rain ) # add rain feature
+                    columns.append( rain ) # add rain feature             
                 train[key]['X'] = np.column_stack(columns)
                 train[key]['features_list'] = features_list
                 
