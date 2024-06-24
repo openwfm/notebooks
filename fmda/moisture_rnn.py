@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from utils import hash2
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
+import yaml
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
@@ -237,8 +238,10 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         # scale=1
         if scaler=="reproducibility":
             scale_fm = 17.076346687085564
+            scale_rain = 0.01
         else:
             scale_fm=1.0
+            scale_rain=1.0
             # Fit scaler to training data
             scalers[scaler].fit(X_train)
             # Apply scaling to all data using in-place operations
@@ -251,6 +254,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     else:
         print("Not scaling data")
         scale_fm=1.0
+        scale_rain=1.0
         scaler=None
     
     logging.info('x_train shape=%s',X_train.shape)
@@ -298,9 +302,14 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
             'batch_shape': (params["batch_size"],params["timesteps"],features),
             'pred_input_shape': (None, features),
             'scaler': scaler,
-            'scale_fm': scale_fm
+            'scale_fm': scale_fm,
+            'scale_rain': scale_rain
         })
-    rnn_dat.update({'scaler': scaler, 'scale_fm': scale_fm})
+    rnn_dat.update({
+        'scaler': scaler, 
+        'scale_fm': scale_fm,
+        'scale_rain': scale_rain
+    })
     
     logging.info('create_rnn_data2 done')
     return rnn_dat
@@ -630,6 +639,65 @@ class ResetStatesCallback(Callback):
         self.model.reset_states()
 
 
+# with open("params.yaml") as file:
+#     phys_params = yaml.safe_load(file)["physics_initializer"]
+
+phys_params = {
+    'DeltaE': [0,-1],                    # bias correction
+    'T1': 0.1,                           # 1/fuel class (10)
+    'fm_raise_vs_rain': 0.2              # fm increase per mm rain 
+}
+
+
+
+def get_initial_weights(model_fit,params):
+    # Given a RNN architecture and hyperparameter dictionary, return array of physics-initiated weights
+    # Inputs:
+    # model_fit: output of create_RNN_2 with no training
+    # params: (dict) dictionary of hyperparameters
+    # rnn_dat: (dict) data dictionary, output of create_rnn_dat
+    # Returns: numpy ndarray of weights that should be a rough solution to the moisture ODE
+    DeltaE = phys_params['DeltaE']
+    T1 = phys_params['T1']
+    fmr = phys_params['fm_raise_vs_rain']
+    centering = params['centering']  # shift activation down
+    scale_fm = params['scale_fm']
+    
+    w0_initial={'Ed':(1.-np.exp(-T1))/2, 
+                'Ew':(1.-np.exp(-T1))/2,
+                'rain':fmr * scale_fm}   # wx - input feature
+                                 #  wh      wb   wd    bd = bias -1
+    
+    w_initial=np.array([np.nan, np.exp(-0.1), DeltaE[0]/scale_fm, # layer 0
+                        1.0, -centering[0] + DeltaE[1]/scale_fm])                 # layer 1
+    if params['verbose_weights']:
+        print('Equilibrium moisture correction bias',DeltaE[0],
+              'in the hidden layer and',DeltaE[1],' in the output layer')
+    
+    w_name = ['wx','wh','bh','wd','bd']
+                        
+    w=model_fit.get_weights()
+    for j in range(w[0].shape[0]):
+            feature = params['features_list'][j]
+            for k in range(w[0].shape[1]):
+                    w[0][j][k]=w0_initial[feature]
+    for i in range(1,len(w)):            # number of the weight
+        for j in range(w[i].shape[0]):   # number of the inputs
+            if w[i].ndim==2:
+                # initialize all entries of the weight matrix to the same number
+                for k in range(w[i].shape[1]):
+                    w[i][j][k]=w_initial[i]/w[i].shape[0]
+            elif w[i].ndim==1:
+                w[i][j]=w_initial[i]
+            else:
+                print('weight',i,'shape',w[i].shape)
+                raise ValueError("Only 1 or 2 dimensions supported")
+        if params['verbose_weights']:
+            print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'initial: sum',np.sum(w[i],axis=0),'\nentries',w[i])
+    
+    return w, w_name
+
 class RNN(RNNModel):
     def __init__(self, params, loss='mean_squared_error'):
         super().__init__(params)
@@ -656,6 +724,14 @@ class RNN(RNNModel):
         
         if self.params["verbose_weights"]:
             print(f"Initial Weights Hash: {hash2(model.get_weights())}")
+
+        if self.params['phys_initialize']:
+            assert self.params['scaler'] == 'reproducibility', f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
+            assert self.params['features_list'] == ['Ed', 'Ew', 'rain'], f"Physics initiation can only be done with features ['Ed', 'Ew', 'rain'], but given features {self.params['features_list']}"
+            print("Initializing Model with Physics based weights")
+            w, w_name=get_initial_weights(model, self.params)
+            model.set_weights(w)
+            print('initial weights hash =',hash2(model.get_weights()))
         return model
     def _build_model_predict(self, return_sequences=True):
         
