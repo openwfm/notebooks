@@ -22,6 +22,7 @@ rnn:
   verbose_fit: False # Prints out all training epochs, makes computation much slower
   features_list: ['Ed', 'Ew', 'rain']
   scale: True
+  scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
   train_frac: 0.5
   val_frac: 0.1
 
@@ -51,10 +52,11 @@ lstm:
   train_frac: 0.5
   val_frac: 0.1
 
-physics_initializer:
-  DeltaE: [0,-1]                # bias correction
-  T1: 0.1                       # 1/fuel class (10)
-  fm_raise_vs_rain: 0.2         # fm increase per mm rain 
+# Lives in moisture_rnn now
+# physics_initializer:
+#   DeltaE: [0,-1]                # bias correction
+#   T1: 0.1                       # 1/fuel class (10)
+#   fm_raise_vs_rain: 0.2         # fm increase per mm rain 
 
 
 # Param sets for reproducibility
@@ -80,6 +82,7 @@ rnn_repro:
   verbose_fit: False # Prints out all training epochs, makes computation much slower
   features_list: ['Ed', 'Ew', 'rain']
   scale: True
+  scaler: 'reproducibility'
   train_frac: 0.5
   val_frac: 0
 
