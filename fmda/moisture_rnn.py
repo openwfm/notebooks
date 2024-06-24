@@ -296,7 +296,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     params.update({
             'features': features,
             'batch_shape': (params["batch_size"],params["timesteps"],features),
-            'pred_input_shape': (hours, features),
+            'pred_input_shape': (None, features),
             'scaler': scaler,
             'scale_fm': scale_fm
         })
