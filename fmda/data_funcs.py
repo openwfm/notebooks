@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from utils import  is_numeric_ndarray, hash2
 import json
 import copy
-
+import subprocess
+import os.path as osp
 
 
 def compare_dicts(dict1, dict2, keys):
@@ -375,4 +376,15 @@ def load_and_fix_data(filename):
             if not 'descr' in test_dict[case].keys():
                 test_dict[case]['descr']=f"{case} FMDA dictionary"
     return test_dict
+
+
+def get_file(filename, data_dir='data'):
+    # Check for file locally, retrieve with wget if not
+    if osp.exists(osp.join(data_dir, filename)):
+        print(f"File {osp.join(data_dir, filename)} exists locally")        
+    elif not osp.exists(filename):
+        import subprocess
+        base_url = "https://demo.openwfm.org/web/data/fmda/dicts/"
+        print(f"Retrieving data {osp.join(base_url, filename)}")
+        subprocess.call(f"wget -P {data_dir} {osp.join(base_url, filename)}", shell=True)
 
