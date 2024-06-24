@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from utils import hash2
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
-
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
     # x [datapoints,features]    all inputs
@@ -162,7 +162,24 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
 
     return x_train, y_train
 
-def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None, scaler=None):
+
+# Dictionary of scalers, used to avoid multiple object creation and to avoid multiple if statements
+scalers = {
+    'minmax': MinMaxScaler(),
+    'standard': StandardScaler() 
+}
+
+# def scale_transform(X, method='minmax'):
+#     # Function to scale data in place
+#     # Inputs: 
+#     # X: (ndarray) data to be scaled
+#     # method: (str) one of keys in scalers dictionary above
+#     scaler = scalers[method]
+#     scaler.fit(X)
+#     # Modify X in-place
+#     X[:] = scaler.transform(X)
+
+def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
     # Inputs:
     # d: (dict) fmda dictionary
@@ -175,24 +192,9 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     # Copy Dictionary 
     d=copy.deepcopy(dict1)
     scale = params['scale']
+    scaler= params['scaler']
     features_list = params["features_list"]
 
-    
-    # Scale Data if required
-    # TODO: Reconcile scaling with moisture_rnn_pkl
-    if scale:
-        print("Scaling Feature Data")
-        scale=1
-        if d['case']=="reproducibility":
-            scale_fm = 17.076346687085564
-            scaler = 'reproducibility'
-        else:
-            scale_fm=1.0
-            scaler=None
-    else:
-        print("Not scaling data")
-        scale_fm=1.0
-        scaler=None
         
     # Extract desired features based on params, combine into matrix
     # Extract response vector 
@@ -225,6 +227,31 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     # Test data from test_ind to end
     X_test = X[test_ind:]
     y_test = y[test_ind:].reshape(-1,1)
+
+    # Scale Data if required
+    # TODO:
+        # Remove need for "scale_fm" param
+        # Reset reproducibility with this scaling
+    if scale:
+        logging.info('Scaling feature data with scaler: %s',scaler)
+        # scale=1
+        if scaler=="reproducibility":
+            scale_fm = 17.076346687085564
+        else:
+            scale_fm=1.0
+            # Fit scaler to training data
+            scalers[scaler].fit(X_train)
+            # Apply scaling to all data using in-place operations
+            X_train[:] = scalers[scaler].transform(X_train)
+            if X_val.shape[0] > 0:
+                X_val[:] = scalers[scaler].transform(X_val)
+            X_test[:] = scalers[scaler].transform(X_test)
+            
+            
+    else:
+        print("Not scaling data")
+        scale_fm=1.0
+        scaler=None
     
     logging.info('x_train shape=%s',X_train.shape)
     logging.info('y_train shape=%s',y_train.shape)
