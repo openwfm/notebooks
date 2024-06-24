@@ -14,6 +14,7 @@ import json
 import copy
 
 
+
 def compare_dicts(dict1, dict2, keys):
     for key in keys:
         if dict1.get(key) != dict2.get(key):
@@ -196,7 +197,8 @@ def plot_feature(x, y, feature_name):
 def plot_features(hmin,hmax,dat,feat_list,linestyle,c,label,alpha=1):
     hour = np.array(range(hmin,hmax))
     for i,feat in enumerate(feat_list):
-        plot_feature(x=hour, y=dat["X"][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
+        if feat in plot_styles.keys():
+            plot_feature(x=hour, y=dat["X"][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
         
 def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
