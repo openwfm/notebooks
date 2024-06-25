@@ -11,9 +11,9 @@ from data_funcs import plot_data,rmse_data
 import matplotlib.pyplot as plt
 import sys
 
-# run this from test-pkl2train.ipynb
 
-def pkl2train(input_file_paths,output_file_path='train.pkl',
+
+def pkl2train(input_file_paths,
               forecast_step=1, atm="HRRR",features_list=['Ed', 'Ew', 'rain']):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
@@ -174,10 +174,10 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
         
     # output
 
-    if output_file_path is not None:
-        with open(output_file_path, 'wb') as file:
-            logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
-            pickle.dump(train, file)
+    # if output_file_path is not None:
+    #     with open(output_file_path, 'wb') as file:
+    #         logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
+    #         pickle.dump(train, file)
     
     logging.info('pkl2train done')
     
