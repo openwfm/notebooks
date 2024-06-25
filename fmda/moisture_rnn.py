@@ -1,3 +1,5 @@
+# v2 training and prediction class infrastructure
+
 # Environment
 import numpy as np
 import pandas as pd
