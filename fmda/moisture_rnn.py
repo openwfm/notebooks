@@ -196,15 +196,25 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     d=copy.deepcopy(dict1)
     scale = params['scale']
     scaler= params['scaler']
+    # Features list given by params dictionayr
     features_list = params["features_list"]
-
+    # All available features list, corresponds to shape of X
+    features_list_all = d["features_list"]
+    # Indices to subset all features with based on params features
+    indices = []
+    for item in features_list:
+        if item in features_list_all:
+            indices.append(features_list_all.index(item))
+        else:
+            print(f"Warning: feature name '{item}' not found in list of all features from input data")
         
     # Extract desired features based on params, combine into matrix
     # Extract response vector 
     fm = d['y']
     y = np.reshape(fm,[fm.shape[0],1])
-    # Extract Features matrix
+    # Extract Features matrix, subset to desired features
     X = d['X']
+    X = X[:, indices]
 
     # Check total observed hours
     hours=d['hours']    
