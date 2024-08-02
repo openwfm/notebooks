@@ -6,7 +6,7 @@ rnn:
   timesteps: 5
   optimizer: adam
   rnn_layers: 1
-  rnn_units: 6
+  rnn_units: 10
   dense_layers: 1
   dense_units: 1
   activation: ['linear', 'linear']
@@ -14,12 +14,13 @@ rnn:
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-  epochs: 100
+  epochs: 150
   learning_rate: 0.001
   phys_initialize: False # physics initialization
   stateful: True
   verbose_weights: True # Prints out hashs of weights for tracking reproducibility
   verbose_fit: False # Prints out all training epochs, makes computation much slower
+  # features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
   features_list: ['Ed', 'Ew', 'rain']
   scale: True
   scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
@@ -49,6 +50,7 @@ lstm:
   verbose_fit: False # Prints out all training epochs, makes computation much slower
   features_list: ['Ed', 'Ew', 'rain']
   scale: True
+  scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
   train_frac: 0.5
   val_frac: 0.1
 
