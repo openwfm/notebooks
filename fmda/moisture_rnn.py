@@ -213,7 +213,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     fm = d['y']
     y = np.reshape(fm,[fm.shape[0],1])
     # Extract Features matrix, subset to desired features
-    X = d['X']
+    X = d['X'].copy()
     X = X[:, indices]
 
     # Check total observed hours
@@ -288,6 +288,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         'scaler':scaler,
         'train_ind':train_ind,
         'test_ind':test_ind,
+        'X_raw': d['X'][:, indices],
         'X':X,
         'y':y,
         'X_train': X_train,

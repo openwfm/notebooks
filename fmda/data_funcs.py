@@ -195,16 +195,17 @@ def plot_feature(x, y, feature_name):
     style = plot_styles.get(feature_name, {})
     plt.plot(x, y, **style)
     
-def plot_features(hmin,hmax,dat,feat_list,linestyle,c,label,alpha=1):
+def plot_features(hmin,hmax,dat,feat_list,linestyle,c,label, raw_name,alpha=1):
     hour = np.array(range(hmin,hmax))
     for i,feat in enumerate(feat_list):
         if feat in plot_styles.keys():
-            plot_feature(x=hour, y=dat["X"][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
+            plot_feature(x=hour, y=dat[raw_name][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
         
-def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
+def plot_data(dat0, raw_name = "X_raw",title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
+    # raw_name: string, dictionary key of dat that has unscaled data for plotting
     # Returns: none
 
     dat = copy.deepcopy(dat0)
@@ -223,7 +224,7 @@ def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=No
     
     if 'features_list' in dat:
         feat_list = dat['features_list']
-        plot_features(hmin,hmax,dat,feat_list,linestyle='-',c='k',label='FM Model')
+        plot_features(hmin,hmax,dat,feat_list, raw_name=raw_name,linestyle='-',c='k',label='FM Model')
     
     # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
     # plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
