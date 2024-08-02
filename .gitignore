@@ -7,3 +7,5 @@ __pycache__
 **/*.json*
 **/*.grib*
 .virtual_documents
+**/*.pkl
+
