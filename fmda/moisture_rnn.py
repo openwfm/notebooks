@@ -18,7 +18,8 @@ from abc import ABC, abstractmethod
 from utils import hash2
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
-
+import yaml
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
     # x [datapoints,features]    all inputs
@@ -164,7 +165,24 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
 
     return x_train, y_train
 
-def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None, scaler=None):
+
+# Dictionary of scalers, used to avoid multiple object creation and to avoid multiple if statements
+scalers = {
+    'minmax': MinMaxScaler(),
+    'standard': StandardScaler() 
+}
+
+# def scale_transform(X, method='minmax'):
+#     # Function to scale data in place
+#     # Inputs: 
+#     # X: (ndarray) data to be scaled
+#     # method: (str) one of keys in scalers dictionary above
+#     scaler = scalers[method]
+#     scaler.fit(X)
+#     # Modify X in-place
+#     X[:] = scaler.transform(X)
+
+def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
     # Inputs:
     # d: (dict) fmda dictionary
@@ -177,31 +195,26 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     # Copy Dictionary 
     d=copy.deepcopy(dict1)
     scale = params['scale']
+    scaler= params['scaler']
+    # Features list given by params dictionayr
     features_list = params["features_list"]
-
-    
-    # Scale Data if required
-    # TODO: Reconcile scaling with moisture_rnn_pkl
-    if scale:
-        print("Scaling Feature Data")
-        scale=1
-        if d['case']=="reproducibility":
-            scale_fm = 17.076346687085564
-            scaler = 'reproducibility'
+    # All available features list, corresponds to shape of X
+    features_list_all = d["features_list"]
+    # Indices to subset all features with based on params features
+    indices = []
+    for item in features_list:
+        if item in features_list_all:
+            indices.append(features_list_all.index(item))
         else:
-            scale_fm=1.0
-            scaler=None
-    else:
-        print("Not scaling data")
-        scale_fm=1.0
-        scaler=None
+            print(f"Warning: feature name '{item}' not found in list of all features from input data")
         
     # Extract desired features based on params, combine into matrix
     # Extract response vector 
     fm = d['y']
     y = np.reshape(fm,[fm.shape[0],1])
-    # Extract Features matrix
-    X = d['X']
+    # Extract Features matrix, subset to desired features
+    X = d['X'].copy()
+    X = X[:, indices]
 
     # Check total observed hours
     hours=d['hours']    
@@ -227,6 +240,34 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     # Test data from test_ind to end
     X_test = X[test_ind:]
     y_test = y[test_ind:].reshape(-1,1)
+
+    # Scale Data if required
+    # TODO:
+        # Remove need for "scale_fm" param
+        # Reset reproducibility with this scaling
+    if scale:
+        logging.info('Scaling feature data with scaler: %s',scaler)
+        # scale=1
+        if scaler=="reproducibility":
+            scale_fm = 17.076346687085564
+            scale_rain = 0.01
+        else:
+            scale_fm=1.0
+            scale_rain=1.0
+            # Fit scaler to training data
+            scalers[scaler].fit(X_train)
+            # Apply scaling to all data using in-place operations
+            X_train[:] = scalers[scaler].transform(X_train)
+            if X_val.shape[0] > 0:
+                X_val[:] = scalers[scaler].transform(X_val)
+            X_test[:] = scalers[scaler].transform(X_test)
+            
+            
+    else:
+        print("Not scaling data")
+        scale_fm=1.0
+        scale_rain=1.0
+        scaler=None
     
     logging.info('x_train shape=%s',X_train.shape)
     logging.info('y_train shape=%s',y_train.shape)
@@ -247,6 +288,7 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         'scaler':scaler,
         'train_ind':train_ind,
         'test_ind':test_ind,
+        'X_raw': d['X'][:, indices],
         'X':X,
         'y':y,
         'X_train': X_train,
@@ -271,11 +313,16 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     params.update({
             'features': features,
             'batch_shape': (params["batch_size"],params["timesteps"],features),
-            'pred_input_shape': (hours, features),
+            'pred_input_shape': (None, features),
             'scaler': scaler,
-            'scale_fm': scale_fm
+            'scale_fm': scale_fm,
+            'scale_rain': scale_rain
         })
-    rnn_dat.update({'scaler': scaler, 'scale_fm': scale_fm})
+    rnn_dat.update({
+        'scaler': scaler, 
+        'scale_fm': scale_fm,
+        'scale_rain': scale_rain
+    })
     
     logging.info('create_rnn_data2 done')
     return rnn_dat
@@ -448,8 +495,64 @@ class RNNModel(ABC):
         super().__init__()
 
     @abstractmethod
-    def fit(self, X_train, y_train, weights=None):
+    def _build_model_train(self, return_sequences=False):
         pass
+
+    @abstractmethod
+    def _build_model_predict(self, return_sequences=True):
+        pass
+    
+    def fit(self, X_train, y_train, plot=True, plot_title = '', 
+            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
+        # verbose_fit argument is for printing out update after each epoch, which gets very long
+        # These print statements at the top could be turned off with a verbose argument, but then
+        # there would be a bunch of different verbose params
+        print(f"Training simple RNN with params: {self.params}")
+        X_train, y_train = self.format_train_data(X_train, y_train)
+        print(f"X_train hash: {hash2(X_train)}")
+        print(f"y_train hash: {hash2(y_train)}")
+        if validation_data is not None:
+            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
+            print(f"X_val hash: {hash2(X_val)}")
+            print(f"y_val hash: {hash2(y_val)}")
+        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
+        # Setup callbacks
+        if self.params["reset_states"]:
+            callbacks=callbacks+[ResetStatesCallback()]
+        
+        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
+        if verbose_fit is None:
+            verbose_fit = self.params['verbose_fit']
+        # Evaluate Model once to set nonzero initial state
+        if self.params["batch_size"]>= X_train.shape[0]:
+            self.model_train(X_train)
+        if validation_data is not None:
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                validation_data = (X_val, y_val),
+                *args, **kwargs
+            )
+        else:
+            history = self.model_train.fit(
+                X_train, y_train+self.params['centering'][1], 
+                epochs=self.params['epochs'], 
+                batch_size=self.params['batch_size'],
+                callbacks = callbacks,
+                verbose=verbose_fit,
+                *args, **kwargs
+            )
+        if plot:
+            self.plot_history(history,plot_title)
+        if self.params["verbose_weights"]:
+            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
+
+        # Update Weights for Prediction Model
+        w_fitted = self.model_train.get_weights()
+        self.model_predict.set_weights(w_fitted)
 
     def predict(self, X_test):
         print("Predicting with simple RNN")
@@ -542,12 +645,71 @@ class RNNModel(ABC):
             'training': err_train, 
             'prediction': err_pred
         }
-        return rmse_dict
+        return m, rmse_dict
         
 class ResetStatesCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.model.reset_states()
 
+
+# with open("params.yaml") as file:
+#     phys_params = yaml.safe_load(file)["physics_initializer"]
+
+phys_params = {
+    'DeltaE': [0,-1],                    # bias correction
+    'T1': 0.1,                           # 1/fuel class (10)
+    'fm_raise_vs_rain': 0.2              # fm increase per mm rain 
+}
+
+
+
+def get_initial_weights(model_fit,params):
+    # Given a RNN architecture and hyperparameter dictionary, return array of physics-initiated weights
+    # Inputs:
+    # model_fit: output of create_RNN_2 with no training
+    # params: (dict) dictionary of hyperparameters
+    # rnn_dat: (dict) data dictionary, output of create_rnn_dat
+    # Returns: numpy ndarray of weights that should be a rough solution to the moisture ODE
+    DeltaE = phys_params['DeltaE']
+    T1 = phys_params['T1']
+    fmr = phys_params['fm_raise_vs_rain']
+    centering = params['centering']  # shift activation down
+    scale_fm = params['scale_fm']
+    
+    w0_initial={'Ed':(1.-np.exp(-T1))/2, 
+                'Ew':(1.-np.exp(-T1))/2,
+                'rain':fmr * scale_fm}   # wx - input feature
+                                 #  wh      wb   wd    bd = bias -1
+    
+    w_initial=np.array([np.nan, np.exp(-0.1), DeltaE[0]/scale_fm, # layer 0
+                        1.0, -centering[0] + DeltaE[1]/scale_fm])                 # layer 1
+    if params['verbose_weights']:
+        print('Equilibrium moisture correction bias',DeltaE[0],
+              'in the hidden layer and',DeltaE[1],' in the output layer')
+    
+    w_name = ['wx','wh','bh','wd','bd']
+                        
+    w=model_fit.get_weights()
+    for j in range(w[0].shape[0]):
+            feature = params['features_list'][j]
+            for k in range(w[0].shape[1]):
+                    w[0][j][k]=w0_initial[feature]
+    for i in range(1,len(w)):            # number of the weight
+        for j in range(w[i].shape[0]):   # number of the inputs
+            if w[i].ndim==2:
+                # initialize all entries of the weight matrix to the same number
+                for k in range(w[i].shape[1]):
+                    w[i][j][k]=w_initial[i]/w[i].shape[0]
+            elif w[i].ndim==1:
+                w[i][j]=w_initial[i]
+            else:
+                print('weight',i,'shape',w[i].shape)
+                raise ValueError("Only 1 or 2 dimensions supported")
+        if params['verbose_weights']:
+            print('weight',i,w_name[i],'shape',w[i].shape,'ndim',w[i].ndim,
+                  'initial: sum',np.sum(w[i],axis=0),'\nentries',w[i])
+    
+    return w, w_name
 
 class RNN(RNNModel):
     def __init__(self, params, loss='mean_squared_error'):
@@ -575,10 +737,18 @@ class RNN(RNNModel):
         
         if self.params["verbose_weights"]:
             print(f"Initial Weights Hash: {hash2(model.get_weights())}")
+
+        if self.params['phys_initialize']:
+            assert self.params['scaler'] == 'reproducibility', f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
+            assert self.params['features_list'] == ['Ed', 'Ew', 'rain'], f"Physics initiation can only be done with features ['Ed', 'Ew', 'rain'], but given features {self.params['features_list']}"
+            print("Initializing Model with Physics based weights")
+            w, w_name=get_initial_weights(model, self.params)
+            model.set_weights(w)
+            print('initial weights hash =',hash2(model.get_weights()))
         return model
     def _build_model_predict(self, return_sequences=True):
         
-        inputs = tf.keras.Input(shape=self.params['pred_input_shape'])
+        inputs = tf.keras.Input(shape=(None,self.params['features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
             x = SimpleRNN(self.params['rnn_units'],activation=self.params['activation'][0],
@@ -594,58 +764,6 @@ class RNN(RNNModel):
         model.set_weights(w_fitted)
         
         return model
-
-    def fit(self, X_train, y_train, plot=True, plot_title = '', 
-            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
-        # verbose_fit argument is for printing out update after each epoch, which gets very long
-        # These print statements at the top could be turned off with a verbose argument, but then
-        # there would be a bunch of different verbose params
-        print(f"Training simple RNN with params: {self.params}")
-        X_train, y_train = self.format_train_data(X_train, y_train)
-        print(f"X_train hash: {hash2(X_train)}")
-        print(f"y_train hash: {hash2(y_train)}")
-        if validation_data is not None:
-            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
-            print(f"X_val hash: {hash2(X_val)}")
-            print(f"y_val hash: {hash2(y_val)}")
-        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
-        # Setup callbacks
-        if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback()]
-        
-        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
-        if verbose_fit is None:
-            verbose_fit = self.params['verbose_fit']
-        # Evaluate Model once to set nonzero initial state
-        if self.params["batch_size"]>= X_train.shape[0]:
-            self.model_train(X_train)
-        if validation_data is not None:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                validation_data = (X_val, y_val),
-                *args, **kwargs
-            )
-        else:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                *args, **kwargs
-            )
-        if plot:
-            self.plot_history(history,plot_title)
-        if self.params["verbose_weights"]:
-            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
-
-        # Update Weights for Prediction Model
-        w_fitted = self.model_train.get_weights()
-        self.model_predict.set_weights(w_fitted)
 
 
 class RNN_LSTM(RNNModel):
@@ -678,7 +796,7 @@ class RNN_LSTM(RNNModel):
         return model
     def _build_model_predict(self, return_sequences=True):
         
-        inputs = tf.keras.Input(shape=self.params['pred_input_shape'])
+        inputs = tf.keras.Input(shape=(None,self.params['features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
             x = LSTM(
@@ -697,56 +815,6 @@ class RNN_LSTM(RNNModel):
         
         return model
 
-    def fit(self, X_train, y_train, plot=True, plot_title = '', 
-            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
-        # verbose_fit argument is for printing out update after each epoch, which gets very long
-        # These print statements at the top could be turned off with a verbose argument, but then
-        # there would be a bunch of different verbose params
-        print(f"Training simple RNN with params: {self.params}")
-        X_train, y_train = self.format_train_data(X_train, y_train)
-        print(f"X_train hash: {hash2(X_train)}")
-        print(f"y_train hash: {hash2(y_train)}")
-        if validation_data is not None:
-            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
-            print(f"X_val hash: {hash2(X_val)}")
-            print(f"y_val hash: {hash2(y_val)}")
-        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
-        # Setup callbacks
-        if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback()]
-        
-        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
-        if verbose_fit is None:
-            verbose_fit = self.params['verbose_fit']
-        # Evaluate Model once to set nonzero initial state
-        if self.params["batch_size"]>= X_train.shape[0]:
-            self.model_train(X_train)
-        if validation_data is not None:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                validation_data = (X_val, y_val),
-                *args, **kwargs
-            )
-        else:
-            history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                *args, **kwargs
-            )
-        if plot:
-            self.plot_history(history,plot_title)
-        if self.params["verbose_weights"]:
-            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
 
-        # Update Weights for Prediction Model
-        w_fitted = self.model_train.get_weights()
-        self.model_predict.set_weights(w_fitted)
 
 

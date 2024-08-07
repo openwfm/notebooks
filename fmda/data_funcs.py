@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from utils import  is_numeric_ndarray, hash2
 import json
 import copy
+import subprocess
+import os.path as osp
 
 
 def compare_dicts(dict1, dict2, keys):
@@ -182,11 +184,28 @@ def plot_one(hmin,hmax,dat,name,linestyle,c,label, alpha=1,type='plot'):
             plt.plot(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
         elif type=='scatter':
             plt.scatter(hour,dat[name][hmin:hmax],linestyle=linestyle,c=c,label=label, alpha=alpha)
-            
-def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
+
+# Lookup table for plotting features
+plot_styles = {
+    'Ed': {'color': '#EF847C', 'linestyle': '--', 'alpha':.8, 'label': 'drying EQ'},
+    'Ew': {'color': '#7CCCEF', 'linestyle': '--', 'alpha':.8, 'label': 'wetting EQ'},
+    'rain': {'color': 'b', 'linestyle': '-', 'alpha':.9, 'label': 'Rain'}
+}
+def plot_feature(x, y, feature_name):
+    style = plot_styles.get(feature_name, {})
+    plt.plot(x, y, **style)
+    
+def plot_features(hmin,hmax,dat,feat_list,linestyle,c,label, raw_name,alpha=1):
+    hour = np.array(range(hmin,hmax))
+    for i,feat in enumerate(feat_list):
+        if feat in plot_styles.keys():
+            plot_feature(x=hour, y=dat[raw_name][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
+        
+def plot_data(dat0, raw_name = "X_raw",title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
+    # raw_name: string, dictionary key of dat that has unscaled data for plotting
     # Returns: none
 
     dat = copy.deepcopy(dat0)
@@ -197,18 +216,27 @@ def plot_data(dat0,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=No
         else:
             hmax = min(hmax, dat['hours'])
     
+    
+    
     plt.figure(figsize=(16,4))
-    # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
-    plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
-    plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='#7CCCEF',label='wetting EQ', alpha=.8)
-    plot_one(hmin,hmax,dat,'fm',linestyle='-',c='#468a29',label='FM Observed')
+    plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
-    plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
-    plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
+    
+    if 'features_list' in dat:
+        feat_list = dat['features_list']
+        plot_features(hmin,hmax,dat,feat_list, raw_name=raw_name,linestyle='-',c='k',label='FM Model')
+    
+    # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
+    # plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
+    # plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='#7CCCEF',label='wetting EQ', alpha=.8)
+    # plot_one(hmin,hmax,dat,'fm',linestyle='-',c='#468a29',label='FM Observed')
+    # plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
+    # plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
+    # plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
     # for test
     # plot_one(hmin,hmax,dat,'x',linestyle='-',c='g',label='x input')
     # plot_one(hmin,hmax,dat,'y',linestyle='-',c='k',label='y truth')
-    plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
+    
     # plot_one(hmin,hmax,dat,'z',linestyle='-',c='r',label='z output')
 
     if 'test_ind' in dat.keys():
@@ -349,4 +377,15 @@ def load_and_fix_data(filename):
             if not 'descr' in test_dict[case].keys():
                 test_dict[case]['descr']=f"{case} FMDA dictionary"
     return test_dict
+
+
+def get_file(filename, data_dir='data'):
+    # Check for file locally, retrieve with wget if not
+    if osp.exists(osp.join(data_dir, filename)):
+        print(f"File {osp.join(data_dir, filename)} exists locally")        
+    elif not osp.exists(filename):
+        import subprocess
+        base_url = "https://demo.openwfm.org/web/data/fmda/dicts/"
+        print(f"Retrieving data {osp.join(base_url, filename)}")
+        subprocess.call(f"wget -P {data_dir} {osp.join(base_url, filename)}", shell=True)
 

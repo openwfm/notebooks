@@ -9,15 +9,35 @@ import reproducibility
 # from moisture_rnn import create_rnn_data_2, train_rnn, rnn_predict
 from data_funcs import plot_data,rmse_data
 import matplotlib.pyplot as plt
+import sys
+import yaml
+import os
 
-# run this from test-pkl2train.ipynb
+# with open("params.yaml") as file:
+#     params_repro = yaml.safe_load(file)["rnn_repro"]
+#     features_repro = params_repro['features_list']
+module_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the YAML file
+yaml_path = os.path.join(module_dir, 'params.yaml')
+with open(yaml_path, 'r') as file:
+    params_repro = yaml.safe_load(file)["rnn_repro"]
+    features_repro = params_repro['features_list']
 
-def pkl2train(input_file_paths,output_file_path='train.pkl',
-              forecast_step=1, atm="HRRR",features_list=['Ed', 'Ew', 'rain']):
+feature_types = {
+    # Static features are based on physical location, e.g. location of RAWS site
+    'static': ['elev', 'lon', 'lat'],
+    # Atmospheric weather features come from either RAWS subdict or HRRR
+    'atm': ['temp', 'rh', 'wind', 'solar', 'soilm', 'canopyw', 'groundflux', 'Ed', 'Ew']
+}
+
+
+def pkl2train(input_file_paths,
+              forecast_step=1, atm="HRRR",features_all=['Ed', 'Ew', 'solar', 'wind', 'elev', 'lon', 'lat', 'rain']):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
     #   forecast_step   int - which forecast step to take atmospheric data from (maybe 03, must be >0). 
-    #   atm_dict0        str - name of subdict where atmospheric vars are located
+    #   atm        str - name of subdict where atmospheric vars are located
+    #   features_list   list of strings - names of keys in subdicts to collect into features matrix. Default is everything collected
     # return:
     #   train          dictionary with structure
     #                  {key : {'key' : key,    # copied subdict key
@@ -28,6 +48,11 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
     #                            
     #
 
+    
+    # TODO: fix this
+    if 'rain' in features_all and (not features_all[-1]=='rain'):
+        raise ValueError(f"Make rain in features list last element since (working on fix as of 24-6-24), given features list: {features_list}")
+    
     if forecast_step > 0 and forecast_step < 100 and forecast_step == int(forecast_step):
         fstep='f'+str(forecast_step).zfill(2)
         fprev='f'+str(forecast_step-1).zfill(2)
@@ -45,8 +70,10 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
         for key in d:
             if key == "reproducibility":
                 atm_dict = "RAWS"
+                features_list = features_repro
             else:
                 atm_dict = atm
+                features_list = features_all
             logging.info('Processing subdictionary %s',key)
             if key in train:
                 logging.warning('skipping duplicate key %s',key)
@@ -77,49 +104,84 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
                 # build matrix of features - assuming all the same length, if not column_stack will fail
                 train[key]['time']=time_hrrr
 
-                # Set up static vars, but not for repro case
-                columns=[]
-                # if not key == "reproducibility":
-                #     # location as features constant in time come first
-                #     columns.append(np.full(timesteps,loc['elev']))  
-                #     columns.append(np.full(timesteps,loc['lon']))
-                #     columns.append(np.full(timesteps,loc['lat']))
-
-                # NOTE: for reproducibility scale is based on max fm over whole period. This is not right statistically as it uses data from training period
+                # NOTE: for reproducibility scale is based on max fm over whole period. 
+                # This is not right statistically as it uses data from training period
                 # TODO: update scaling
                 if True and (key == "reproducibility"):
                     scale_fm=max(max(subdict[atm_dict]["Ew"]),max(subdict[atm_dict]["Ed"]),max(subdict[atm_dict]["fm"]))/1
                 else:
                     scale_fm = 1
                 train[key]["scale_fm"] = scale_fm
-                
-                # TODO: test with features just Ed and Ew for reproducibillity. Perhaps pretrain on E's only
-                # for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
-                # List of HRRR features in fstep subdicts, EXCLUDING rain which needs separate calculation
-                hfeats = ['temp', 'rh', 'wind', 'solar', 'soilm', 'canopyw', 'groundflux', 'Ed', 'Ew']
-                # for i in ["Ed","Ew"]:
-                    # # Use forcase steps if data from HRRR, not if from RAWS
-                    # if atm_dict == "HRRR":
-                    #     columns.append(subdict[atm_dict][fstep][i]/scale_fm)   # add variables from HRRR forecast steps 
-                    # elif atm_dict == "RAWS":
-                    #     columns.append(subdict[atm_dict][i]/scale_fm)
+                # Set up static vars, but not for repro case
+                columns=[]
+
                 for feat in features_list:
-                    if feat in hfeats:
-                        # Use forcase steps if data from HRRR, not if from RAWS
+                    # For atmospheric features,
+                    if feat in feature_types['atm']:
                         if atm_dict == "HRRR":
                             vec = subdict[atm_dict][fstep][feat]
-                            if feat in ['Ed', 'Ew']:
-                                vec = vec / scale_fm
-                            columns.append(vec)   # add variables from HRRR forecast steps 
                         elif atm_dict == "RAWS":
-                            if feat in subdict[atm_dict]:
-                                vec = subdict[atm_dict][feat]
-                                if feat in ['Ed', 'Ew']:
-                                    vec = vec / scale_fm                        
-                                columns.append(vec)                    
-                            else:
-                                logging.info('No %s data found in RAWS subdictionary %s', feat, key)
+                            vec = subdict[atm_dict][feat]
+                        if feat in ['Ed', 'Ew']:
+                            vec = vec / scale_fm
+                        columns.append(vec)
+                    
+                    # For static features, repeat to fit number of time observations
+                    elif feat in feature_types['static']:
+                        columns.append(np.full(timesteps,loc[feat]))
 
+
+
+
+
+
+
+                
+                # # List of recognized static features
+                # sfeats = ['elev', 'lon', 'lat']
+                # for feat in features_list:
+                #     if feat in sfeats:
+                #         columns.append(np.full(timesteps,loc[feat]))
+                # # if not key == "reproducibility":
+                # #     # location as features constant in time come first
+                # #     columns.append(np.full(timesteps,loc['elev']))  
+                # #     columns.append(np.full(timesteps,loc['lon']))
+                # #     columns.append(np.full(timesteps,loc['lat']))
+
+                # # NOTE: for reproducibility scale is based on max fm over whole period. This is not right statistically as it uses data from training period
+                # # TODO: update scaling
+                # if True and (key == "reproducibility"):
+                #     scale_fm=max(max(subdict[atm_dict]["Ew"]),max(subdict[atm_dict]["Ed"]),max(subdict[atm_dict]["fm"]))/1
+                # else:
+                #     scale_fm = 1
+                # train[key]["scale_fm"] = scale_fm
+                
+                # # TODO: test with features just Ed and Ew for reproducibillity. Perhaps pretrain on E's only
+                # # for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
+                # # List of HRRR features in fstep subdicts, EXCLUDING rain which needs separate calculation
+                # hfeats = ['temp', 'rh', 'wind', 'solar', 'soilm', 'canopyw', 'groundflux', 'Ed', 'Ew']
+                # # for i in ["Ed","Ew"]:
+                #     # # Use forcase steps if data from HRRR, not if from RAWS
+                #     # if atm_dict == "HRRR":
+                #     #     columns.append(subdict[atm_dict][fstep][i]/scale_fm)   # add variables from HRRR forecast steps 
+                #     # elif atm_dict == "RAWS":
+                #     #     columns.append(subdict[atm_dict][i]/scale_fm)
+                # for feat in features_list:
+                #     if feat in hfeats:
+                #         # Use forcase steps if data from HRRR, not if from RAWS
+                #         if atm_dict == "HRRR":
+                #             vec = subdict[atm_dict][fstep][feat]
+                #             if feat in ['Ed', 'Ew']:
+                #                 vec = vec / scale_fm
+                #             columns.append(vec)   # add variables from HRRR forecast steps 
+                #         elif atm_dict == "RAWS":
+                #             if feat in subdict[atm_dict]:
+                #                 vec = subdict[atm_dict][feat]
+                #                 if feat in ['Ed', 'Ew']:
+                #                     vec = vec / scale_fm                        
+                #                 columns.append(vec)                    
+                #             else:
+                #                 logging.info('No %s data found in RAWS subdictionary %s', feat, key)
                 # compute rain as difference of accumulated precipitation
                 if 'rain' in features_list:
                     if atm_dict == "HRRR":
@@ -131,7 +193,7 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
                             rain = subdict[atm_dict]['rain']
                         else:
                             logging.info('No rain data found in RAWS subdictionary %s', key)
-                    columns.append( rain ) # add rain feature
+                    columns.append( rain ) # add rain feature             
                 train[key]['X'] = np.column_stack(columns)
                 train[key]['features_list'] = features_list
                 
@@ -170,10 +232,10 @@ def pkl2train(input_file_paths,output_file_path='train.pkl',
         
     # output
 
-    if output_file_path is not None:
-        with open(output_file_path, 'wb') as file:
-            logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
-            pickle.dump(train, file)
+    # if output_file_path is not None:
+    #     with open(output_file_path, 'wb') as file:
+    #         logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
+    #         pickle.dump(train, file)
     
     logging.info('pkl2train done')
     
