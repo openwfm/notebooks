@@ -2,10 +2,11 @@ name: fmda_ml
 channels:
   - defaults
 dependencies:
-  - python>=3.12
+  - python = 3.10
   - pandas
   - tensorflow
   - scikit-learn
   - jupyterlab
+
 
 
