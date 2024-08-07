@@ -1,11 +1,11 @@
 name: fmda_ml
 channels:
   - defaults
-  - conda-forge
 dependencies:
+  - python>=3.12
   - pandas
   - tensorflow
   - scikit-learn
   - jupyterlab
-  - synopticpy
+
 
