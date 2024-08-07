@@ -737,6 +737,7 @@ class RNN(RNNModel):
         
         if self.params["verbose_weights"]:
             print(f"Initial Weights Hash: {hash2(model.get_weights())}")
+            # print(model.get_weights())
 
         if self.params['phys_initialize']:
             assert self.params['scaler'] == 'reproducibility', f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
