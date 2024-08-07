@@ -1,9 +1,0 @@
-conda create --name=new python=3.10 -y
-conda activate new
-conda install -c conda-forge xarray cfgrib eccodes gdal -y
-conda install jupyterlab -y
-pip install mesopy
-conda install tensorflow keras pandas scikit-learn -y
-conda install matplotlib -y
-conda install -y boto3
-
