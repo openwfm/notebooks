@@ -515,6 +515,7 @@ class RNNModel(ABC):
             X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
             print(f"X_val hash: {hash2(X_val)}")
             print(f"y_val hash: {hash2(y_val)}")
+        
         print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
         # Setup callbacks
         if self.params["reset_states"]:
@@ -545,6 +546,7 @@ class RNNModel(ABC):
                 verbose=verbose_fit,
                 *args, **kwargs
             )
+        
         if plot:
             self.plot_history(history,plot_title)
         if self.params["verbose_weights"]:
@@ -555,7 +557,7 @@ class RNNModel(ABC):
         self.model_predict.set_weights(w_fitted)
 
     def predict(self, X_test):
-        print("Predicting with simple RNN")
+        print("Predicting")
         X_test = self.format_pred_data(X_test)
         preds = self.model_predict.predict(X_test).flatten()
         return preds
@@ -587,7 +589,7 @@ class RNNModel(ABC):
         else:
             X_val = None
         case_id = dict1['case']
-
+        
         # Fit model
         if X_val is None:
             self.fit(X_train, y_train)
@@ -603,6 +605,7 @@ class RNNModel(ABC):
             y = np.concatenate((y_train, y_val, y_test)).flatten()
         # Predict
         print(f"Predicting Training through Test \n features hash: {hash2(X)} \n response hash: {hash2(y)} ")
+        
         m = self.predict(X).flatten()
         dict1['m']=m
         dict0['m']=m # add to outside env dictionary, should be only place this happens
@@ -789,7 +792,7 @@ class RNN_LSTM(RNNModel):
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
-        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
