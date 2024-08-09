@@ -13,9 +13,7 @@ import sys
 import yaml
 import os
 
-# with open("params.yaml") as file:
-#     params_repro = yaml.safe_load(file)["rnn_repro"]
-#     features_repro = params_repro['features_list']
+
 module_dir = os.path.dirname(os.path.abspath(__file__))
 # Construct the path to the YAML file
 yaml_path = os.path.join(module_dir, 'params.yaml')
