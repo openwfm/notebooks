@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import copy
 
 
 def model_decay(m0,E,partials=0,T1=0.1,tlen=1):  
@@ -168,16 +169,19 @@ Q = np.array([[1e-3, 0.],
 H = np.array([[1., 0.]])  # first component observed
 R = np.array([1e-3]) # data variance
 
-def run_augmented_kf(dat,h2=None,hours=None, H=H, Q=Q, R=R):
+def run_augmented_kf(dat0,h2=None,hours=None, H=H, Q=Q, R=R):
+    dat = copy.deepcopy(dat0)
+    
     if h2 is None:
         h2 = int(dat['h2'])
     if hours is None:
         hours = int(dat['hours'])
     
-    d = dat['fm']
-    Ed = dat['Ed']
-    Ew = dat['Ew']
-    rain = dat['rain']
+    d = dat['y']
+    feats = dat['features_list']
+    Ed = dat['X'][:,feats.index('Ed')]
+    Ew = dat['X'][:,feats.index('Ew')]
+    rain = dat['X'][:,feats.index('rain')]
     
     u = np.zeros((2,hours))
     u[:,0]=[0.1,0.0]       # initialize,background state  
