@@ -26,25 +26,29 @@ def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
     # y [datapoints,outputs]
     # timesteps: split x and y into samples length timesteps, shifted by 1
     # datapoints: number of timesteps to use for training, no more than y.shape[0]
-    print('staircase: shape x = ',x.shape)
-    print('staircase: shape y = ',y.shape)
-    print('staircase: timesteps=',timesteps)
-    print('staircase: datapoints=',datapoints)
-    print('staircase: return_sequences=',return_sequences)
+    if verbose:
+        print('staircase: shape x = ',x.shape)
+        print('staircase: shape y = ',y.shape)
+        print('staircase: timesteps=',timesteps)
+        print('staircase: datapoints=',datapoints)
+        print('staircase: return_sequences=',return_sequences)
     outputs = y.shape[1]
     features = x.shape[1]
     samples = datapoints-timesteps+1
-    print('staircase: samples=',samples,'timesteps=',timesteps,'features=',features)
+    if verbose:
+        print('staircase: samples=',samples,'timesteps=',timesteps,'features=',features)
     x_train = np.empty([samples, timesteps, features])
     if return_sequences:
-        print('returning all timesteps in a sample')
+        if verbose:
+            print('returning all timesteps in a sample')
         y_train = np.empty([samples, timesteps, outputs])  # all
         for i in range(samples):
             for k in range(timesteps):
                 x_train[i,k,:] = x[i+k,:]
                 y_train[i,k,:] = y[i+k,:]
     else:
-        print('returning only the last timestep in a sample')
+        if verbose:
+            print('returning only the last timestep in a sample')
         y_train = np.empty([samples, outputs])
         for i in range(samples):
             for k in range(timesteps):
@@ -65,16 +69,18 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
    
     if batch_size is None:
         raise ValueError('staircase_2 requires batch_size')
-    print('staircase_2: shape x = ',x.shape)
-    print('staircase_2: shape y = ',y.shape)
-    print('staircase_2: timesteps=',timesteps)
-    print('staircase_2: batch_size=',batch_size)
-    print('staircase_2: return_sequences=',return_sequences)
+    if verbose:
+        print('staircase_2: shape x = ',x.shape)
+        print('staircase_2: shape y = ',y.shape)
+        print('staircase_2: timesteps=',timesteps)
+        print('staircase_2: batch_size=',batch_size)
+        print('staircase_2: return_sequences=',return_sequences)
     
     nx,features= x.shape
     ny,outputs = y.shape
     datapoints = min(nx,ny,trainsteps)   
-    print('staircase_2: datapoints=',datapoints)
+    if verbose:
+        print('staircase_2: datapoints=',datapoints)
     
     # sequence j in a given batch is assumed to be the continuation of sequence j in the previous batch
     # https://www.tensorflow.org/guide/keras/working_with_rnns Cross-batch statefulness
@@ -122,8 +128,9 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
     max_batches = datapoints // timesteps
     max_sequences = max_batches * batch_size
 
-    print('staircase_2: max_batches=',max_batches)
-    print('staircase_2: max_sequences=',max_sequences)
+    if verbose:
+        print('staircase_2: max_batches=',max_batches)
+        print('staircase_2: max_sequences=',max_sequences)
                                       
     x_train = np.zeros((max_sequences, timesteps, features)) 
     if return_sequences:
@@ -147,21 +154,23 @@ def staircase_2(x,y,timesteps,batch_size=None,trainsteps=np.inf,return_sequences
             else:
                  y_train[k,:] = y[next-1,:]
             k += 1   
-    
-    print('staircase_2: shape x_train = ',x_train.shape)
-    print('staircase_2: shape y_train = ',y_train.shape)
-    print('staircase_2: sequences generated',k)
-    print('staircase_2: batch_size=',batch_size)
+    if verbose:
+        print('staircase_2: shape x_train = ',x_train.shape)
+        print('staircase_2: shape y_train = ',y_train.shape)
+        print('staircase_2: sequences generated',k)
+        print('staircase_2: batch_size=',batch_size)
     k = (k // batch_size) * batch_size
-    print('staircase_2: removing partial and empty batches at the end, keeping',k)
+    if verbose:
+        print('staircase_2: removing partial and empty batches at the end, keeping',k)
     x_train = x_train[:k,:,:]
     if return_sequences:
          y_train = y_train[:k,:,:]
     else:
          y_train = y_train[:k,:]
-            
-    print('staircase_2: shape x_train = ',x_train.shape)
-    print('staircase_2: shape y_train = ',y_train.shape)
+
+    if verbose:
+        print('staircase_2: shape x_train = ',x_train.shape)
+        print('staircase_2: shape y_train = ',y_train.shape)
 
     return x_train, y_train
 
