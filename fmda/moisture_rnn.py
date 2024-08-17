@@ -480,9 +480,9 @@ class RNNModel(ABC):
         
         # Fit model
         if X_val is None:
-            self.fit(X_train, y_train)
+            self.fit(X_train, y_train, plot_title=case_id)
         else:
-            self.fit(X_train, y_train, validation_data = (X_val, y_val))
+            self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id)
         # Generate Predictions, 
         # run through training to get hidden state set proporly for forecast period
         if X_val is None:
