@@ -218,7 +218,7 @@ def plot_data(dat0, raw_name = "X_raw",title=None,title2=None,hmin=0,hmax=None,x
     
     
     
-    plt.figure(figsize=(16,4))
+    # plt.figure(figsize=(16,4))
     plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
     
