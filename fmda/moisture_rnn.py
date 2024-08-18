@@ -6,7 +6,7 @@ import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import sys
-from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.callbacks import Callback, EarlyStopping
 from sklearn.metrics import mean_squared_error
 import logging
 from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
@@ -408,6 +408,8 @@ class RNNModel(ABC):
         # Setup callbacks
         if self.params["reset_states"]:
             callbacks=callbacks+[ResetStatesCallback()]
+        # if validation_data is not None:
+        #     callbacks=callbacks+[early_stopping]
         
         # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
         if verbose_fit is None:
@@ -537,11 +539,38 @@ class RNNModel(ABC):
             'prediction': err_pred
         }
         return m, rmse_dict
-        
+
+## Callbacks
 class ResetStatesCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.model.reset_states()
+        
+# early_stopping = EarlyStopping(
+#     monitor='val_loss',
+#     patience=10,
+#     verbose=1,
+#     mode='min',
+#     restore_best_weights=True
+# )
 
+## Learning Schedules
+lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
+    initial_learning_rate=0.001,
+    decay_steps=1000,
+    alpha=0.0,
+    name='CosineDecay',
+    # warmup_target=None,
+    # warmup_steps=100
+)
+
+
+early_stopping = EarlyStopping(
+    monitor='val_loss',  # Metric to monitor, e.g., 'val_loss', 'val_accuracy'
+    patience=5,          # Number of epochs with no improvement after which training will be stopped
+    verbose=1,           # Print information about early stopping
+    mode='min',          # 'min' means training will stop when the quantity monitored has stopped decreasing
+    restore_best_weights=True  # Restore model weights from the epoch with the best value of the monitored quantity
+)
 
 # with open("params.yaml") as file:
 #     phys_params = yaml.safe_load(file)["physics_initializer"]
@@ -624,6 +653,7 @@ class RNN(RNNModel):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        # optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
