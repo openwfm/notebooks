@@ -6,6 +6,14 @@ from datetime import datetime
 import logging
 import sys
 import inspect
+import yaml
+
+def read_yml(yaml_path, subkey=None):
+    with open(yaml_path, 'r') as file:
+        d = yaml.safe_load(file)
+        if subkey is not None:
+            d = d[subkey]
+    return d
 
 def logging_setup():
     logging.basicConfig(

@@ -21,6 +21,9 @@ import copy
 import yaml
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
+#*************************************************************************************
+# Data Formatting Functions
+
 def staircase(x,y,timesteps,datapoints,return_sequences=False, verbose = False):
     # x [datapoints,features]    all inputs
     # y [datapoints,outputs]
@@ -201,28 +204,29 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     # val_frac: (float) fraction of data to use for validation data (starting from end of train)
     # Returns: (dict) formatted data used in RNN 
     logging.info('create_rnn_data start')
-    # Copy Dictionary 
+    # Copy Dictionary to avoid changing the input to this function
     d=copy.deepcopy(dict1)
     scale = params['scale']
     scaler= params['scaler']
-    # Features list given by params dictionayr
+    # Features list given by params dict to be used in training
     features_list = params["features_list"]
     # All available features list, corresponds to shape of X
-    features_list_all = d["features_list"]
+    features_all = d["features_list"]
     # Indices to subset all features with based on params features
     indices = []
     for item in features_list:
-        if item in features_list_all:
-            indices.append(features_list_all.index(item))
+        if item in features_all:
+            indices.append(features_all.index(item))
         else:
             print(f"Warning: feature name '{item}' not found in list of all features from input data")
         
     # Extract desired features based on params, combine into matrix
     # Extract response vector 
-    fm = d['y']
-    y = np.reshape(fm,[fm.shape[0],1])
+    y = d['y']
+    y = np.reshape(y,(-1,1))
     # Extract Features matrix, subset to desired features
-    X = d['X'].copy()
+    X_raw = d['X'][:, indices].copy() # saw untransformed features matrix 
+    X = d['X']
     X = X[:, indices]
 
     # Check total observed hours
@@ -293,11 +297,11 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
         'case':d['case'],
         'hours':hours,
         'features_list':features_list,
-        'features': len(features_list),
+        'n_features': len(features_list),
         'scaler':scaler,
         'train_ind':train_ind,
         'test_ind':test_ind,
-        'X_raw': d['X'][:, indices],
+        'X_raw': X_raw,
         'X':X,
         'y':y,
         'X_train': X_train,
@@ -319,14 +323,14 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     logging.info('batch_size=%s',batch_size)
     logging.info('timesteps=%s',timesteps)
     features = len(features_list)
-    params.update({
-            'features': features,
-            'batch_shape': (params["batch_size"],params["timesteps"],features),
-            'pred_input_shape': (None, features),
-            'scaler': scaler,
-            'scale_fm': scale_fm,
-            'scale_rain': scale_rain
-        })
+    # params.update({
+    #         'n_features': features,
+    #         'batch_shape': (params["batch_size"],params["timesteps"],features),
+    #         'pred_input_shape': (None, features),
+    #         'scaler': scaler,
+    #         'scale_fm': scale_fm,
+    #         'scale_rain': scale_rain
+    #     })
     rnn_dat.update({
         'scaler': scaler, 
         'scale_fm': scale_fm,
@@ -336,7 +340,102 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
     logging.info('create_rnn_data2 done')
     return rnn_dat
 
+#***********************************************************************************************
+### RNN Class Functionality
 
+# Custom class for parameters dictionary. Inherits from dict, but adds checks and safeguards
+class RNNParams(dict):
+    def __init__(self, input_dict=None):
+        super().__init__(input_dict)
+        # Automatically run checks on initialization
+        self.run_checks()           
+        # Automatically calculate shapes on initialization
+        self.calc_param_shapes()        
+    def run_checks(self, verbose=True):
+        print("Checking params...")
+        # Keys must exist and be integers
+        int_keys = [
+            'batch_size', 'timesteps', 'rnn_layers', 
+            'rnn_units', 'dense_layers', 'dense_units', 'epochs'
+        ]
+        
+        for key in int_keys:
+            assert key in self, f"Missing required key: {key}"
+            assert isinstance(self[key], int), f"Key '{key}' must be an integer"      
+
+        # Keys must exist and be lists
+        list_keys = ['activation', 'features_list', 'dropout']
+        for key in list_keys:
+            assert key in self, f"Missing required key: {key}"
+            assert isinstance(self[key], list), f"Key '{key}' must be a list" 
+
+        # Keys must exist and be floats
+        float_keys = ['learning_rate', 'train_frac', 'val_frac']
+        for key in float_keys:
+            assert key in self, f"Missing required key: {key}"
+            assert isinstance(self[key], float), f"Key '{key}' must be a float"  
+
+        print("Input dictionary passed all checks.")
+    def calc_param_shapes(self, verbose=True):
+        if verbose:
+            print("Calculating shape params based on features list, timesteps, and batch size")
+            print(f"Input Feature List: {self['features_list']}")
+            print(f"Input Timesteps: {self['timesteps']}")
+            print(f"Input Batch Size: {self['batch_size']}")
+            
+        n_features = len(self['features_list'])
+        batch_shape = (self["batch_size"], self["timesteps"], n_features)
+        if verbose:
+            print("Calculated params:")
+            print(f"Number of features: {n_features}")
+            print(f"Batch Shape: {batch_shape}")
+            
+        # Update the dictionary
+        super().update({
+            'n_features': n_features,
+            'batch_shape': batch_shape
+        })
+        if verbose:
+            print(self)   
+            
+    def update(self, *args, verbose=True, **kwargs):
+        # Prevent updating n_features and batch_shape
+        restricted_keys = {'n_features', 'batch_shape'}
+        keys_to_check = {'features_list', 'timesteps', 'batch_size'}
+        
+        # Check for restricted keys in args
+        if args:
+            if isinstance(args[0], dict):
+                if restricted_keys & args[0].keys():
+                    raise KeyError(f"Cannot directly update keys: {restricted_keys & args[0].keys()}, \n Instead update one of: {keys_to_check}")
+            elif isinstance(args[0], (tuple, list)) and all(isinstance(i, tuple) and len(i) == 2 for i in args[0]):
+                if restricted_keys & {k for k, v in args[0]}:
+                    raise KeyError(f"Cannot directly update keys: {restricted_keys & {k for k, v in args[0]}}, \n Instead update one of: {keys_to_check}")
+
+        # Check for restricted keys in kwargs
+        if restricted_keys & kwargs.keys():
+            raise KeyError(f"Cannot update restricted keys: {restricted_keys & kwargs.keys()}")
+
+        
+        # Track if specific keys are updated
+        keys_updated = set()
+
+        # Update using the standard dict update method
+        if args:
+            if isinstance(args[0], dict):
+                keys_updated.update(args[0].keys() & keys_to_check)
+            elif isinstance(args[0], (tuple, list)) and all(isinstance(i, tuple) and len(i) == 2 for i in args[0]):
+                keys_updated.update(k for k, v in args[0] if k in keys_to_check)
+        
+        if kwargs:
+            keys_updated.update(kwargs.keys() & keys_to_check)
+
+        # Call the parent update method
+        super().update(*args, **kwargs)
+
+        # Recalculate shapes if necessary
+        if keys_updated:
+            self.calc_param_shapes(verbose=verbose)
     
 repro_hashes = {
     'phys_initialize': {
@@ -378,6 +477,7 @@ repro_hashes = {
 class RNNModel(ABC):
     def __init__(self, params: dict):
         self.params = params
+        self.params['n_features'] = len(self.params['features_list'])
         if type(self) is RNNModel:
             raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
         super().__init__()
@@ -456,7 +556,7 @@ class RNNModel(ABC):
         X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
         return X, y
     def format_pred_data(self, X):
-        return np.reshape(X,(1, X.shape[0], self.params['features']))
+        return np.reshape(X,(1, X.shape[0], self.params['n_features']))
 
     def plot_history(self, history, plot_title):
         plt.figure()
@@ -473,6 +573,7 @@ class RNNModel(ABC):
         # Make copy to prevent changing in place
         dict1 = copy.deepcopy(dict0)
         # Extract Fields
+        scale_fm = dict1['scale_fm']
         X_train, y_train, X_test, y_test = dict1['X_train'].copy(), dict1['y_train'].copy(), dict1["X_test"].copy(), dict1['y_test'].copy()
         if 'X_val' in dict1:
             X_val, y_val = dict1['X_val'].copy(), dict1['y_val'].copy()
@@ -502,10 +603,10 @@ class RNNModel(ABC):
         if self.params['scale']:
             print(f"Rescaling data using {self.params['scaler']}")
             if self.params['scaler'] == "reproducibility":
-                m  *= self.params['scale_fm']
-                y  *= self.params['scale_fm']
-                y_train *= self.params['scale_fm']
-                y_test *= self.params['scale_fm']
+                m  *= scale_fm
+                y  *= scale_fm
+                y_train *= scale_fm
+                y_test *= scale_fm
         # Check Reproducibility, TODO: old dict calls it hidden_units not rnn_units, so this doens't check that
         if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale', 'activation', 'learning_rate']):
             print("Checking Reproducibility")
@@ -523,7 +624,6 @@ class RNNModel(ABC):
 
         # print(dict1.keys())
         # Plot final fit and data
-        # TODO: make plot_data specific to this context
         dict1['y'] = y
         plot_data(dict1, title="RNN", title2=dict1['case'])
         
@@ -539,6 +639,8 @@ class RNNModel(ABC):
             'prediction': err_pred
         }
         return m, rmse_dict
+
+
 
 ## Callbacks
 
@@ -582,7 +684,7 @@ phys_params = {
 
 
 
-def get_initial_weights(model_fit,params):
+def get_initial_weights(model_fit,params,scale_fm):
     # Given a RNN architecture and hyperparameter dictionary, return array of physics-initiated weights
     # Inputs:
     # model_fit: output of create_RNN_2 with no training
@@ -593,7 +695,6 @@ def get_initial_weights(model_fit,params):
     T1 = phys_params['T1']
     fmr = phys_params['fm_raise_vs_rain']
     centering = params['centering']  # shift activation down
-    scale_fm = params['scale_fm']
     
     w0_initial={'Ed':(1.-np.exp(-T1))/2, 
                 'Ew':(1.-np.exp(-T1))/2,
@@ -666,13 +767,13 @@ class RNN(RNNModel):
             assert self.params['scaler'] == 'reproducibility', f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
             assert self.params['features_list'] == ['Ed', 'Ew', 'rain'], f"Physics initiation can only be done with features ['Ed', 'Ew', 'rain'], but given features {self.params['features_list']}"
             print("Initializing Model with Physics based weights")
-            w, w_name=get_initial_weights(model, self.params)
+            w, w_name=get_initial_weights(model, self.params, scale_fm = scale_fm)
             model.set_weights(w)
             print('initial weights hash =',hash2(model.get_weights()))
         return model
     def _build_model_predict(self, return_sequences=True):
         
-        inputs = tf.keras.Input(shape=(None,self.params['features']))
+        inputs = tf.keras.Input(shape=(None,self.params['n_features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
             x = SimpleRNN(self.params['rnn_units'],activation=self.params['activation'][0],
@@ -723,7 +824,7 @@ class RNN_LSTM(RNNModel):
         return model
     def _build_model_predict(self, return_sequences=True):
         
-        inputs = tf.keras.Input(shape=(None,self.params['features']))
+        inputs = tf.keras.Input(shape=(None,self.params['n_features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
             x = LSTM(
