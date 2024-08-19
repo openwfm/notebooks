@@ -8,9 +8,8 @@ Clone repository:
 	git clone https://github.com/openwfm/notebooks
 
 Build and activate environment
-
-	conda create -n fmda_ml pandas tensorflow scikit-learn jupyterlab
-	pip install synopticpy
+	cd ./fmda/install
+	conda env create -f fmda_ml.yml
 	conda activate fmda_ml
 python
 ## Notebooks
