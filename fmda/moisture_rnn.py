@@ -541,17 +541,16 @@ class RNNModel(ABC):
         return m, rmse_dict
 
 ## Callbacks
+
 class ResetStatesCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
-        self.model.reset_states()
-        
-# early_stopping = EarlyStopping(
-#     monitor='val_loss',
-#     patience=10,
-#     verbose=1,
-#     mode='min',
-#     restore_best_weights=True
-# )
+        # Iterate over each layer in the model
+        for layer in self.model.layers:
+            # Check if the layer has a reset_states method
+            if hasattr(layer, 'reset_states'):
+                layer.reset_states()
+
+    
 
 ## Learning Schedules
 lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
