@@ -7,14 +7,14 @@ rnn:
   optimizer: adam
   rnn_layers: 1
   rnn_units: 20
-  dense_layers: 1
-  dense_units: 1
+  dense_layers: 1 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
+  dense_units: 5 # number of units for hidden dense layers
   activation: ['linear', 'linear']
   centering: [0.0,0.0]
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-  epochs: 150
+  epochs: 200
   learning_rate: 0.001
   clipvalue: 10.0 # gradient clipping param, gradient can't exceed this value
   phys_initialize: False # physics initialization
@@ -71,7 +71,7 @@ rnn_repro:
   epochs: 200
   rnn_layers: 1
   rnn_units: 20
-  dense_layers: 1
+  dense_layers: 0 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
   dense_units: 1
   activation: ['linear', 'linear']
   centering: [0.0,0.0]

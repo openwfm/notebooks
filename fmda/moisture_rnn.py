@@ -383,7 +383,7 @@ class RNNModel(ABC):
         super().__init__()
 
     @abstractmethod
-    def _build_model_train(self, return_sequences=False):
+    def _build_model_train(self):
         pass
 
     @abstractmethod
@@ -636,10 +636,11 @@ class RNN(RNNModel):
         self.model_train = self._build_model_train()
         self.model_predict = self._build_model_predict()
 
-    def _build_model_train(self, return_sequences=False):
+    def _build_model_train(self):
         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
         x = inputs
         for i in range(self.params['rnn_layers']):
+            return_sequences = True if i < self.params['rnn_layers'] - 1 else False
             x = SimpleRNN(
                 units=self.params['rnn_units'],
                 activation=self.params['activation'][0],
@@ -650,6 +651,8 @@ class RNN(RNNModel):
             x = Dropout(self.params["dropout"][1])(x)            
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        # Add final output layer, must be 1 dense cell with linear activation if continuous scalar output
+        x = Dense(units=1, activation='linear')(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
         # optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule)
@@ -676,6 +679,8 @@ class RNN(RNNModel):
                   stateful=False,return_sequences=return_sequences)(x)
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        # Add final output layer, must be 1 dense cell with linear activation if continuous scalar output
+        x = Dense(units=1, activation='linear')(x)        
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
         model.compile(loss='mean_squared_error', optimizer=optimizer)  
@@ -693,10 +698,11 @@ class RNN_LSTM(RNNModel):
         self.model_train = self._build_model_train()
         self.model_predict = self._build_model_predict()
 
-    def _build_model_train(self, return_sequences=False):
+    def _build_model_train(self):
         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
         x = inputs
         for i in range(self.params['rnn_layers']):
+            return_sequences = True if i < self.params['rnn_layers'] - 1 else False
             x = LSTM(
                 units=self.params['rnn_units'],
                 activation=self.params['activation'][0],
