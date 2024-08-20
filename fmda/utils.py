@@ -9,6 +9,10 @@ import inspect
 import yaml
 import hashlib
 
+# Function to check if lists are nested, or all elements in given list are in target list
+def all_items_exist(source_list, target_list):
+    return all(item in target_list for item in source_list)
+
 def read_yml(yaml_path, subkey=None):
     with open(yaml_path, 'r') as file:
         d = yaml.safe_load(file)
