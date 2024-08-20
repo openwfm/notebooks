@@ -746,6 +746,7 @@ class RNN(RNNModel):
                 units=self.params['rnn_units'],
                 activation=self.params['activation'][0],
                 dropout=self.params["dropout"][0],
+                recurrent_dropout = self.params["recurrent_dropout"],
                 stateful=self.params['stateful'],
                 return_sequences=return_sequences)(x)
         if self.params["dropout"][1] > 0:
@@ -808,6 +809,7 @@ class RNN_LSTM(RNNModel):
                 units=self.params['rnn_units'],
                 activation=self.params['activation'][0],
                 dropout=self.params["dropout"][0],
+                recurrent_dropout = self.params["recurrent_dropout"],
                 recurrent_activation=self.params["recurrent_activation"],
                 stateful=self.params['stateful'],
                 return_sequences=return_sequences)(x)
