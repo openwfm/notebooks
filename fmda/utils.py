@@ -7,6 +7,7 @@ import logging
 import sys
 import inspect
 import yaml
+import hashlib
 
 def read_yml(yaml_path, subkey=None):
     with open(yaml_path, 'r') as file:
@@ -45,6 +46,27 @@ def vprint(*args):
         print(args[-1])
         
         
+## Function for Hashing numpy arrays 
+def ndarray_hash(arr: np.ndarray) -> str:
+    # Convert the array to a bytes string
+    arr_bytes = arr.tobytes()
+    # Use hashlib to generate a unique hash
+    hash_obj = hashlib.md5(arr_bytes)
+    return hash_obj.hexdigest()
+    
+## Function for Hashing tensorflow models
+def weights_hash(model):
+    # Extract all weights and biases
+    weights = model.get_weights()
+    
+    # Convert each weight array to a string
+    weight_str = ''.join([np.array2string(w, separator=',') for w in weights])
+    
+    # Generate a SHA-256 hash of the combined string
+    weight_hash = hashlib.md5(weight_str.encode('utf-8')).hexdigest()
+    
+    return weight_hash
+
 ## Generic function to hash dictionary of various types
 
 @singledispatch
