@@ -8,6 +8,7 @@ import sys
 import inspect
 import yaml
 import hashlib
+import pickle
 
 # Function to check if lists are nested, or all elements in given list are in target list
 def all_items_exist(source_list, target_list):
@@ -18,6 +19,12 @@ def read_yml(yaml_path, subkey=None):
         d = yaml.safe_load(file)
         if subkey is not None:
             d = d[subkey]
+    return d
+
+def read_pkl(file_path):
+    with open(file_path, 'rb') as file:
+        print(f"loading file {file_path}")
+        d = pickle.load(file)
     return d
 
 def logging_setup():
