@@ -9,6 +9,20 @@ import inspect
 import yaml
 import hashlib
 import pickle
+import os.path as osp
+
+# Utility to retrieve files from URL
+def retrieve_url(url, dest_path, force_download=False):
+    if not osp.exists(dest_path) or force_download:
+        target_extension = osp.splitext(dest_path)[1]
+        url_extension = osp.splitext(urlparse(url).path)[1]
+        if target_extension != url_extension:
+            print("Warning: file extension from url does not match destination file extension")
+        subprocess.call(f"wget -O {dest_path}  {url}", shell=True)
+        assert osp.exists(dest_path)
+        print(f"Successfully downloaded {url} to {dest_path}")
+    else:
+        print(f"Target data already exists at {dest_path}")
 
 # Function to check if lists are nested, or all elements in given list are in target list
 def all_items_exist(source_list, target_list):
