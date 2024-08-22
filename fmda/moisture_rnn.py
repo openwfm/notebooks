@@ -7,19 +7,19 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import sys
 from tensorflow.keras.callbacks import Callback, EarlyStopping
-from sklearn.metrics import mean_squared_error
+# from sklearn.metrics import mean_squared_error
 import logging
 from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
 # Local modules
 import reproducibility
-from utils import print_dict_summary
-from data_funcs import load_and_fix_data, rmse
+# from utils import print_dict_summary
 from abc import ABC, abstractmethod
-from utils import hash2
+from utils import hash2, all_items_exist, hash_ndarray, hash_weights
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
-import yaml
+# import yaml
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import warnings
 
 #*************************************************************************************
 # Data Formatting Functions
@@ -436,47 +436,200 @@ class RNNParams(dict):
         # Recalculate shapes if necessary
         if keys_updated:
             self.calc_param_shapes(verbose=verbose)
-    
-repro_hashes = {
-    'phys_initialize': {
-        'fitted_weight_hash' : 4.2030588308041834e+19,
-        'predictions_hash' :3.59976005554199219
-    },
-    'rand_initialize': {
-        'fitted_weight_hash' : 4.4965532557938975e+19,
-        'predictions_hash' : 3.71594738960266113
-    },
-    'params':{'id':0,
-        'purpose':'reproducibility',
-        'batch_size':32,
-        'training':5,
-        'cases':['case11'],
-        'scale':1,        # every feature in [0, scale]
-        'rain_do':True,
-        'verbose':False,
-        'timesteps':5,
-        'activation':['linear','linear'],
-        'hidden_units':20,  
-        'dense_units':1,    # do not change
-        'dense_layers':1,   # do not change
-        'centering':[0.0,0.0],  # should be activation at 0
-        'DeltaE':[0,-1],    # bias correction
-        'synthetic':False,  # run also synthetic cases
-        'T1': 0.1,          # 1/fuel class (10)
-        'fm_raise_vs_rain': 0.2,         # fm increase per mm rain 
-        'train_frac':0.5,  # time fraction to spend on training
-        'epochs':200,
-        'verbose_fit':0,
-        'verbose_weights':False,
-        'initialize': True,
-        'learning_rate': 0.001 # default learning rate
-        }
-}
 
+
+## Class for handling input data
+class RNNData(dict):
+    required_keys = {"loc", "time", "X", "y", "features_list"}  
+    def __init__(self, input_dict, scaler=None, features_list=None):
+        # Copy to avoid 
+        input_data = input_dict.copy()
+        super().__init__(input_data)
+        self.scaler = None
+        if scaler is not None:
+            self.set_scaler(scaler)
+        # Rename and define other stuff
+        self['hours'] = len(self['y'])
+        self['all_features_list'] = self.pop('features_list')
+        if features_list is None:
+            print("Using all input features.")
+            self.features_list = self.all_features_list
+        else:
+            self.features_list = features_list
+        self.run_checks()
+        self.__dict__.update(self)
+    def run_checks(self, verbose=True):
+        missing_keys = self.required_keys - self.keys()
+        if missing_keys:
+            raise KeyError(f"Missing required keys: {missing_keys}")
+        # Check y 1-d
+        y_shape = np.shape(self.y)
+        if not (len(y_shape) == 1 or (len(y_shape) == 2 and y_shape[1] == 1)):
+            raise ValueError(f"'y' must be one-dimensional, with shape (N,) or (N, 1). Current shape is {y_shape}.")
+        
+        # Check if 'hours' is provided and matches len(y)
+        if 'hours' in self:
+            if self.hours != len(self.y):
+                raise ValueError(f"Provided 'hours' value {self.hours} does not match the length of 'y', which is {len(self.y)}.")
+        # Check desired subset of features is in all input features
+        if not all_items_exist(self.features_list, self.all_features_list):
+            raise ValueError(f"Provided 'features_list' {self.features_list} has elements not in input features.")
+    def set_scaler(self, scaler):
+        recognized_scalers = ['minmax', 'standard']
+        if scaler in recognized_scalers:
+            self.scaler = scalers[scaler]
+        else:
+            raise ValueError(f"Unrecognized scaler '{scaler}'. Recognized scalers are: {recognized_scalers}.")
+    def train_test_split(self, train_frac, val_frac=0.0, subset_features=True, features_list=None, split_time=True, split_space=False, verbose=True):
+        # Extract data to desired features
+        X = self.X.copy()
+        y = self.y.copy()
+        if subset_features:
+            if verbose and self.features_list != self.all_features_list:
+                print(f"Subsetting input data to features_list: {self.features_list}")
+            # Indices to subset all features with based on params features
+            indices = []
+            for item in self.features_list:
+                if item in self.all_features_list:
+                    indices.append(self.all_features_list.index(item))
+                else:
+                    print(f"Warning: feature name '{item}' not found in list of all features from input data")
+            X = X[:, indices]
+        # Setup train/test in time
+        train_ind = int(np.floor(self.hours * train_frac)); self.train_ind = train_ind
+        test_ind= int(train_ind + round(self.hours * val_frac)); self.test_ind = test_ind
+
+        # Check for any potential issues with indices
+        if test_ind > self.hours:
+            print(f"Setting test index to {self.hours}")
+            test_ind = self.hours
+        if train_ind >= test_ind:
+            raise ValueError("Train index must be less than test index.")        
+        
+        # Training data from 0 to train_ind
+        self.X_train = X[:train_ind]
+        self.y_train = y[:train_ind].reshape(-1,1) # assumes y 1-d, change this if vector output
+        # Validation data from train_ind to test_ind
+        if val_frac >0:
+            self.X_val = X[train_ind:test_ind]
+            self.y_val = y[train_ind:test_ind].reshape(-1,1) # assumes y 1-d, change this if vector output
+        # Test data from test_ind to end
+        self.X_test = X[test_ind:]
+        self.y_test = y[test_ind:].reshape(-1,1) # assumes y 1-d, change this if vector output
+
+        # Print statements if verbose
+        if verbose:
+            print(f"Train index: 0 to {train_ind}")
+            print(f"Validation index: {train_ind} to {test_ind}")
+            print(f"Test index: {test_ind} to {self.hours}")
+            print(f"X_train shape: {self.X_train.shape}, y_train shape: {self.y_train.shape}")
+            print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
+            print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")
+    def scale_data(self, verbose=True):
+        if self.scaler is None:
+            raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
+        if not hasattr(self, "X_train"):
+            raise AttributeError("No X_train within object. Run train_test_split first. This is to avoid fitting the scaler with prediction data.")
+        if verbose:
+            print(f"Scaling data with scaler {self.scaler}, fitting on X_train")
+        # Fit the scaler on the training data
+        self.scaler.fit(self.X_train)      
+        # Transform the data using the fitted scaler
+        self.X_train = self.scaler.transform(self.X_train)
+        if hasattr(self, 'X_val'):
+            self.X_val = self.scaler.transform(self.X_val)
+        self.X_test = self.scaler.transform(self.X_test)
+    def inverse_scale(self, return_X = 'all_hours', save_changes=False, verbose=True):
+        if verbose:
+            print("Inverse scaling data...")
+        X_train = self.scaler.inverse_transform(self.X_train)
+        X_val = self.scaler.inverse_transform(self.X_val)
+        X_test = self.scaler.inverse_transform(self.X_test)
+
+        if save_changes:
+            print("Inverse transformed data saved")
+            self.X_train = X_train
+            self.X_val = X_val
+            self.X_test = X_test
+        else:
+            if verbose:
+                print("Inverse scaled, but internal data not changed.")
+        if verbose:
+            print(f"Attempting to return {return_X}")
+        if return_X == "all_hours":
+            return np.concatenate((X_train, X_val, X_test), axis=0)
+        else:
+            print(f"Unrecognized or unimplemented return value {return_X}")
+    def print_hashes(self, attrs_to_check = ['X', 'y', 'X_train', 'y_train', 'X_val', 'y_val', 'X_test', 'y_test']):
+        for attr in attrs_to_check:
+            if hasattr(self, attr):
+                value = getattr(self, attr)
+                print(f"Hash of {attr}: {hash_ndarray(value)}")        
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(f"'rnn_data' object has no attribute '{key}'")
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)  # Update the dictionary
+        if key in self.required_keys:
+            super().__setattr__(key, value)  # Ensure the attribute is updated as well
+
+    def __setattr__(self, key, value):
+        self[key] = value    
+
+
+# Function to check reproduciblity hashes, environment info, and model parameters
+def check_reproducibility(dict0, params, m_hash, w_hash):
+    if not hasattr(dict0, "repro_info"):
+        warnings.warn("The provided data dictionary does not have the required 'repro_info' attribute. Not running reproduciblity checks.")
+        return 
+    
+    repro_info = dict0.repro_info
+    # Check Hashes
+    if params['phys_initialize']:
+        hashes = repro_info['phys_initialize']
+        warnings.warn("Physics Initialization not implemented yet. Not running reproduciblity checks.")
+    else:
+        hashes = repro_info['rand_initialize']
+        print(f"Fitted weights hash: {w_hash} \n Reproducibility weights hash: {hashes['fitted_weights_hash']}")
+        print(f"Model predictions hash: {m_hash} \n Reproducibility preds hash: {hashes['preds_hash']}")
+        if (w_hash != hashes['fitted_weights_hash']) or (m_hash != hashes['preds_hash']):
+            if w_hash != hashes['fitted_weights_hash']:
+                warnings.warn("The fitted weights hash does not match the reproducibility weights hash.")        
+            if m_hash != hashes['preds_hash']:
+                warnings.warn("The predictions hash does not match the reproducibility predictions hash.")
+        else:
+            print("***Reproducibility Checks passed - model weights and model predictions match expected.***")
+            
+    # Check Environment
+    current_py_version = sys.version[0:6]
+    current_tf_version = tf.__version__
+    if current_py_version != repro_info['env_info']['py_version']:
+        warnings.warn(f"Python version mismatch: Current Python version is {current_py_version}, "
+                      f"expected {repro_info['env_info']['py_version']}.")
+        
+    if current_tf_version != repro_info['env_info']['tf_version']:
+        warnings.warn(f"TensorFlow version mismatch: Current TensorFlow version is {current_tf_version}, "
+                      f"expected {repro_info['env_info']['tf_version']}.")    
+    
+    # Check Params
+    repro_params = repro_info.get('params', {})
+    
+    for key, repro_value in repro_params.items():
+        if key in params:
+            if params[key] != repro_value:
+                warnings.warn(f"Parameter mismatch for '{key}': Current value is {params[key]}, "
+                              f"repro value is {repro_value}.")
+        else:
+            warnings.warn(f"Parameter '{key}' is missing in the current params.")
+
+    return 
 
 class RNNModel(ABC):
     def __init__(self, params: dict):
-        self.params = params
+        self.params = copy.deepcopy(params)
         self.params['n_features'] = len(self.params['features_list'])
         if type(self) is RNNModel:
             raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
@@ -491,20 +644,24 @@ class RNNModel(ABC):
         pass
     
     def fit(self, X_train, y_train, plot=True, plot_title = '', 
-            weights=None, callbacks=[], verbose_fit=None, validation_data=None, *args, **kwargs):
+            weights=None, callbacks=[], validation_data=None, *args, **kwargs):
         # verbose_fit argument is for printing out update after each epoch, which gets very long
         # These print statements at the top could be turned off with a verbose argument, but then
         # there would be a bunch of different verbose params
-        print(f"Training simple RNN with params: {self.params}")
+        verbose_fit = self.params['verbose_fit']
+        verbose_weights = self.params['verbose_weights']
+        if verbose_weights:
+            print(f"Training simple RNN with params: {self.params}")
         X_train, y_train = self.format_train_data(X_train, y_train)
-        print(f"X_train hash: {hash2(X_train)}")
-        print(f"y_train hash: {hash2(y_train)}")
         if validation_data is not None:
             X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
-            print(f"X_val hash: {hash2(X_val)}")
-            print(f"y_val hash: {hash2(y_val)}")
-        
-        print(f"Initial weights before training hash: {hash2(self.model_train.get_weights())}")
+        if verbose_weights:
+            print(f"Formatted X_train hash: {hash_ndarray(X_train)}")
+            print(f"Formatted y_train hash: {hash_ndarray(y_train)}")
+            if validation_data is not None:
+                print(f"Formatted X_val hash: {hash_ndarray(X_val)}")
+                print(f"Formatted y_val hash: {hash_ndarray(y_val)}")
+            print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
         # Setup callbacks
         if self.params["reset_states"]:
             callbacks=callbacks+[ResetStatesCallback()]
@@ -512,8 +669,7 @@ class RNNModel(ABC):
         #     callbacks=callbacks+[early_stopping]
         
         # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
-        if verbose_fit is None:
-            verbose_fit = self.params['verbose_fit']
+
         # Evaluate Model once to set nonzero initial state
         if self.params["batch_size"]>= X_train.shape[0]:
             self.model_train(X_train)
@@ -540,7 +696,7 @@ class RNNModel(ABC):
         if plot:
             self.plot_history(history,plot_title)
         if self.params["verbose_weights"]:
-            print(f"Fitted Weights Hash: {hash2(self.model_train.get_weights())}")
+            print(f"Fitted Weights Hash: {hash_weights(self.model_train)}")
 
         # Update Weights for Prediction Model
         w_fitted = self.model_train.get_weights()
@@ -569,9 +725,14 @@ class RNNModel(ABC):
         plt.legend(loc='upper left')
         plt.show()
 
-    def run_model(self, dict0):
+    def run_model(self, dict0, reproducibility_run=False):
+        verbose_fit = self.params['verbose_fit']
+        verbose_weights = self.params['verbose_weights']
         # Make copy to prevent changing in place
         dict1 = copy.deepcopy(dict0)
+        if verbose_weights:
+            print("Input data hashes, NOT formatted for rnn sequence/batches yet")
+            dict1.print_hashes()
         # Extract Fields
         scale_fm = dict1['scale_fm']
         X_train, y_train, X_test, y_test = dict1['X_train'].copy(), dict1['y_train'].copy(), dict1["X_test"].copy(), dict1['y_test'].copy()
@@ -595,32 +756,40 @@ class RNNModel(ABC):
             X = np.concatenate((X_train, X_val, X_test))
             y = np.concatenate((y_train, y_val, y_test)).flatten()
         # Predict
-        print(f"Predicting Training through Test \n features hash: {hash2(X)} \n response hash: {hash2(y)} ")
+        if verbose_weights:
+            print(f"Predicting Training through Test")
+            print(f"All X hash: {hash_ndarray(X)}")
         
         m = self.predict(X).flatten()
+        if verbose_weights:
+            print(f"Predictions Hash: {hash_ndarray(m)}")
         dict1['m']=m
         dict0['m']=m # add to outside env dictionary, should be only place this happens
-        if self.params['scale']:
-            print(f"Rescaling data using {self.params['scaler']}")
-            if self.params['scaler'] == "reproducibility":
-                m  *= scale_fm
-                y  *= scale_fm
-                y_train *= scale_fm
-                y_test *= scale_fm
+        
+        # if self.params['scale']:
+        #     print(f"Rescaling data using {self.params['scaler']}")
+        #     if self.params['scaler'] == "reproducibility":
+        #         m  *= scale_fm
+        #         y  *= scale_fm
+        #         y_train *= scale_fm
+        #         y_test *= scale_fm
         # Check Reproducibility, TODO: old dict calls it hidden_units not rnn_units, so this doens't check that
-        if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale', 'activation', 'learning_rate']):
-            print("Checking Reproducibility")
-            checkm = m[350]
-            hv = hash2(self.model_predict.get_weights())
-            if self.params['phys_initialize']:
-                hv5 = repro_hashes['phys_initialize']['fitted_weight_hash']
-                mv = repro_hashes['phys_initialize']['predictions_hash']
-            else:
-                hv5 = repro_hashes['rand_initialize']['fitted_weight_hash']
-                mv = repro_hashes['rand_initialize']['predictions_hash']           
+        # if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale', 'activation', 'learning_rate']):
+        #     print("Checking Reproducibility")
+        #     checkm = m[350]
+        #     hv = hash2(self.model_predict.get_weights())
+        #     if self.params['phys_initialize']:
+        #         hv5 = repro_hashes['phys_initialize']['fitted_weight_hash']
+        #         mv = repro_hashes['phys_initialize']['predictions_hash']
+        #     else:
+        #         hv5 = repro_hashes['rand_initialize']['fitted_weight_hash']
+        #         mv = repro_hashes['rand_initialize']['predictions_hash']           
             
-            print(f"Fitted weights hash (check 5): {hv} \n Reproducibility weights hash: {hv5} \n Error: {hv5-hv}")
-            print(f"Model predictions hash: {checkm} \n Reproducibility preds hash: {mv} \n Error: {mv-checkm}")
+        #     print(f"Fitted weights hash (check 5): {hv} \n Reproducibility weights hash: {hv5} \n Error: {hv5-hv}")
+        #     print(f"Model predictions hash: {checkm} \n Reproducibility preds hash: {mv} \n Error: {mv-checkm}")
+        if reproducibility_run:
+            print("Checking Reproducibility")
+            check_reproducibility(dict0, self.params, hash_ndarray(m), hash_weights(self.model_predict))
 
         # print(dict1.keys())
         # Plot final fit and data
@@ -761,7 +930,7 @@ class RNN(RNNModel):
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
-            print(f"Initial Weights Hash: {hash2(model.get_weights())}")
+            print(f"Initial Weights Hash: {hash_weights(model)}")
             # print(model.get_weights())
 
         if self.params['phys_initialize']:
@@ -770,7 +939,7 @@ class RNN(RNNModel):
             print("Initializing Model with Physics based weights")
             w, w_name=get_initial_weights(model, self.params, scale_fm = scale_fm)
             model.set_weights(w)
-            print('initial weights hash =',hash2(model.get_weights()))
+            print('initial weights hash =',hash_weights(model))
         return model
     def _build_model_predict(self, return_sequences=True):
         
@@ -822,7 +991,7 @@ class RNN_LSTM(RNNModel):
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
-            print(f"Initial Weights Hash: {hash2(model.get_weights())}")
+            print(f"Initial Weights Hash: {hash_weights(model)}")
         return model
     def _build_model_predict(self, return_sequences=True):
         

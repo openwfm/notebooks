@@ -195,20 +195,21 @@ def plot_feature(x, y, feature_name):
     style = plot_styles.get(feature_name, {})
     plt.plot(x, y, **style)
     
-def plot_features(hmin,hmax,dat,feat_list,linestyle,c,label, raw_name,alpha=1):
+def plot_features(hmin,hmax,dat,linestyle,c,label,alpha=1):
     hour = np.array(range(hmin,hmax))
-    for i,feat in enumerate(feat_list):
+    for feat in dat.features_list:
+        i = dat.all_features_list.index(feat) # index of main data
         if feat in plot_styles.keys():
-            plot_feature(x=hour, y=dat[raw_name][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
+            plot_feature(x=hour, y=dat['X'][:,i][hmin:hmax], feature_name=feat)
         
-def plot_data(dat0, raw_name = "X_raw",title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
+def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
-    # raw_name: string, dictionary key of dat that has unscaled data for plotting
+    # inverse_scale: logical, whether to inverse scale data
     # Returns: none
 
-    dat = copy.deepcopy(dat0)
+    # dat = copy.deepcopy(dat0)
     
     if 'hours' in dat:
         if hmax is None:
@@ -221,23 +222,8 @@ def plot_data(dat0, raw_name = "X_raw",title=None,title2=None,hmin=0,hmax=None,x
     # plt.figure(figsize=(16,4))
     plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
+    plot_features(hmin,hmax,dat,linestyle='-',c='k',label='FM Model')
     
-    if 'features_list' in dat:
-        feat_list = dat['features_list']
-        plot_features(hmin,hmax,dat,feat_list, raw_name=raw_name,linestyle='-',c='k',label='FM Model')
-    
-    # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
-    # plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
-    # plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='#7CCCEF',label='wetting EQ', alpha=.8)
-    # plot_one(hmin,hmax,dat,'fm',linestyle='-',c='#468a29',label='FM Observed')
-    # plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
-    # plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
-    # plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
-    # for test
-    # plot_one(hmin,hmax,dat,'x',linestyle='-',c='g',label='x input')
-    # plot_one(hmin,hmax,dat,'y',linestyle='-',c='k',label='y truth')
-    
-    # plot_one(hmin,hmax,dat,'z',linestyle='-',c='r',label='z output')
 
     if 'test_ind' in dat.keys():
         test_ind = dat["test_ind"]
@@ -351,32 +337,7 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
 
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def load_and_fix_data(filename):
-    # Given path to FMDA training dictionary, read and return cleaned dictionary
-    # Inputs: 
-    # filename: (str) path to file with .pickle extension
-    # Returns:
-    # FMDA dictionary with NA values "fixed"
-    
-    with open(filename, 'rb') as handle:
-        test_dict = pickle.load(handle)
-        for case in test_dict:
-            test_dict[case]['case'] = case
-            test_dict[case]['filename'] = filename
-            for key in test_dict[case].keys():
-                var = test_dict[case][key]    # pointer to test_dict[case][key]
-                if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
-                    nans = np.sum(np.isnan(var))
-                    if nans:
-                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values, fixing')
-                        fixnan(var)
-                        nans = np.sum(np.isnan(test_dict[case][key]))
-                        print('After fixing, remained',nans,'nan values')
-            if not 'title' in test_dict[case].keys():
-                test_dict[case]['title']=case
-            if not 'descr' in test_dict[case].keys():
-                test_dict[case]['descr']=f"{case} FMDA dictionary"
-    return test_dict
+
 
 
 def get_file(filename, data_dir='data'):

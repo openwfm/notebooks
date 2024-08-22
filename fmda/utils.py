@@ -14,6 +14,7 @@ import pickle
 def all_items_exist(source_list, target_list):
     return all(item in target_list for item in source_list)
 
+# Generic helper function to read yaml files
 def read_yml(yaml_path, subkey=None):
     with open(yaml_path, 'r') as file:
         d = yaml.safe_load(file)
@@ -21,6 +22,35 @@ def read_yml(yaml_path, subkey=None):
             d = d[subkey]
     return d
 
+# Use to load nested fmda dictionary of cases
+def load_and_fix_data(filename):
+    # Given path to FMDA training dictionary, read and return cleaned dictionary
+    # Inputs: 
+    # filename: (str) path to file with .pickle extension
+    # Returns:
+    # FMDA dictionary with NA values "fixed"
+    print(f"loading file {filename}")
+    with open(filename, 'rb') as handle:
+        test_dict = pickle.load(handle)
+        for case in test_dict:
+            test_dict[case]['case'] = case
+            test_dict[case]['filename'] = filename
+            for key in test_dict[case].keys():
+                var = test_dict[case][key]    # pointer to test_dict[case][key]
+                if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
+                    nans = np.sum(np.isnan(var))
+                    if nans:
+                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values, fixing')
+                        fixnan(var)
+                        nans = np.sum(np.isnan(test_dict[case][key]))
+                        print('After fixing, remained',nans,'nan values')
+            if not 'title' in test_dict[case].keys():
+                test_dict[case]['title']=case
+            if not 'descr' in test_dict[case].keys():
+                test_dict[case]['descr']=f"{case} FMDA dictionary"
+    return test_dict
+
+# Generic helper function to read pickle files
 def read_pkl(file_path):
     with open(file_path, 'rb') as file:
         print(f"loading file {file_path}")
@@ -58,7 +88,7 @@ def vprint(*args):
         
         
 ## Function for Hashing numpy arrays 
-def ndarray_hash(arr: np.ndarray) -> str:
+def hash_ndarray(arr: np.ndarray) -> str:
     # Convert the array to a bytes string
     arr_bytes = arr.tobytes()
     # Use hashlib to generate a unique hash
@@ -66,7 +96,7 @@ def ndarray_hash(arr: np.ndarray) -> str:
     return hash_obj.hexdigest()
     
 ## Function for Hashing tensorflow models
-def weights_hash(model):
+def hash_weights(model):
     # Extract all weights and biases
     weights = model.get_weights()
     

@@ -13,14 +13,6 @@ import sys
 import yaml
 import os
 
-
-module_dir = os.path.dirname(os.path.abspath(__file__))
-# Construct the path to the YAML file
-yaml_path = os.path.join(module_dir, 'params.yaml')
-with open(yaml_path, 'r') as file:
-    params_repro = yaml.safe_load(file)["rnn_repro"]
-    features_repro = params_repro['features_list']
-
 feature_types = {
     # Static features are based on physical location, e.g. location of RAWS site
     'static': ['elev', 'lon', 'lat'],
@@ -66,12 +58,8 @@ def pkl2train(input_file_paths,
             logging.info("loading file %s", file_path)
             d = pickle.load(file)
         for key in d:
-            if key == "reproducibility":
-                atm_dict = "RAWS"
-                features_list = features_repro
-            else:
-                atm_dict = atm
-                features_list = features_all
+            atm_dict = atm
+            features_list = features_all
             logging.info('Processing subdictionary %s',key)
             if key in train:
                 logging.warning('skipping duplicate key %s',key)
@@ -102,13 +90,8 @@ def pkl2train(input_file_paths,
                 # build matrix of features - assuming all the same length, if not column_stack will fail
                 train[key]['time']=time_hrrr
 
-                # NOTE: for reproducibility scale is based on max fm over whole period. 
-                # This is not right statistically as it uses data from training period
-                # TODO: update scaling
-                if True and (key == "reproducibility"):
-                    scale_fm=max(max(subdict[atm_dict]["Ew"]),max(subdict[atm_dict]["Ed"]),max(subdict[atm_dict]["fm"]))/1
-                else:
-                    scale_fm = 1
+                # TODO: REMOVE THIS
+                scale_fm = 1
                 train[key]["scale_fm"] = scale_fm
                 # Set up static vars, but not for repro case
                 columns=[]
@@ -127,59 +110,7 @@ def pkl2train(input_file_paths,
                     # For static features, repeat to fit number of time observations
                     elif feat in feature_types['static']:
                         columns.append(np.full(timesteps,loc[feat]))
-
-
-
-
-
-
-
                 
-                # # List of recognized static features
-                # sfeats = ['elev', 'lon', 'lat']
-                # for feat in features_list:
-                #     if feat in sfeats:
-                #         columns.append(np.full(timesteps,loc[feat]))
-                # # if not key == "reproducibility":
-                # #     # location as features constant in time come first
-                # #     columns.append(np.full(timesteps,loc['elev']))  
-                # #     columns.append(np.full(timesteps,loc['lon']))
-                # #     columns.append(np.full(timesteps,loc['lat']))
-
-                # # NOTE: for reproducibility scale is based on max fm over whole period. This is not right statistically as it uses data from training period
-                # # TODO: update scaling
-                # if True and (key == "reproducibility"):
-                #     scale_fm=max(max(subdict[atm_dict]["Ew"]),max(subdict[atm_dict]["Ed"]),max(subdict[atm_dict]["fm"]))/1
-                # else:
-                #     scale_fm = 1
-                # train[key]["scale_fm"] = scale_fm
-                
-                # # TODO: test with features just Ed and Ew for reproducibillity. Perhaps pretrain on E's only
-                # # for i in ["rh","wind","solar","soilm","groundflux","Ed","Ew"]:
-                # # List of HRRR features in fstep subdicts, EXCLUDING rain which needs separate calculation
-                # hfeats = ['temp', 'rh', 'wind', 'solar', 'soilm', 'canopyw', 'groundflux', 'Ed', 'Ew']
-                # # for i in ["Ed","Ew"]:
-                #     # # Use forcase steps if data from HRRR, not if from RAWS
-                #     # if atm_dict == "HRRR":
-                #     #     columns.append(subdict[atm_dict][fstep][i]/scale_fm)   # add variables from HRRR forecast steps 
-                #     # elif atm_dict == "RAWS":
-                #     #     columns.append(subdict[atm_dict][i]/scale_fm)
-                # for feat in features_list:
-                #     if feat in hfeats:
-                #         # Use forcase steps if data from HRRR, not if from RAWS
-                #         if atm_dict == "HRRR":
-                #             vec = subdict[atm_dict][fstep][feat]
-                #             if feat in ['Ed', 'Ew']:
-                #                 vec = vec / scale_fm
-                #             columns.append(vec)   # add variables from HRRR forecast steps 
-                #         elif atm_dict == "RAWS":
-                #             if feat in subdict[atm_dict]:
-                #                 vec = subdict[atm_dict][feat]
-                #                 if feat in ['Ed', 'Ew']:
-                #                     vec = vec / scale_fm                        
-                #                 columns.append(vec)                    
-                #             else:
-                #                 logging.info('No %s data found in RAWS subdictionary %s', feat, key)
                 # compute rain as difference of accumulated precipitation
                 if 'rain' in features_list:
                     if atm_dict == "HRRR":

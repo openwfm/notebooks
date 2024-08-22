@@ -64,31 +64,60 @@ lstm:
 
 
 # Param sets for reproducibility
+
+## v2.1 params
 rnn_repro:
   batch_size: 32
   timesteps: 5
   optimizer: adam
-  epochs: 200
   rnn_layers: 1
   rnn_units: 20
-  dense_layers: 0 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
-  dense_units: 1
+  dense_layers: 1
+  dense_units: 5
   activation: ['linear', 'linear']
-  centering: [0.0,0.0]
-  dropout: [0.0, 0.0]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
-  recurrent_dropout: 0.0 # Length must match number of recurrent layers
-  reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-  epochs: 200
+  centering: [0.0, 0.0]
+  dropout: [0.2, 0.2]
+  recurrent_dropout: 0.2
+  reset_states: True
+  epochs: 300
   learning_rate: 0.001
-  phys_initialize: False # physics initialization
+  clipvalue: 10.0
+  phys_initialize: False
   stateful: True
-  verbose_weights: True # Prints out hashs of weights for tracking reproducibility
-  verbose_fit: False # Prints out all training epochs, makes computation much slower
-  features_list: ['Ed', 'Ew', 'rain']
+  verbose_weights: True
+  verbose_fit: False
+  features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
   scale: True
-  scaler: 'reproducibility'
+  scaler: 'minmax'
   train_frac: 0.5
-  val_frac: 0.0
+  val_frac: 0.2
+
+## v2.0 params
+# rnn_repro:
+#   batch_size: 32
+#   timesteps: 5
+#   optimizer: adam
+#   epochs: 200
+#   rnn_layers: 1
+#   rnn_units: 20
+#   dense_layers: 0 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
+#   dense_units: 1
+#   activation: ['linear', 'linear']
+#   centering: [0.0,0.0]
+#   dropout: [0.0, 0.0]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
+#   recurrent_dropout: 0.0 # Length must match number of recurrent layers
+#   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
+#   epochs: 200
+#   learning_rate: 0.001
+#   phys_initialize: False # physics initialization
+#   stateful: True
+#   verbose_weights: True # Prints out hashs of weights for tracking reproducibility
+#   verbose_fit: False # Prints out all training epochs, makes computation much slower
+#   features_list: ['Ed', 'Ew', 'rain']
+#   scale: True
+#   scaler: 'reproducibility'
+#   train_frac: 0.5
+#   val_frac: 0.0
 
 
 
