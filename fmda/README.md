@@ -13,15 +13,15 @@ Build and activate environment:
     * conda activate fmda_ml
 
 
-## Notebooks
+## Main Notebooks
 
 * version_control/rnn_train_versions.ipynb
     - Runs model in testing type mode where exact initial and fitted hashes are checked against known history
 	- Shows reproducibility changes and major code restructuring
-* rnn_class.ipynb
-	- Demonstrates RNN class functionality, different params and configurations
-* fmda_rnn_serial.ipynb
-	- Trains and predicts the model at multiple locations in serial fashion
+
+* fmda_rnn_serial.ipynb 	
+    - Automatically retrieves fmda dictionary from OpenWFM Demo
+    - Trains and predicts the model at multiple locations in serial fashion
          1. Train separate models at multiple locations and compare predictions on that location itself
          2. Train single model with data from multiple locations. Take same model object and call .fit multiple times. Compare predictions for new locations
 
