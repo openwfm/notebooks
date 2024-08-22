@@ -7,10 +7,10 @@ Code repository for project to build RNN models to predict dead fuel moisture co
 Clone repository:
 	git clone https://github.com/openwfm/notebooks
 
-Build and activate environment
-	cd ./fmda/install
-	conda env create -f fmda_ml.yml
-	conda activate fmda_ml
+Build and activate environment:
+	* cd ./fmda/install
+	* conda env create -f fmda_ml.yml
+	* conda activate fmda_ml
 python
 ## Notebooks
 
