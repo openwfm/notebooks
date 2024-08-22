@@ -10,6 +10,8 @@ import yaml
 import hashlib
 import pickle
 import os.path as osp
+from urllib.parse import urlparse
+import subprocess
 
 # Utility to retrieve files from URL
 def retrieve_url(url, dest_path, force_download=False):
