@@ -8,9 +8,9 @@ Clone repository:
 	git clone https://github.com/openwfm/notebooks
 
 Build and activate environment:
-	* cd ./fmda/install
-	* conda env create -f fmda_ml.yml
-	* conda activate fmda_ml
+    * cd ./fmda/install
+    * conda env create -f fmda_ml.yml
+    * conda activate fmda_ml
 
 
 ## Notebooks
