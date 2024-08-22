@@ -11,7 +11,8 @@ Build and activate environment:
 	* cd ./fmda/install
 	* conda env create -f fmda_ml.yml
 	* conda activate fmda_ml
-python
+
+
 ## Notebooks
 
 * version_control/rnn_train_versions.ipynb
