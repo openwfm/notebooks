@@ -28,7 +28,6 @@ rnn:
   train_frac: 0.5
   val_frac: 0.1
 
-# NOTE: as of 16-6-24 only param difference with simple rnn is recurrent_activation param
 lstm:
   batch_size: 32
   timesteps: 5
@@ -55,12 +54,6 @@ lstm:
   scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
   train_frac: 0.5
   val_frac: 0.1
-
-# Lives in moisture_rnn now
-# physics_initializer:
-#   DeltaE: [0,-1]                # bias correction
-#   T1: 0.1                       # 1/fuel class (10)
-#   fm_raise_vs_rain: 0.2         # fm increase per mm rain 
 
 
 # Param sets for reproducibility
