@@ -664,7 +664,7 @@ class RNNModel(ABC):
             print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
         # Setup callbacks
         if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback(), TerminateOnNaN()]
+            callbacks=callbacks+[ResetStatesCallback(batch_reset = self.params['batch_reset']), TerminateOnNaN()]
         # if validation_data is not None:
         #     callbacks=callbacks+[early_stopping]
         
@@ -814,13 +814,24 @@ class RNNModel(ABC):
 ## Callbacks
 
 class ResetStatesCallback(Callback):
+    def __init__(self, batch_reset=None):
+        super(ResetStatesCallback, self).__init__()
+        self.batch_reset = batch_reset    
     def on_epoch_end(self, epoch, logs=None):
         # Iterate over each layer in the model
         for layer in self.model.layers:
             # Check if the layer has a reset_states method
             if hasattr(layer, 'reset_states'):
                 layer.reset_states()
-
+    def on_train_batch_end(self, batch, logs=None):
+        batch_reset = self.batch_reset
+        if batch_reset is not None and batch % batch_reset == 0:
+            # print(f"Resetting states after batch {batch + 1}")
+            # Iterate over each layer in the model
+            for layer in self.model.layers:
+                # Check if the layer has a reset_states method
+                if hasattr(layer, 'reset_states'):
+                    layer.reset_states()
     
 
 ## Learning Schedules
