@@ -184,16 +184,8 @@ scalers = {
     'standard': StandardScaler() 
 }
 
-# def scale_transform(X, method='minmax'):
-#     # Function to scale data in place
-#     # Inputs: 
-#     # X: (ndarray) data to be scaled
-#     # method: (str) one of keys in scalers dictionary above
-#     scaler = scalers[method]
-#     scaler.fit(X)
-#     # Modify X in-place
-#     X[:] = scaler.transform(X)
 
+## DEPRECATED, use RNNData class instead
 def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None):
     # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
     # Inputs:
@@ -343,15 +335,33 @@ def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=No
 #***********************************************************************************************
 ### RNN Class Functionality
 
-# Custom class for parameters dictionary. Inherits from dict, but adds checks and safeguards
 class RNNParams(dict):
-    def __init__(self, input_dict=None):
+    """
+    A custom dictionary class for handling RNN parameters. Automatically calculates certain params based on others. Overwrites the update method to protect from incompatible parameter choices. Inherits from dict
+    """    
+    def __init__(self, input_dict):
+        """
+        Initializes the RNNParams instance and runs checks and shape calculations.
+
+        Parameters:
+        -----------
+        input_dict : dict,
+            A dictionary containing RNN parameters.
+        """
         super().__init__(input_dict)
         # Automatically run checks on initialization
         self.run_checks()           
         # Automatically calculate shapes on initialization
         self.calc_param_shapes()        
     def run_checks(self, verbose=True):
+        """
+        Validates that required keys exist and are of the correct type.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """
         print("Checking params...")
         # Keys must exist and be integers
         int_keys = [
@@ -377,6 +387,14 @@ class RNNParams(dict):
 
         print("Input dictionary passed all checks.")
     def calc_param_shapes(self, verbose=True):
+        """
+        Calculates and updates the shapes of certain parameters based on input data.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """
         if verbose:
             print("Calculating shape params based on features list, timesteps, and batch size")
             print(f"Input Feature List: {self['features_list']}")
@@ -399,6 +417,14 @@ class RNNParams(dict):
             print(self)   
             
     def update(self, *args, verbose=True, **kwargs):
+        """
+        Updates the dictionary, with restrictions on certain keys, and recalculates shapes if necessary.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """
         # Prevent updating n_features and batch_shape
         restricted_keys = {'n_features', 'batch_shape'}
         keys_to_check = {'features_list', 'timesteps', 'batch_size'}
@@ -440,8 +466,24 @@ class RNNParams(dict):
 
 ## Class for handling input data
 class RNNData(dict):
+    """
+    A custom dictionary class for managing RNN data, with validation, scaling, and train-test splitting functionality.
+    """    
     required_keys = {"loc", "time", "X", "y", "features_list"}  
     def __init__(self, input_dict, scaler=None, features_list=None):
+        """
+        Initializes the RNNData instance, performs checks, and prepares data.
+
+        Parameters:
+        -----------
+        input_dict : dict
+            A dictionary containing the initial data.
+        scaler : str, optional
+            The name of the scaler to be used (e.g., 'minmax', 'standard'). Default is None.
+        features_list : list, optional
+            A subset of features to be used. Default is None which means all features.
+        """
+
         # Copy to avoid 
         input_data = input_dict.copy()
         super().__init__(input_data)
@@ -459,6 +501,14 @@ class RNNData(dict):
         self.run_checks()
         self.__dict__.update(self)
     def run_checks(self, verbose=True):
+        """
+        Validates that required keys are present and checks the integrity of data shapes.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """        
         missing_keys = self.required_keys - self.keys()
         if missing_keys:
             raise KeyError(f"Missing required keys: {missing_keys}")
@@ -475,12 +525,40 @@ class RNNData(dict):
         if not all_items_exist(self.features_list, self.all_features_list):
             raise ValueError(f"Provided 'features_list' {self.features_list} has elements not in input features.")
     def set_scaler(self, scaler):
+        """
+        Sets the scaler to be used for data normalization.
+
+        Parameters:
+        -----------
+        scaler : str
+            The name of the scaler (e.g., 'minmax', 'standard').
+        """        
         recognized_scalers = ['minmax', 'standard']
         if scaler in recognized_scalers:
             self.scaler = scalers[scaler]
         else:
             raise ValueError(f"Unrecognized scaler '{scaler}'. Recognized scalers are: {recognized_scalers}.")
     def train_test_split(self, train_frac, val_frac=0.0, subset_features=True, features_list=None, split_time=True, split_space=False, verbose=True):
+        """
+        Splits the data into training, validation, and test sets.
+
+        Parameters:
+        -----------
+        train_frac : float
+            The fraction of data to be used for training.
+        val_frac : float, optional
+            The fraction of data to be used for validation. Default is 0.0.
+        subset_features : bool, optional
+            If True, subsets the data to the specified features list. Default is True.
+        features_list : list, optional
+            A list of features to use for subsetting. Default is None.
+        split_time : bool, optional
+            Whether to split the data based on time. Default is True.
+        split_space : bool, optional
+            Whether to split the data based on space. Default is False.
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """
         # Extract data to desired features
         X = self.X.copy()
         y = self.y.copy()
@@ -526,6 +604,14 @@ class RNNData(dict):
             print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
             print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")
     def scale_data(self, verbose=True):
+        """
+        Scales the data using the set scaler.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """        
         if self.scaler is None:
             raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
         if not hasattr(self, "X_train"):
@@ -540,6 +626,18 @@ class RNNData(dict):
             self.X_val = self.scaler.transform(self.X_val)
         self.X_test = self.scaler.transform(self.X_test)
     def inverse_scale(self, return_X = 'all_hours', save_changes=False, verbose=True):
+        """
+        Inversely scales the data to its original form.
+
+        Parameters:
+        -----------
+        return_X : str, optional
+            Specifies what data to return after inverse scaling. Default is 'all_hours'.
+        save_changes : bool, optional
+            If True, updates the internal data with the inversely scaled values. Default is False.
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """        
         if verbose:
             print("Inverse scaling data...")
         X_train = self.scaler.inverse_transform(self.X_train)
@@ -561,27 +659,69 @@ class RNNData(dict):
         else:
             print(f"Unrecognized or unimplemented return value {return_X}")
     def print_hashes(self, attrs_to_check = ['X', 'y', 'X_train', 'y_train', 'X_val', 'y_val', 'X_test', 'y_test']):
+        """
+        Prints the hash of specified data attributes.
+
+        Parameters:
+        -----------
+        attrs_to_check : list, optional
+            A list of attribute names to hash and print. Default includes 'X', 'y', and split data.
+        """
         for attr in attrs_to_check:
             if hasattr(self, attr):
                 value = getattr(self, attr)
                 print(f"Hash of {attr}: {hash_ndarray(value)}")        
     def __getattr__(self, key):
+        """
+        Allows attribute-style access to dictionary keys, a.k.a. enables the "." operator for get elements
+        """        
         try:
             return self[key]
         except KeyError:
             raise AttributeError(f"'rnn_data' object has no attribute '{key}'")
 
     def __setitem__(self, key, value):
+        """
+        Ensures dictionary and attribute updates stay in sync for required keys.
+        """        
         super().__setitem__(key, value)  # Update the dictionary
         if key in self.required_keys:
             super().__setattr__(key, value)  # Ensure the attribute is updated as well
 
     def __setattr__(self, key, value):
+        """
+        Ensures dictionary keys are updated when setting attributes.
+        """
         self[key] = value    
 
 
 # Function to check reproduciblity hashes, environment info, and model parameters
 def check_reproducibility(dict0, params, m_hash, w_hash):
+    """
+    Performs reproducibility checks on a model by comparing current settings and outputs with stored reproducibility information.
+
+    Parameters:
+    -----------
+    dict0 : dict
+        The data dictionary that should contain reproducibility information under the 'repro_info' attribute.
+    params : dict
+        The current model parameters to be checked against the reproducibility information.
+    m_hash : str
+        The hash of the current model predictions.
+    w_hash : str
+        The hash of the current fitted model weights.
+
+    Returns:
+    --------
+    None
+        The function returns None. It issues warnings if any reproducibility checks fail.
+
+    Notes:
+    ------
+    - Checks are only performed if the `dict0` contains the 'repro_info' attribute.
+    - Issues warnings for mismatches in model weights, predictions, Python version, TensorFlow version, and model parameters.
+    - Skips checks if physics-based initialization is used (not implemented).
+    """    
     if not hasattr(dict0, "repro_info"):
         warnings.warn("The provided data dictionary does not have the required 'repro_info' attribute. Not running reproduciblity checks.")
         return 
@@ -628,7 +768,18 @@ def check_reproducibility(dict0, params, m_hash, w_hash):
     return 
 
 class RNNModel(ABC):
+    """
+    Abstract base class for RNN models, providing structure for training, predicting, and running reproducibility checks.
+    """
     def __init__(self, params: dict):
+        """
+        Initializes the RNNModel with the given parameters.
+
+        Parameters:
+        -----------
+        params : dict
+            A dictionary containing model parameters.
+        """
         self.params = copy.deepcopy(params)
         self.params['n_features'] = len(self.params['features_list'])
         if type(self) is RNNModel:
@@ -637,14 +788,36 @@ class RNNModel(ABC):
 
     @abstractmethod
     def _build_model_train(self):
+        """Abstract method to build the training model."""
         pass
 
     @abstractmethod
     def _build_model_predict(self, return_sequences=True):
+        """Abstract method to build the prediction model. This model copies weights from the train model but with input structure that allows for easier prediction of arbitrary length timeseries. This model is not to be used for training, or don't use with .fit calls"""
         pass
     
     def fit(self, X_train, y_train, plot=True, plot_title = '', 
             weights=None, callbacks=[], validation_data=None, *args, **kwargs):
+        """
+        Trains the model on the provided training data.
+
+        Parameters:
+        -----------
+        X_train : np.ndarray
+            The input matrix data for training.
+        y_train : np.ndarray
+            The target vector data for training.
+        plot : bool, optional
+            If True, plots the training history. Default is True.
+        plot_title : str, optional
+            The title for the training plot. Default is an empty string.
+        weights : optional
+            Initial weights for the model. Default is None.
+        callbacks : list, optional
+            A list of callback functions to use during training. Default is an empty list.
+        validation_data : tuple, optional
+            Validation data to use during training, expected format (X_val, y_val). Default is None.
+        """        
         # verbose_fit argument is for printing out update after each epoch, which gets very long
         # These print statements at the top could be turned off with a verbose argument, but then
         # there would be a bunch of different verbose params
@@ -703,18 +876,71 @@ class RNNModel(ABC):
         self.model_predict.set_weights(w_fitted)
 
     def predict(self, X_test):
+        """
+        Generates predictions on the provided test data using the internal prediction model.
+
+        Parameters:
+        -----------
+        X_test : np.ndarray
+            The input data for generating predictions.
+
+        Returns:
+        --------
+        np.ndarray
+            The predicted values.
+        """        
         print("Predicting")
         X_test = self.format_pred_data(X_test)
         preds = self.model_predict.predict(X_test).flatten()
         return preds
 
     def format_train_data(self, X, y, verbose=False):
+        """
+        Formats the training data for RNN input.
+
+        Parameters:
+        -----------
+        X : np.ndarray
+            The input data.
+        y : np.ndarray
+            The target data.
+        verbose : bool, optional
+            If True, prints status messages. Default is False.
+
+        Returns:
+        --------
+        tuple
+            Formatted input and target data.
+        """        
         X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
         return X, y
     def format_pred_data(self, X):
+        """
+        Formats the prediction data for RNN input.
+
+        Parameters:
+        -----------
+        X : np.ndarray
+            The input data.
+
+        Returns:
+        --------
+        np.ndarray
+            The formatted input data.
+        """        
         return np.reshape(X,(1, X.shape[0], self.params['n_features']))
 
     def plot_history(self, history, plot_title):
+        """
+        Plots the training history.
+
+        Parameters:
+        -----------
+        history : History object
+            The training history object from model fitting. Output of keras' .fit command
+        plot_title : str
+            The title for the plot.
+        """
         plt.figure()
         plt.semilogy(history.history['loss'], label='Training loss')
         if 'val_loss' in history.history:
@@ -726,6 +952,21 @@ class RNNModel(ABC):
         plt.show()
 
     def run_model(self, dict0, reproducibility_run=False):
+        """
+        Runs the RNN model, including training, prediction, and reproducibility checks.
+
+        Parameters:
+        -----------
+        dict0 : dict
+            The dictionary containing the input data and configuration.
+        reproducibility_run : bool, optional
+            If True, performs reproducibility checks after running the model. Default is False.
+
+        Returns:
+        --------
+        tuple
+            Model predictions and a dictionary of RMSE errors.
+        """        
         verbose_fit = self.params['verbose_fit']
         verbose_weights = self.params['verbose_weights']
         # Make copy to prevent changing in place
@@ -766,27 +1007,6 @@ class RNNModel(ABC):
         dict1['m']=m
         dict0['m']=m # add to outside env dictionary, should be only place this happens
         
-        # if self.params['scale']:
-        #     print(f"Rescaling data using {self.params['scaler']}")
-        #     if self.params['scaler'] == "reproducibility":
-        #         m  *= scale_fm
-        #         y  *= scale_fm
-        #         y_train *= scale_fm
-        #         y_test *= scale_fm
-        # Check Reproducibility, TODO: old dict calls it hidden_units not rnn_units, so this doens't check that
-        # if (case_id == "reproducibility") and compare_dicts(self.params, repro_hashes['params'], ['epochs', 'batch_size', 'scale', 'activation', 'learning_rate']):
-        #     print("Checking Reproducibility")
-        #     checkm = m[350]
-        #     hv = hash2(self.model_predict.get_weights())
-        #     if self.params['phys_initialize']:
-        #         hv5 = repro_hashes['phys_initialize']['fitted_weight_hash']
-        #         mv = repro_hashes['phys_initialize']['predictions_hash']
-        #     else:
-        #         hv5 = repro_hashes['rand_initialize']['fitted_weight_hash']
-        #         mv = repro_hashes['rand_initialize']['predictions_hash']           
-            
-        #     print(f"Fitted weights hash (check 5): {hv} \n Reproducibility weights hash: {hv5} \n Error: {hv5-hv}")
-        #     print(f"Model predictions hash: {checkm} \n Reproducibility preds hash: {mv} \n Error: {mv-checkm}")
         if reproducibility_run:
             print("Checking Reproducibility")
             check_reproducibility(dict0, self.params, hash_ndarray(m), hash_weights(self.model_predict))
@@ -814,16 +1034,52 @@ class RNNModel(ABC):
 ## Callbacks
 
 class ResetStatesCallback(Callback):
+    """
+    Custom callback to reset the states of RNN layers at the end of each epoch and optionally after a specified number of batches.
+
+    Parameters:
+    -----------
+    batch_reset : int, optional
+        If provided, resets the states of RNN layers after every `batch_reset` batches. Default is None.
+    """    
     def __init__(self, batch_reset=None):
+        """
+        Initializes the ResetStatesCallback with an optional batch reset interval.
+
+        Parameters:
+        -----------
+        batch_reset : int, optional
+            The interval of batches after which to reset the states of RNN layers. Default is None.
+        """        
         super(ResetStatesCallback, self).__init__()
         self.batch_reset = batch_reset    
     def on_epoch_end(self, epoch, logs=None):
+        """
+        Resets the states of RNN layers at the end of each epoch.
+
+        Parameters:
+        -----------
+        epoch : int
+            The index of the current epoch.
+        logs : dict, optional
+            A dictionary containing metrics from the epoch. Default is None.
+        """        
         # Iterate over each layer in the model
         for layer in self.model.layers:
             # Check if the layer has a reset_states method
             if hasattr(layer, 'reset_states'):
                 layer.reset_states()
     def on_train_batch_end(self, batch, logs=None):
+        """
+        Resets the states of RNN layers after a specified number of batches, if `batch_reset` is provided.
+
+        Parameters:
+        -----------
+        batch : int
+            The index of the current batch.
+        logs : dict, optional
+            A dictionary containing metrics from the batch. Default is None.
+        """        
         batch_reset = self.batch_reset
         if batch_reset is not None and batch % batch_reset == 0:
             # print(f"Resetting states after batch {batch + 1}")
@@ -912,12 +1168,40 @@ def get_initial_weights(model_fit,params,scale_fm):
     return w, w_name
 
 class RNN(RNNModel):
+    """
+    A concrete implementation of the RNNModel abstract base class, using simple recurrent cells for hidden recurrent layers.
+
+    Parameters:
+    -----------
+    params : dict
+        A dictionary of model parameters.
+    loss : str, optional
+        The loss function to use during model training. Default is 'mean_squared_error'.
+    """
     def __init__(self, params, loss='mean_squared_error'):
+        """
+        Initializes the RNN model by building the training and prediction models.
+
+        Parameters:
+        -----------
+        params : dict or RNNParams
+            A dictionary containing the model's parameters. 
+        loss : str, optional
+            The loss function to use during model training. Default is 'mean_squared_error'.
+        """        
         super().__init__(params)
         self.model_train = self._build_model_train()
         self.model_predict = self._build_model_predict()
 
     def _build_model_train(self):
+        """
+        Builds and compiles the training model, with batch & sequence shape specifications for input.
+
+        Returns:
+        --------
+        model : tf.keras.Model
+            The compiled Keras model for training.
+        """        
         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
         x = inputs
         for i in range(self.params['rnn_layers']):
@@ -954,6 +1238,19 @@ class RNN(RNNModel):
             print('initial weights hash =',hash_weights(model))
         return model
     def _build_model_predict(self, return_sequences=True):
+        """
+        Builds and compiles the prediction model, doesn't use batch shape nor sequence length.
+
+        Parameters:
+        -----------
+        return_sequences : bool, optional
+            Whether to return the full sequence of outputs. Default is True.
+
+        Returns:
+        --------
+        model : tf.keras.Model
+            The compiled Keras model for prediction.
+        """        
         inputs = tf.keras.Input(shape=(None,self.params['n_features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
@@ -975,12 +1272,40 @@ class RNN(RNNModel):
 
 
 class RNN_LSTM(RNNModel):
+    """
+    A concrete implementation of the RNNModel abstract base class, use LSTM cells for hidden recurrent layers.
+
+    Parameters:
+    -----------
+    params : dict
+        A dictionary of model parameters.
+    loss : str, optional
+        The loss function to use during model training. Default is 'mean_squared_error'.
+    """
     def __init__(self, params, loss='mean_squared_error'):
+        """
+        Initializes the RNN model by building the training and prediction models.
+
+        Parameters:
+        -----------
+        params : dict or RNNParams
+            A dictionary containing the model's parameters. 
+        loss : str, optional
+            The loss function to use during model training. Default is 'mean_squared_error'.
+        """           
         super().__init__(params)
         self.model_train = self._build_model_train()
         self.model_predict = self._build_model_predict()
 
     def _build_model_train(self):
+        """
+        Builds and compiles the training model, with batch & sequence shape specifications for input.
+
+        Returns:
+        --------
+        model : tf.keras.Model
+            The compiled Keras model for training.
+        """               
         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
         x = inputs
         for i in range(self.params['rnn_layers']):
@@ -1006,7 +1331,19 @@ class RNN_LSTM(RNNModel):
             print(f"Initial Weights Hash: {hash_weights(model)}")
         return model
     def _build_model_predict(self, return_sequences=True):
-        
+        """
+        Builds and compiles the prediction model, doesn't use batch shape nor sequence length.
+
+        Parameters:
+        -----------
+        return_sequences : bool, optional
+            Whether to return the full sequence of outputs. Default is True.
+
+        Returns:
+        --------
+        model : tf.keras.Model
+            The compiled Keras model for prediction.
+        """           
         inputs = tf.keras.Input(shape=(None,self.params['n_features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
