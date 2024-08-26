@@ -6,7 +6,7 @@ import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import sys
-from tensorflow.keras.callbacks import Callback, EarlyStopping
+from tensorflow.keras.callbacks import Callback, EarlyStopping, TerminateOnNaN
 # from sklearn.metrics import mean_squared_error
 import logging
 from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
@@ -664,7 +664,7 @@ class RNNModel(ABC):
             print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
         # Setup callbacks
         if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback()]
+            callbacks=callbacks+[ResetStatesCallback(), TerminateOnNaN()]
         # if validation_data is not None:
         #     callbacks=callbacks+[early_stopping]
         
@@ -926,6 +926,7 @@ class RNN(RNNModel):
         x = Dense(units=1, activation='linear')(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
         # optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
@@ -942,7 +943,6 @@ class RNN(RNNModel):
             print('initial weights hash =',hash_weights(model))
         return model
     def _build_model_predict(self, return_sequences=True):
-        
         inputs = tf.keras.Input(shape=(None,self.params['n_features']))
         x = inputs
         for i in range(self.params['rnn_layers']):
@@ -987,7 +987,8 @@ class RNN_LSTM(RNNModel):
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
-        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
+        # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
+        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
