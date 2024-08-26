@@ -5,15 +5,16 @@ rnn:
   batch_size: 32
   timesteps: 5
   optimizer: adam
-  rnn_layers: 1
-  rnn_units: 20
+  rnn_layers: 1 # Number of hidden recurrent layers
+  rnn_units: 20 # Number of units per hidden recurrent layer
   dense_layers: 1 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
   dense_units: 5 # number of units for hidden dense layers
-  activation: ['linear', 'linear']
+  activation: ['linear', 'linear'] # Activation type for hidden layers, dense layers respectively
   centering: [0.0,0.0]
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
+  batch_reset: 10 # reset states after given number of batches
   epochs: 200
   learning_rate: 0.001
   clipvalue: 10.0 # gradient clipping param, gradient can't exceed this value
@@ -25,8 +26,9 @@ rnn:
   features_list: ['Ed', 'Ew', 'rain']
   scale: True
   scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
-  train_frac: 0.5
-  val_frac: 0.1
+  train_frac: 0.5 # percent of input data to be used in training set
+  val_frac: 0.1 # percent of input data to be used in validation set. Test set size determined from train_frac and val_frac
+  
 
 lstm:
   batch_size: 32
@@ -42,6 +44,7 @@ lstm:
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
+  batch_reset: 150 # reset states after given number of batches  
   epochs: 100
   learning_rate: 0.0001
   clipvalue: 1.0 # gradient clipping param, gradient can't exceed this value
@@ -72,6 +75,7 @@ rnn_repro:
   dropout: [0.2, 0.2]
   recurrent_dropout: 0.2
   reset_states: True
+  batch_reset: null
   epochs: 300
   learning_rate: 0.001
   clipvalue: 10.0
