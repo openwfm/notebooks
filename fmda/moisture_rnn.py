@@ -1088,9 +1088,10 @@ class ResetStatesCallback(Callback):
                 # Check if the layer has a reset_states method
                 if hasattr(layer, 'reset_states'):
                     layer.reset_states()
-    
+
 
 ## Learning Schedules
+## NOT TESTED YET
 lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
     initial_learning_rate=0.001,
     decay_steps=1000,
@@ -1100,7 +1101,7 @@ lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
     # warmup_steps=100
 )
 
-
+## NOT TESTED YET
 early_stopping = EarlyStopping(
     monitor='val_loss',  # Metric to monitor, e.g., 'val_loss', 'val_accuracy'
     patience=5,          # Number of epochs with no improvement after which training will be stopped
