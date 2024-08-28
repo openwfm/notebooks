@@ -838,8 +838,9 @@ class RNNModel(ABC):
         # Setup callbacks
         if self.params["reset_states"]:
             callbacks=callbacks+[ResetStatesCallback(batch_reset = self.params['batch_reset']), TerminateOnNaN()]
-        # if validation_data is not None:
-        #     callbacks=callbacks+[early_stopping]
+        if validation_data is not None:
+            print("Using early stopping callback.")
+            callbacks=callbacks+[EarlyStoppingCallback(patience = self.params['early_stopping_patience'])]
         
         # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
 
@@ -1102,13 +1103,30 @@ lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
 )
 
 ## NOT TESTED YET
-early_stopping = EarlyStopping(
-    monitor='val_loss',  # Metric to monitor, e.g., 'val_loss', 'val_accuracy'
-    patience=5,          # Number of epochs with no improvement after which training will be stopped
-    verbose=1,           # Print information about early stopping
-    mode='min',          # 'min' means training will stop when the quantity monitored has stopped decreasing
-    restore_best_weights=True  # Restore model weights from the epoch with the best value of the monitored quantity
-)
+def EarlyStoppingCallback(patience=5):
+    """
+    Creates an EarlyStopping callback with the specified patience.
+
+    Args:
+        patience (int): Number of epochs with no improvement after which training will be stopped.
+
+    Returns:
+        EarlyStopping: Configured EarlyStopping callback.
+    """
+    return EarlyStopping(
+        monitor='val_loss',
+        patience=patience,
+        verbose=1,
+        mode='min',
+        restore_best_weights=True
+    )
+# early_stopping = EarlyStopping(
+#     monitor='val_loss',  # Metric to monitor, e.g., 'val_loss', 'val_accuracy'
+#     patience=5,          # Number of epochs with no improvement after which training will be stopped
+#     verbose=1,           # Print information about early stopping
+#     mode='min',          # 'min' means training will stop when the quantity monitored has stopped decreasing
+#     restore_best_weights=True  # Restore model weights from the epoch with the best value of the monitored quantity
+# )
 
 # with open("params.yaml") as file:
 #     phys_params = yaml.safe_load(file)["physics_initializer"]

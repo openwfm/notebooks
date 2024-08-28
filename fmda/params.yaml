@@ -25,9 +25,10 @@ rnn:
   # features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
   features_list: ['Ed', 'Ew', 'rain']
   scale: True
-  scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
+  scaler: 'standard' # One of methods in scalers dictionary in moisture_rnn.py
   train_frac: 0.5 # percent of input data to be used in training set
   val_frac: 0.1 # percent of input data to be used in validation set. Test set size determined from train_frac and val_frac
+  early_stopping_patience: 5 # Number of epochs with no improvement after which training will be stopped.
   
 
 lstm:
@@ -57,6 +58,7 @@ lstm:
   scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
   train_frac: 0.5
   val_frac: 0.1
+  early_stopping_patience: 5 # Number of epochs with no improvement after which training will be stopped.
 
 
 # Param sets for reproducibility
@@ -88,6 +90,7 @@ rnn_repro:
   scaler: 'minmax'
   train_frac: 0.5
   val_frac: 0.2
+  early_stopping_patience: 9999 # early stopping not used in repro case, so setting to a huge value to ignore
 
 ## v2.0 params
 # rnn_repro:
