@@ -195,71 +195,68 @@ def plot_feature(x, y, feature_name):
     style = plot_styles.get(feature_name, {})
     plt.plot(x, y, **style)
     
-def plot_features(hmin,hmax,dat,feat_list,linestyle,c,label, raw_name,alpha=1):
+def plot_features(hmin,hmax,dat,linestyle,c,label,alpha=1):
     hour = np.array(range(hmin,hmax))
-    for i,feat in enumerate(feat_list):
+    for feat in dat.features_list:
+        i = dat.all_features_list.index(feat) # index of main data
         if feat in plot_styles.keys():
-            plot_feature(x=hour, y=dat[raw_name][:,i][hmin:hmax]*dat['scale_fm'], feature_name=feat)
+            plot_feature(x=hour, y=dat['X'][:,i][hmin:hmax], feature_name=feat)
         
-def plot_data(dat0, raw_name = "X_raw",title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
+def plot_data(dat, plot_period='all', create_figure=False,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
-    # raw_name: string, dictionary key of dat that has unscaled data for plotting
+    # inverse_scale: logical, whether to inverse scale data
     # Returns: none
 
-    dat = copy.deepcopy(dat0)
+    # dat = copy.deepcopy(dat0)
     
     if 'hours' in dat:
         if hmax is None:
             hmax = dat['hours']
         else:
-            hmax = min(hmax, dat['hours'])
+            hmax = min(hmax, dat['hours'])        
+        if plot_period == "all":
+            pass
+        elif plot_period == "predict":
+            assert "test_ind" in dat.keys()
+            hmin = dat['test_ind']
+
+        else: 
+            raise ValueError(f"unrecognized time period for plotting plot_period: {plot_period}")
     
     
-    
-    plt.figure(figsize=(16,4))
+    if create_figure:
+        plt.figure(figsize=(16,4))
+
     plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
+    plot_features(hmin,hmax,dat,linestyle='-',c='k',label='FM Model')
     
-    if 'features_list' in dat:
-        feat_list = dat['features_list']
-        plot_features(hmin,hmax,dat,feat_list, raw_name=raw_name,linestyle='-',c='k',label='FM Model')
-    
-    # plot_one(hmin,hmax,dat,'E',linestyle='--',c='r',label='EQ')
-    # plot_one(hmin,hmax,dat,'Ed',linestyle='--',c='#EF847C',label='drying EQ', alpha=.8)
-    # plot_one(hmin,hmax,dat,'Ew',linestyle='--',c='#7CCCEF',label='wetting EQ', alpha=.8)
-    # plot_one(hmin,hmax,dat,'fm',linestyle='-',c='#468a29',label='FM Observed')
-    # plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
-    # plot_one(hmin,hmax,dat,'Ec',linestyle='-',c='#8BC084',label='equilibrium correction')
-    # plot_one(hmin,hmax,dat,'rain',linestyle='-',c='b',label='Rain', alpha=.4)
-    # for test
-    # plot_one(hmin,hmax,dat,'x',linestyle='-',c='g',label='x input')
-    # plot_one(hmin,hmax,dat,'y',linestyle='-',c='k',label='y truth')
-    
-    # plot_one(hmin,hmax,dat,'z',linestyle='-',c='r',label='z output')
 
     if 'test_ind' in dat.keys():
         test_ind = dat["test_ind"]
     else:
         test_ind = None
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Note: the code within the tildes here makes a more complex, annotated plot
     if (test_ind is not None) and ('m' in dat.keys()):
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Note: the code within the tildes here makes a more complex, annotated plot
-        plt.axvline(dat['test_ind'], linestyle=':', c='k', alpha=.8)
+        plt.axvline(test_ind, linestyle=':', c='k', alpha=.8)
         yy = plt.ylim() # used to format annotations
-        plt.annotate('', xy=(0, yy[0]),xytext=(dat['test_ind'],yy[0]),                  
+        plot_y0 = np.max([hmin, test_ind]) # Used to format annotations
+        plot_y1 = np.min([hmin, test_ind])
+        plt.annotate('', xy=(hmin, yy[0]),xytext=(plot_y0,yy[0]),  
                 arrowprops=dict(arrowstyle='<-', linewidth=2),
                 annotation_clip=False)
-        plt.annotate('(Training)',xy=(np.ceil(dat['test_ind']/2),yy[1]),xytext=(np.ceil(dat['test_ind']/2),yy[1]+1),
+        plt.annotate('(Training)',xy=((hmin+plot_y0)/2,yy[1]),xytext=((hmin+plot_y0)/2,yy[1]+1), ha = 'right',
                 annotation_clip=False, alpha=.8)
-        plt.annotate('', xy=(dat['test_ind'], yy[0]),xytext=(dat['hours'],yy[0]),                  
+        plt.annotate('', xy=(plot_y0, yy[0]),xytext=(hmax,yy[0]),                  
                 arrowprops=dict(arrowstyle='<-', linewidth=2),
                 annotation_clip=False)
-        plt.annotate('(Forecast)',xy=(np.ceil(dat['test_ind']+(dat['hours']-dat['test_ind'])/2),yy[1]),
-                     xytext=(np.ceil(dat['test_ind']+(dat['hours']-dat['test_ind'])/2),yy[1]+1),
+        plt.annotate('(Forecast)',xy=(hmax-(hmax-test_ind)/2,yy[1]),
+                     xytext=(hmax-(hmax-test_ind)/2,yy[1]+1),
                 annotation_clip=False, alpha=.8)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     
     if title is not None:
@@ -272,6 +269,8 @@ def plot_data(dat0, raw_name = "X_raw",title=None,title2=None,hmin=0,hmax=None,x
     if title2 is not None:
         t = t + ' ' + title2 
     t = t + ' (' + rmse_data_str(dat)+')'
+    if plot_period == "predict":
+        t = t + " - Forecast Period"
     plt.title(t, y=1.1)
     
     if xlabel is None:
@@ -351,32 +350,7 @@ def rmse_data(dat, hours = None, h2 = None, simulation='m', measurements='fm'):
 
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def load_and_fix_data(filename):
-    # Given path to FMDA training dictionary, read and return cleaned dictionary
-    # Inputs: 
-    # filename: (str) path to file with .pickle extension
-    # Returns:
-    # FMDA dictionary with NA values "fixed"
-    
-    with open(filename, 'rb') as handle:
-        test_dict = pickle.load(handle)
-        for case in test_dict:
-            test_dict[case]['case'] = case
-            test_dict[case]['filename'] = filename
-            for key in test_dict[case].keys():
-                var = test_dict[case][key]    # pointer to test_dict[case][key]
-                if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
-                    nans = np.sum(np.isnan(var))
-                    if nans:
-                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values, fixing')
-                        fixnan(var)
-                        nans = np.sum(np.isnan(test_dict[case][key]))
-                        print('After fixing, remained',nans,'nan values')
-            if not 'title' in test_dict[case].keys():
-                test_dict[case]['title']=case
-            if not 'descr' in test_dict[case].keys():
-                test_dict[case]['descr']=f"{case} FMDA dictionary"
-    return test_dict
+
 
 
 def get_file(filename, data_dir='data'):

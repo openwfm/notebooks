@@ -8,4 +8,4 @@ __pycache__
 **/*.grib*
 .virtual_documents
 **/*.pkl
-
+**/*.png

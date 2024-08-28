@@ -6,6 +6,173 @@ from datetime import datetime
 import logging
 import sys
 import inspect
+import yaml
+import hashlib
+import pickle
+import os.path as osp
+from urllib.parse import urlparse
+import subprocess
+
+# Utility to retrieve files from URL
+def retrieve_url(url, dest_path, force_download=False):
+    """
+    Downloads a file from a specified URL to a destination path.
+
+    Parameters:
+    -----------
+    url : str
+        The URL from which to download the file.
+    dest_path : str
+        The destination path where the file should be saved.
+    force_download : bool, optional
+        If True, forces the download even if the file already exists at the destination path.
+        Default is False.
+
+    Warnings:
+    ---------
+    Prints a warning if the file extension of the URL does not match the destination file extension.
+
+    Raises:
+    -------
+    AssertionError:
+        If the download fails and the file does not exist at the destination path.
+
+    Notes:
+    ------
+    This function uses the `wget` command-line tool to download the file. Ensure that `wget` is 
+    installed and accessible from the system's PATH.
+
+    Prints:
+    -------
+    A message indicating whether the file was downloaded or if it already exists at the 
+    destination path.
+    """    
+    if not osp.exists(dest_path) or force_download:
+        target_extension = osp.splitext(dest_path)[1]
+        url_extension = osp.splitext(urlparse(url).path)[1]
+        if target_extension != url_extension:
+            print("Warning: file extension from url does not match destination file extension")
+        subprocess.call(f"wget -O {dest_path}  {url}", shell=True)
+        assert osp.exists(dest_path)
+        print(f"Successfully downloaded {url} to {dest_path}")
+    else:
+        print(f"Target data already exists at {dest_path}")
+
+# Function to check if lists are nested, or all elements in given list are in target list
+def all_items_exist(source_list, target_list):
+    """
+    Checks if all items from the source list exist in the target list.
+
+    Parameters:
+    -----------
+    source_list : list
+        The list of items to check for existence in the target list.
+    target_list : list
+        The list in which to check for the presence of items from the source list.
+
+    Returns:
+    --------
+    bool
+        True if all items in the source list are present in the target list, False otherwise.
+
+    Example:
+    --------
+    >>> source_list = [1, 2, 3]
+    >>> target_list = [1, 2, 3, 4, 5]
+    >>> all_items_exist(source_list, target_list)
+    True
+
+    >>> source_list = [1, 2, 6]
+    >>> all_items_exist(source_list, target_list)
+    False
+    """    
+    return all(item in target_list for item in source_list)
+
+# Generic helper function to read yaml files
+def read_yml(yaml_path, subkey=None):
+    """
+    Reads a YAML file and optionally retrieves a specific subkey.
+
+    Parameters:
+    -----------
+    yaml_path : str
+        The path to the YAML file to be read.
+    subkey : str, optional
+        A specific key within the YAML file to retrieve. If provided, only the value associated 
+        with this key will be returned. If not provided, the entire YAML file is returned as a 
+        dictionary. Default is None.
+
+    Returns:
+    --------
+    dict or any
+        The contents of the YAML file as a dictionary, or the value associated with the specified 
+        subkey if provided.
+
+    """    
+    with open(yaml_path, 'r') as file:
+        d = yaml.safe_load(file)
+        if subkey is not None:
+            d = d[subkey]
+    return d
+
+# Use to load nested fmda dictionary of cases
+def load_and_fix_data(filename):
+    # Given path to FMDA training dictionary, read and return cleaned dictionary
+    # Inputs: 
+    # filename: (str) path to file with .pickle extension
+    # Returns:
+    # FMDA dictionary with NA values "fixed"
+    print(f"loading file {filename}")
+    with open(filename, 'rb') as handle:
+        test_dict = pickle.load(handle)
+        for case in test_dict:
+            test_dict[case]['case'] = case
+            test_dict[case]['filename'] = filename
+            for key in test_dict[case].keys():
+                var = test_dict[case][key]    # pointer to test_dict[case][key]
+                if isinstance(var,np.ndarray) and (var.dtype.kind == 'f'):
+                    nans = np.sum(np.isnan(var))
+                    if nans:
+                        print('WARNING: case',case,'variable',key,'shape',var.shape,'has',nans,'nan values, fixing')
+                        fixnan(var)
+                        nans = np.sum(np.isnan(test_dict[case][key]))
+                        print('After fixing, remained',nans,'nan values')
+            if not 'title' in test_dict[case].keys():
+                test_dict[case]['title']=case
+            if not 'descr' in test_dict[case].keys():
+                test_dict[case]['descr']=f"{case} FMDA dictionary"
+    return test_dict
+
+# Generic helper function to read pickle files
+def read_pkl(file_path):
+    """
+    Reads a pickle file and returns its contents.
+
+    Parameters:
+    -----------
+    file_path : str
+        The path to the pickle file to be read.
+
+    Returns:
+    --------
+    any
+        The object stored in the pickle file.
+
+    Prints:
+    -------
+    A message indicating the file path being loaded.
+
+    Notes:
+    ------
+    This function uses Python's `pickle` module to deserialize the contents of the file. Ensure 
+    that the pickle file was created in a safe and trusted environment to avoid security risks 
+    associated with loading arbitrary code.
+
+    """    
+    with open(file_path, 'rb') as file:
+        print(f"loading file {file_path}")
+        d = pickle.load(file)
+    return d
 
 def logging_setup():
     logging.basicConfig(
@@ -37,6 +204,66 @@ def vprint(*args):
         print(args[-1])
         
         
+## Function for Hashing numpy arrays 
+def hash_ndarray(arr: np.ndarray) -> str:
+    """
+    Generates a unique hash string for a NumPy ndarray.
+
+    Parameters:
+    -----------
+    arr : np.ndarray
+        The NumPy array to be hashed.
+
+    Returns:
+    --------
+    str
+        A hexadecimal string representing the MD5 hash of the array.
+
+    Notes:
+    ------
+    This function first converts the NumPy array to a bytes string using the `tobytes()` method, 
+    and then computes the MD5 hash of this bytes string. Performance might be bad for very large arrays.
+    
+    Example:
+    --------
+    >>> arr = np.array([1, 2, 3])
+    >>> hash_value = hash_ndarray(arr)
+    >>> print(hash_value)
+    '2a1dd1e1e59d0a384c26951e316cd7e6'
+    """    
+    # Convert the array to a bytes string
+    arr_bytes = arr.tobytes()
+    # Use hashlib to generate a unique hash
+    hash_obj = hashlib.md5(arr_bytes)
+    return hash_obj.hexdigest()
+    
+## Function for Hashing tensorflow models
+def hash_weights(model):
+    """
+    Generates a unique hash string for a the weights of a given Keras model.
+
+    Parameters:
+    -----------
+    model : A keras model
+        The Keras model to be hashed.
+
+    Returns:
+    --------
+    str
+        A hexadecimal string representing the MD5 hash of the model weights.
+
+    """
+    # Extract all weights and biases
+    weights = model.get_weights()
+    
+    # Convert each weight array to a string
+    weight_str = ''.join([np.array2string(w, separator=',') for w in weights])
+    
+    # Generate a SHA-256 hash of the combined string
+    weight_hash = hashlib.md5(weight_str.encode('utf-8')).hexdigest()
+    
+    return weight_hash
+
 ## Generic function to hash dictionary of various types
 
 @singledispatch
