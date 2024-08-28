@@ -202,7 +202,7 @@ def plot_features(hmin,hmax,dat,linestyle,c,label,alpha=1):
         if feat in plot_styles.keys():
             plot_feature(x=hour, y=dat['X'][:,i][hmin:hmax], feature_name=feat)
         
-def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
+def plot_data(dat, plot_period='all', create_figure=False,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=None):
     # Plot fmda dictionary of data and model if present
     # Inputs:
     # dat: FMDA dictionary
@@ -215,11 +215,20 @@ def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=Non
         if hmax is None:
             hmax = dat['hours']
         else:
-            hmax = min(hmax, dat['hours'])
+            hmax = min(hmax, dat['hours'])        
+        if plot_period == "all":
+            pass
+        elif plot_period == "predict":
+            assert "test_ind" in dat.keys()
+            hmin = dat['test_ind']
+
+        else: 
+            raise ValueError(f"unrecognized time period for plotting plot_period: {plot_period}")
     
     
-    
-    # plt.figure(figsize=(16,4))
+    if create_figure:
+        plt.figure(figsize=(16,4))
+
     plot_one(hmin,hmax,dat,'y',linestyle='-',c='#468a29',label='FM Observed')
     plot_one(hmin,hmax,dat,'m',linestyle='-',c='k',label='FM Model')
     plot_features(hmin,hmax,dat,linestyle='-',c='k',label='FM Model')
@@ -229,23 +238,25 @@ def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=Non
         test_ind = dat["test_ind"]
     else:
         test_ind = None
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Note: the code within the tildes here makes a more complex, annotated plot
     if (test_ind is not None) and ('m' in dat.keys()):
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Note: the code within the tildes here makes a more complex, annotated plot
-        plt.axvline(dat['test_ind'], linestyle=':', c='k', alpha=.8)
+        plt.axvline(test_ind, linestyle=':', c='k', alpha=.8)
         yy = plt.ylim() # used to format annotations
-        plt.annotate('', xy=(0, yy[0]),xytext=(dat['test_ind'],yy[0]),                  
+        plot_y0 = np.max([hmin, test_ind]) # Used to format annotations
+        plot_y1 = np.min([hmin, test_ind])
+        plt.annotate('', xy=(hmin, yy[0]),xytext=(plot_y0,yy[0]),  
                 arrowprops=dict(arrowstyle='<-', linewidth=2),
                 annotation_clip=False)
-        plt.annotate('(Training)',xy=(np.ceil(dat['test_ind']/2),yy[1]),xytext=(np.ceil(dat['test_ind']/2),yy[1]+1),
+        plt.annotate('(Training)',xy=((hmin+plot_y0)/2,yy[1]),xytext=((hmin+plot_y0)/2,yy[1]+1), ha = 'right',
                 annotation_clip=False, alpha=.8)
-        plt.annotate('', xy=(dat['test_ind'], yy[0]),xytext=(dat['hours'],yy[0]),                  
+        plt.annotate('', xy=(plot_y0, yy[0]),xytext=(hmax,yy[0]),                  
                 arrowprops=dict(arrowstyle='<-', linewidth=2),
                 annotation_clip=False)
-        plt.annotate('(Forecast)',xy=(np.ceil(dat['test_ind']+(dat['hours']-dat['test_ind'])/2),yy[1]),
-                     xytext=(np.ceil(dat['test_ind']+(dat['hours']-dat['test_ind'])/2),yy[1]+1),
+        plt.annotate('(Forecast)',xy=(hmax-(hmax-test_ind)/2,yy[1]),
+                     xytext=(hmax-(hmax-test_ind)/2,yy[1]+1),
                 annotation_clip=False, alpha=.8)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     
     if title is not None:
@@ -258,6 +269,8 @@ def plot_data(dat,title=None,title2=None,hmin=0,hmax=None,xlabel=None,ylabel=Non
     if title2 is not None:
         t = t + ' ' + title2 
     t = t + ' (' + rmse_data_str(dat)+')'
+    if plot_period == "predict":
+        t = t + " - Forecast Period"
     plt.title(t, y=1.1)
     
     if xlabel is None:

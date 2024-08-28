@@ -951,7 +951,7 @@ class RNNModel(ABC):
         plt.legend(loc='upper left')
         plt.show()
 
-    def run_model(self, dict0, reproducibility_run=False):
+    def run_model(self, dict0, reproducibility_run=False, plot_period='all'):
         """
         Runs the RNN model, including training, prediction, and reproducibility checks.
 
@@ -1014,7 +1014,7 @@ class RNNModel(ABC):
         # print(dict1.keys())
         # Plot final fit and data
         dict1['y'] = y
-        plot_data(dict1, title="RNN", title2=dict1['case'])
+        plot_data(dict1, title="RNN", title2=dict1['case'], plot_period=plot_period)
         
         # Calculate Errors
         err = rmse(m, y)
