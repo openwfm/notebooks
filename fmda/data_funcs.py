@@ -15,6 +15,62 @@ import copy
 import subprocess
 import os.path as osp
 
+# Utility to combine nested fmda dictionaries
+def combine_nested(nested_input_dict, verbose=True):
+    """
+    Combines input data dictionaries.
+
+    Parameters:
+    -----------
+    verbose : bool, optional
+        If True, prints status messages. Default is True.
+    """   
+    # Setup return dictionary
+    d = {}
+    # Use the helper function to populate the keys
+    d['id'] = _combine_key(nested_input_dict, 'id')
+    d['case'] = _combine_key(nested_input_dict, 'case')
+    d['filename'] = _combine_key(nested_input_dict, 'filename')
+    d['time'] = _combine_key(nested_input_dict, 'time')
+    d['X'] = _combine_key(nested_input_dict, 'X')
+    d['y'] = _combine_key(nested_input_dict, 'y')
+
+    # Build the loc subdictionary using _combine_key for each loc key
+    d['loc'] = {
+        'STID': _combine_key(nested_input_dict, 'loc', 'STID'),
+        'lat': _combine_key(nested_input_dict, 'loc', 'lat'),
+        'lon': _combine_key(nested_input_dict, 'loc', 'lon'),
+        'elev': _combine_key(nested_input_dict, 'loc', 'elev'),
+        'pixel_x': _combine_key(nested_input_dict, 'loc', 'pixel_x'),
+        'pixel_y': _combine_key(nested_input_dict, 'loc', 'pixel_y')
+    }
+    
+    # Handle features_list separately with validation
+    features_list = _combine_key(nested_input_dict, 'features_list')
+    if features_list:
+        first_features_list = features_list[0]
+        for fl in features_list:
+            if fl != first_features_list:
+                warnings.warn("Different features_list found in the nested input dictionaries.")
+        d['features_list'] = first_features_list
+
+    return d
+        
+def _combine_key(nested_input_dict, key, subkey=None):
+    combined_list = []
+    for input_dict in nested_input_dict.values():
+        if isinstance(input_dict, dict):
+            try:
+                if subkey:
+                    combined_list.append(input_dict[key][subkey])
+                else:
+                    combined_list.append(input_dict[key])
+            except KeyError:
+                raise ValueError(f"Missing expected key: '{key}'{f' or subkey: {subkey}' if subkey else ''} in one of the input dictionaries")
+        else:
+            raise ValueError(f"Expected a dictionary, but got {type(input_dict)}")
+    return combined_list 
+
 
 def compare_dicts(dict1, dict2, keys):
     for key in keys:
