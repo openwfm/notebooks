@@ -484,9 +484,11 @@ class RNNData(dict):
             A subset of features to be used. Default is None which means all features.
         """
 
-        # Copy to avoid 
+        # Copy to avoid changing external input
         input_data = input_dict.copy()
+        # Initialize inherited dict class
         super().__init__(input_data)
+        # Set up Data Scaling
         self.scaler = None
         if scaler is not None:
             self.set_scaler(scaler)
@@ -500,6 +502,7 @@ class RNNData(dict):
             self.features_list = features_list
         self.run_checks()
         self.__dict__.update(self)
+    
     def run_checks(self, verbose=True):
         """
         Validates that required keys are present and checks the integrity of data shapes.
