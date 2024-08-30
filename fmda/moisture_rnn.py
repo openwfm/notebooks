@@ -798,7 +798,27 @@ class RNNModel(ABC):
     def _build_model_predict(self, return_sequences=True):
         """Abstract method to build the prediction model. This model copies weights from the train model but with input structure that allows for easier prediction of arbitrary length timeseries. This model is not to be used for training, or don't use with .fit calls"""
         pass
-    
+
+    def is_stateful(self):
+        """
+        Checks whether any of the layers in the internal model (self.model_train) are stateful.
+
+        Returns:
+        bool: True if at least one layer in the model is stateful, False otherwise.
+        
+        This method iterates over all the layers in the model and checks if any of them
+        have the 'stateful' attribute set to True. This is useful for determining if 
+        the model is designed to maintain state across batches during training.
+
+        Example:
+        --------
+        model.is_stateful()
+        """          
+        for layer in self.model_train.layers:
+            if hasattr(layer, 'stateful') and layer.stateful:
+                return True
+        return False
+        
     def fit(self, X_train, y_train, plot=True, plot_title = '', 
             weights=None, callbacks=[], validation_data=None, *args, **kwargs):
         """
