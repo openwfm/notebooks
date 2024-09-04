@@ -608,7 +608,7 @@ class RNNData(dict):
             print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")
     def scale_data(self, verbose=True):
         """
-        Scales the data using the set scaler.
+        Scales the training data using the set scaler.
 
         Parameters:
         -----------
@@ -620,7 +620,7 @@ class RNNData(dict):
         if not hasattr(self, "X_train"):
             raise AttributeError("No X_train within object. Run train_test_split first. This is to avoid fitting the scaler with prediction data.")
         if verbose:
-            print(f"Scaling data with scaler {self.scaler}, fitting on X_train")
+            print(f"Scaling used training data with scaler {self.scaler}, fitting on X_train")
         # Fit the scaler on the training data
         self.scaler.fit(self.X_train)      
         # Transform the data using the fitted scaler
@@ -628,6 +628,35 @@ class RNNData(dict):
         if hasattr(self, 'X_val'):
             self.X_val = self.scaler.transform(self.X_val)
         self.X_test = self.scaler.transform(self.X_test)
+    def scale_all_X(self, verbose=True):
+        """
+        Scales the all data using the set scaler.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        Returns:
+        -------
+        ndarray
+            Scaled X matrix, subsetted to features_list.
+        """      
+        if self.scaler is None:
+            raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
+        if verbose:
+            print(f"Scaling all X data with scaler {self.scaler}, fitted on X_train")
+        # Subset features
+        indices = []
+        for item in self.features_list:
+            if item in self.all_features_list:
+                indices.append(self.all_features_list.index(item))
+            else:
+                print(f"Warning: feature name '{item}' not found in list of all features from input data")
+        X = self.X[:, indices]
+        X = self.scaler.transform(X)
+
+        return X    
+
     def inverse_scale(self, return_X = 'all_hours', save_changes=False, verbose=True):
         """
         Inversely scales the data to its original form.
@@ -661,6 +690,47 @@ class RNNData(dict):
             return np.concatenate((X_train, X_val, X_test), axis=0)
         else:
             print(f"Unrecognized or unimplemented return value {return_X}")
+    def batch_reshape(self, timesteps, batch_size, method = "nonspatial", verbose=False):
+        """
+        Restructures input data to RNN using batches and sequences.
+
+        Parameters:
+        ----------
+        batch_size : int
+            The size of each training batch to reshape the data.
+        timesteps : int
+            The number of timesteps or sequence length. Consistitutes a single sample
+        method : str, optional
+            The reshaping method to use, by default "nonspatial".
+            - "nonspatial": Reshapes data assuming no spatial dimensions.
+            - "spatial": Reshapes data considering spatial dimensions.
+        timesteps : int
+            Number of timesteps or sequence length used for a single sequence in RNN training. Constitutes a single sample to the model
+
+        batch_size : int
+            Number of sequences used within a batch of training
+
+        Returns:
+        -------
+        None
+            This method reshapes the data in place.
+        Raises:
+        ------
+        AttributeError
+            If either 'X_train' or 'y_train' attributes do not exist within the instance.
+            
+        """
+
+        if not hasattr(self, 'X_train') or not hasattr(self, 'y_train'):
+            raise AttributeError("Both 'X_train' and 'y_train' must be set before reshaping batches.")
+        
+        if method == "nonspatial":
+            print(f"Reshaping training data using batch size: {batch_size} and timesteps: {timesteps}")
+            self.X_train, self.y_train = staircase_2(self.X_train, self.y_train, timesteps = timesteps, batch_size=batch_size, verbose=verbose)
+            if hasattr(self, "X_val"):
+                print(f"Reshaping validation data using batch size: {batch_size} and timesteps: {timesteps}")
+                self.X_val, self.y_val = staircase_2(self.X_val, self.y_val, timesteps = timesteps, batch_size=batch_size, verbose=verbose)
+        
     def print_hashes(self, attrs_to_check = ['X', 'y', 'X_train', 'y_train', 'X_val', 'y_val', 'X_test', 'y_test']):
         """
         Prints the hash of specified data attributes.
@@ -848,9 +918,9 @@ class RNNModel(ABC):
         verbose_weights = self.params['verbose_weights']
         if verbose_weights:
             print(f"Training simple RNN with params: {self.params}")
-        X_train, y_train = self.format_train_data(X_train, y_train)
+        # X_train, y_train = self.format_train_data(X_train, y_train)
         if validation_data is not None:
-            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
+            X_val, y_val =validation_data[0], validation_data[1]
         if verbose_weights:
             print(f"Formatted X_train hash: {hash_ndarray(X_train)}")
             print(f"Formatted y_train hash: {hash_ndarray(y_train)}")
@@ -918,26 +988,27 @@ class RNNModel(ABC):
         preds = self.model_predict.predict(X_test).flatten()
         return preds
 
-    def format_train_data(self, X, y, verbose=False):
-        """
-        Formats the training data for RNN input.
+    # DEPRECATED, USED WITHIN RNNData object now
+    # def format_train_data(self, X, y, verbose=False):
+    #     """
+    #     Formats the training data for RNN input.
 
-        Parameters:
-        -----------
-        X : np.ndarray
-            The input data.
-        y : np.ndarray
-            The target data.
-        verbose : bool, optional
-            If True, prints status messages. Default is False.
+    #     Parameters:
+    #     -----------
+    #     X : np.ndarray
+    #         The input data.
+    #     y : np.ndarray
+    #         The target data.
+    #     verbose : bool, optional
+    #         If True, prints status messages. Default is False.
 
-        Returns:
-        --------
-        tuple
-            Formatted input and target data.
-        """        
-        X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
-        return X, y
+    #     Returns:
+    #     --------
+    #     tuple
+    #         Formatted input and target data.
+    #     """        
+    #     X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
+    #     return X, y
     def format_pred_data(self, X):
         """
         Formats the prediction data for RNN input.
@@ -1014,12 +1085,8 @@ class RNNModel(ABC):
             self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id)
         # Generate Predictions, 
         # run through training to get hidden state set proporly for forecast period
-        if X_val is None:
-            X = np.concatenate((X_train, X_test))
-            y = np.concatenate((y_train, y_test)).flatten()
-        else:
-            X = np.concatenate((X_train, X_val, X_test))
-            y = np.concatenate((y_train, y_val, y_test)).flatten()
+        X = dict1.scale_all_X()
+        y = dict1.y.flatten()
         # Predict
         if verbose_weights:
             print(f"Predicting Training through Test")
@@ -1044,8 +1111,9 @@ class RNNModel(ABC):
         err = rmse(m, y)
         train_ind = dict1["train_ind"] # index of final training set value
         test_ind = dict1["test_ind"] # index of first test set value
-        err_train = rmse(m[:train_ind], y_train.flatten())
-        err_pred = rmse(m[test_ind:], y_test.flatten())
+        
+        err_train = rmse(m[:train_ind], y[:train_ind].flatten())
+        err_pred = rmse(m[test_ind:], y[test_ind:].flatten())
         rmse_dict = {
             'all': err, 
             'training': err_train, 
