@@ -13,6 +13,57 @@ import os.path as osp
 from urllib.parse import urlparse
 import subprocess
 
+from itertools import islice
+
+class Dict(dict):
+    """
+    A dictionary that allows member access to its keys.
+    A convenience class.
+    """
+
+    def __init__(self, d):
+        """
+        Updates itself with d.
+        """
+        self.update(d)
+
+    def __getattr__(self, item):
+        return self[item]
+
+    def __setattr__(self, item, value):
+        self[item] = value
+
+    def __getitem__(self, item):
+        if item in self:
+            return super().__getitem__(item)
+        else:
+            for key in self:
+                if isinstance(key,(range,tuple)) and item in key:
+                    return super().__getitem__(key)
+            raise KeyError(item)
+
+    def keys(self):
+        if any([isinstance(key,(range,tuple)) for key in self]):
+            keys = []
+            for key in self:
+                if isinstance(key,(range,tuple)):
+                    for k in key:
+                        keys.append(k)
+                else:
+                    keys.append(key)
+            return keys
+        else:
+            return super().keys()
+
+def save(obj, file):
+    with open(file,'wb') as output:
+        dill.dump(obj, output )
+
+def load(file):
+    with open(file,'rb') as input:
+        returnitem = dill.load(input)
+        return returnitem
+
 # Utility to retrieve files from URL
 def retrieve_url(url, dest_path, force_download=False):
     """
@@ -231,8 +282,13 @@ def hash_ndarray(arr: np.ndarray) -> str:
     >>> print(hash_value)
     '2a1dd1e1e59d0a384c26951e316cd7e6'
     """    
-    # Convert the array to a bytes string
-    arr_bytes = arr.tobytes()
+    # If input is list, attempt to concatenate and then hash
+    if type(arr) == list:
+        arr = np.vstack(arr)
+        arr_bytes = arr.tobytes()
+    else:
+        # Convert the array to a bytes string
+        arr_bytes = arr.tobytes()
     # Use hashlib to generate a unique hash
     hash_obj = hashlib.md5(arr_bytes)
     return hash_obj.hexdigest()
