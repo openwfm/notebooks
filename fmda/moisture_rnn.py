@@ -392,10 +392,10 @@ def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = Non
     Parameters:
     -----------
     X : list of numpy arrays
-        A list where each element is a numpy array containing features for a specific location. The shape of each array is `(time_steps, features)`.
+        A list where each element is a numpy array containing features for a specific location. The shape of each array is `(total_time_steps, features)`.
 
     y : list of numpy arrays
-        A list where each element is a numpy array containing the target values for a specific location. The shape of each array is `(time_steps,)`.
+        A list where each element is a numpy array containing the target values for a specific location. The shape of each array is `(total_time_steps,)`.
 
     batch_size : int
         The number of sequences to include in each batch.
@@ -421,7 +421,7 @@ def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = Non
         A 2D numpy array with shape `(total_sequences, 1)` containing the corresponding target values for all locations.
 
     n_seqs : int
-        Number of sequences per location. Used to reset states when location changes
+        Number of sequences per location. Used to reset states when location changes. Hidden state of RNN will be reset after n_seqs number of batches
 
     Notes:
     ------
