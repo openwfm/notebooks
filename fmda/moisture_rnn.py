@@ -1178,7 +1178,7 @@ class RNNModel(ABC):
             print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
         # Setup callbacks
         if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback(batch_reset = self.params['batch_reset']), TerminateOnNaN()]
+            callbacks=callbacks+[ResetStatesCallback(self.params), TerminateOnNaN()]
         if validation_data is not None:
             print("Using early stopping callback.")
             callbacks=callbacks+[EarlyStoppingCallback(patience = self.params['early_stopping_patience'])]
@@ -1371,6 +1371,26 @@ class RNNModel(ABC):
 
 
 ## Callbacks
+
+# Helper functions for batch reset schedules
+def calc_exp_intervals(bmin, bmax, n_epochs, force_bmax = True):
+    # Calculate the exponential intervals for each epoch
+    epochs = np.arange(n_epochs)
+    factors = epochs / n_epochs
+    intervals = bmin * (bmax / bmin) ** factors
+    if force_bmax:
+        intervals[-1] = bmax  # Ensure the last value is exactly bmax
+    return intervals.astype(int)
+
+def calc_log_intervals(bmin, bmax, n_epochs, force_bmax = True):
+    # Calculate the logarithmic intervals for each epoch
+    epochs = np.arange(n_epochs)
+    factors = np.log(1 + epochs) / np.log(1 + n_epochs)
+    intervals = bmin + (bmax - bmin) * factors
+    if force_bmax:
+        intervals[-1] = bmax  # Ensure the last value is exactly bmax
+    return intervals.astype(int)
+
 class ResetStatesCallback(Callback):
     """
     Custom callback to reset the states of RNN layers at the end of each epoch and optionally after a specified number of batches.
@@ -1380,20 +1400,55 @@ class ResetStatesCallback(Callback):
     batch_reset : int, optional
         If provided, resets the states of RNN layers after every `batch_reset` batches. Default is None.
     """    
-    def __init__(self, batch_reset=None, loc_batch_reset=None):
+    # def __init__(self, bmin=None, bmax=None, epochs=None, loc_batch_reset = None, batch_schedule_type='linear', verbose=True):
+    def __init__(self, params=None, verbose=True):
         """
         Initializes the ResetStatesCallback with an optional batch reset interval.
 
         Parameters:
         -----------
-        batch_reset : int, optional
-            The interval of batches after which to reset the states of RNN layers. Default is None.
-        loc_batch_reset : int, optional
-            The interval of batches after which the location changes for a given batch number, then reset the states of RNN layers. Default is None.
+        params: dict, optional
+            Dictionary of parameters. If None provided, only on_epoch_end will trigger reset of hidden states.
+            - bmin : int
+                Minimum for batch reset schedule
+            - bmax : int
+                Maximum for batch reset schedule
+            - epochs : int
+                Number of training epochs.
+            - loc_batch_reset : int
+                Interval of batches after which to reset the states of RNN layers for location changes. Triggers reset for training AND validation phases
+            - batch_schedule_type : str
+                Type of batch scheduling to be used. Recognized methods are following:
+                - 'constant' : Used fixed batch reset interval throughout training
+                - 'linear'   : Increases the batch reset interval linearly over epochs from bmin to bmax.
+                - 'exp'      : Increases the batch reset interval exponentially over epochs from bmin to bmax.
+                - 'log'      : Increases the batch reset interval logarithmically over epochs from bmin to bmax.
+
+                
+        Returns:
+        -----------
+        Only in-place reset of hidden states of RNN that calls uses this callback.
+        
         """        
         super(ResetStatesCallback, self).__init__()
-        self.batch_reset = batch_reset 
-        self.loc_batch_reset = loc_batch_reset 
+
+        # Check for optional arguments, set None if missing in input params 
+        arg_list = ['bmin', 'bmax', 'epochs', 'loc_batch_reset', 'batch_schedule_type']
+        for arg in arg_list:
+            setattr(self, arg, params.get(arg, None))          
+
+        self.verbose = verbose
+        if self.verbose:
+            print(f"Using ResetStatesCallback with Batch Reset Schedule: {self.batch_schedule_type}")
+        # Calculate the reset intervals for each epoch during initialization
+        if self.batch_schedule_type is not None:
+            if self.epochs is None:
+                raise ValueError(f"Arugment `epochs` cannot be none with self.batch_schedule_type: {self.batch_schedule_type}")
+            self.batch_reset_intervals = self._calc_reset_intervals(self.batch_schedule_type)
+            if self.verbose:
+                print(f"batch_reset_intervals: {self.batch_reset_intervals}")
+        else:
+            self.batch_reset_intervals = None
     def on_epoch_end(self, epoch, logs=None):
         """
         Resets the states of RNN layers at the end of each epoch.
@@ -1405,12 +1460,31 @@ class ResetStatesCallback(Callback):
         logs : dict, optional
             A dictionary containing metrics from the epoch. Default is None.
         """        
-        # print(f"Resetting hidden state after epoch: {epoch+1}", flush=True)
+        # print(f" Resetting hidden state after epoch: {epoch+1}", flush=True)
         # Iterate over each layer in the model
         for layer in self.model.layers:
             # Check if the layer has a reset_states method
             if hasattr(layer, 'reset_states'):
                 layer.reset_states()
+    def _calc_reset_intervals(self,batch_schedule_type):
+        methods = ['constant', 'linear', 'exp', 'log']
+        if batch_schedule_type not in methods:
+            raise ValueError(f"Batch schedule method {batch_schedule_type} not recognized. \n Available methods: {methods}")
+        if batch_schedule_type == "constant":
+            
+            return np.repeat(self.bmin, self.epochs).astype(int)
+        elif batch_schedule_type == "linear":
+            return np.linspace(self.bmin, self.bmax, self.epochs).astype(int)
+        elif batch_schedule_type == "exp":
+            return calc_exp_intervals(self.bmin, self.bmax, self.epochs)
+        elif batch_schedule_type == "log":
+            return calc_log_intervals(self.bmin, self.bmax, self.epochs)
+    def on_epoch_begin(self, epoch, logs=None):
+        # Set the reset interval for the current epoch
+        if self.batch_reset_intervals is not None:
+            self.current_batch_reset = self.batch_reset_intervals[epoch]
+        else:
+            self.current_batch_reset = None
     def on_train_batch_end(self, batch, logs=None):
         """
         Resets the states of RNN layers during training after a specified number of batches, if `batch_reset` or `loc_batch_reset` are provided. The `batch_reset` is used for stability and to avoid exploding gradients at the beginning of training when a hidden state is being passed with weights that haven't learned yet. The `loc_batch_reset` is used to reset the states when a particular batch is from a new location and thus the hidden state should be passed.
@@ -1422,15 +1496,14 @@ class ResetStatesCallback(Callback):
         logs : dict, optional
             A dictionary containing metrics from the batch. Default is None.
         """        
-        batch_reset = self.batch_reset
-        loc_batch_reset = self.loc_batch_reset
-        if (batch_reset is not None and batch % batch_reset == 0) or (loc_batch_reset is not None and batch % loc_batch_reset == 0):
-            # print(f"Resetting states after batch {batch + 1}")
+        batch_reset = self.current_batch_reset
+        if (batch_reset is not None and batch % batch_reset == 0):
+            # print(f" Resetting states after batch {batch + 1}")
             # Iterate over each layer in the model
             for layer in self.model.layers:
                 # Check if the layer has a reset_states method
                 if hasattr(layer, 'reset_states'):
-                    layer.reset_states()
+                    layer.reset_states()  
     def on_test_batch_end(self, batch, logs=None):
         """
         Resets the states of RNN layers during validation if `loc_batch_reset` is provided to demarcate a new location and thus avoid passing a hidden state to a wrong location.
@@ -1444,12 +1517,12 @@ class ResetStatesCallback(Callback):
         """          
         loc_batch_reset = self.loc_batch_reset
         if (loc_batch_reset is not None and batch % loc_batch_reset == 0):
-            # print(f"Resetting in test batch states after batch {batch + 1}")
+            # print(f"Resetting states in Validation mode after batch {batch + 1}")
             # Iterate over each layer in the model
             for layer in self.model.layers:
                 # Check if the layer has a reset_states method
                 if hasattr(layer, 'reset_states'):
-                    layer.reset_states()        
+                    layer.reset_states()          
                    
 # class ResetStatesCallback(Callback):
 #     """

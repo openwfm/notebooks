@@ -14,8 +14,10 @@ rnn:
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-  batch_reset: 10 # reset states after given number of batches
-  epochs: 200
+  # batch_reset: 10 # reset states after given number of batches
+  batch_schedule_type: 'constant' # Schedule to Reset Hidden State
+  bmin: 20 # Minimum number of batches for batch reset schedule
+  epochs: 20
   learning_rate: 0.001
   clipvalue: 10.0 # gradient clipping param, gradient can't exceed this value
   phys_initialize: False # physics initialization
@@ -45,7 +47,7 @@ lstm:
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-  batch_reset: 150 # reset states after given number of batches  
+  # batch_reset: 150 # reset states after given number of batches  
   epochs: 100
   learning_rate: 0.0001
   clipvalue: 1.0 # gradient clipping param, gradient can't exceed this value
@@ -77,7 +79,7 @@ rnn_repro:
   dropout: [0.2, 0.2]
   recurrent_dropout: 0.2
   reset_states: True
-  batch_reset: null
+  # batch_reset: null
   epochs: 300
   learning_rate: 0.001
   clipvalue: 10.0
