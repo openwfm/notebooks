@@ -648,8 +648,8 @@ class RNNData(dict):
             if val_frac >0:
                 self.X_val = [Xi[train_ind:test_ind] for Xi in X]
                 self.y_val = [yi[train_ind:test_ind].reshape(-1,1) for yi in y]
-            self.X_test = [Xi[:train_ind] for Xi in X]
-            self.y_test = [yi[:train_ind].reshape(-1,1) for yi in y]
+            self.X_test = [Xi[test_ind:] for Xi in X]
+            self.y_test = [yi[test_ind:].reshape(-1,1) for yi in y]
         else:
             self.X_train = X[:train_ind]
             self.y_train = y[:train_ind].reshape(-1,1) # assumes y 1-d, change this if vector output
@@ -1164,26 +1164,31 @@ class RNNModel(ABC):
             self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id)
 
         # Generate Predictions and Evaluate Test Error
-        # if dict0.spatial:
-        #     m, errs = _eval_spatial(dict0)
-        # else:
-        #     m, errs = _eval_single(dict0)
+        if dict0.spatial:
+            m, errs = self._eval_multi(dict0)
+        else:
+            m, errs = self._eval_single(dict0, verbose_weights, reproducibility_run)
+            plot_data(dict0, title="RNN", title2=dict0['case'], plot_period=plot_period)
 
+
+        if save_outputs:
+            dict0['m']=m
     
+        return m, errs
+
+    def _eval_single(self, dict0, verbose_weights, reproducibility_run):
         # Generate Predictions, 
         # run through training to get hidden state set properly for forecast period
+        print(f"Running prediction on all input data, Training through Test")
         X = dict0.scale_all_X()
         y = dict0.y.flatten()
         # Predict
         if verbose_weights:
-            print(f"Predicting Training through Test")
             print(f"All X hash: {hash_ndarray(X)}")
         
         m = self.predict(X).flatten()
         if verbose_weights:
             print(f"Predictions Hash: {hash_ndarray(m)}")
-        dict0['m']=m
-        # dict0['m']=m # add to outside env dictionary, should be only place where input dict is modified
         
         if reproducibility_run:
             print("Checking Reproducibility")
@@ -1192,7 +1197,7 @@ class RNNModel(ABC):
         # print(dict0.keys())
         # Plot final fit and data
         # dict0['y'] = y
-        plot_data(dict0, title="RNN", title2=dict0['case'], plot_period=plot_period)
+        # plot_data(dict0, title="RNN", title2=dict0['case'], plot_period=plot_period)
         
         # Calculate Errors
         err = rmse(m, y)
@@ -1207,10 +1212,27 @@ class RNNModel(ABC):
             'prediction': err_pred
         }
         return m, rmse_dict
-    def _eval_single(self, dict0):
-        pass
-    def _eval_spatial(self, dict0):
-        pass
+        
+    def _eval_multi(self, dict0):
+        # Train Error: NOT DOING YET. DECIDE WHETHER THIS IS NEEDED
+        
+        # Test Error
+        new_data = np.stack(dict0.X_test, axis=0)
+        y_array = np.stack(dict0.y_test, axis=0)
+        preds = self.model_predict.predict(new_data)
+
+        # Calculate RMSE
+        ## Note: not using util rmse function since this approach is for 3d arrays
+        # Compute the squared differences
+        squared_diff = np.square(preds - y_array)
+        
+        # Mean squared error along the timesteps and dimensions (axis 1 and 2)
+        mse = np.mean(squared_diff, axis=(1, 2))
+
+        # Root mean squared error (RMSE) for each timeseries
+        rmses = np.sqrt(mse)
+        
+        return preds, rmses
 
 
 ## Callbacks
