@@ -445,7 +445,7 @@ class RNNParams(dict):
             
     def update(self, *args, verbose=True, **kwargs):
         """
-        Updates the dictionary, with restrictions on certain keys, and recalculates shapes if necessary.
+        Overwrites the standard update functon from dict. This is to prevent certain keys from being modified directly and to automatically update keys to be compatible with each other. The keys handled relate to the shape of the input data to the RNN.
 
         Parameters:
         -----------
@@ -954,8 +954,7 @@ class RNNModel(ABC):
         params : dict
             A dictionary containing model parameters.
         """
-        self.params = copy.deepcopy(params)
-        self.params['n_features'] = len(self.params['features_list'])
+        self.params = params
         if type(self) is RNNModel:
             raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
         super().__init__()
@@ -990,10 +989,10 @@ class RNNModel(ABC):
                 return True
         return False
         
-    def fit(self, X_train, y_train, plot=True, plot_title = '', 
+    def fit(self, X_train, y_train, plot_history=True, plot_title = '', 
             weights=None, callbacks=[], validation_data=None, *args, **kwargs):
         """
-        Trains the model on the provided training data.
+        Trains the model on the provided training data. Uses the fit method of the training model and then copies the weights over to the prediction model, which has a less restrictive input shape. Formats a list of callbacks to use within the fit method based on params input
 
         Parameters:
         -----------
@@ -1001,7 +1000,7 @@ class RNNModel(ABC):
             The input matrix data for training.
         y_train : np.ndarray
             The target vector data for training.
-        plot : bool, optional
+        plot_history : bool, optional
             If True, plots the training history. Default is True.
         plot_title : str, optional
             The title for the training plot. Default is an empty string.
@@ -1013,15 +1012,20 @@ class RNNModel(ABC):
             Validation data to use during training, expected format (X_val, y_val). Default is None.
         """        
         # verbose_fit argument is for printing out update after each epoch, which gets very long
-        # These print statements at the top could be turned off with a verbose argument, but then
-        # there would be a bunch of different verbose params
-        verbose_fit = self.params['verbose_fit']
+        verbose_fit = self.params['verbose_fit'] 
         verbose_weights = self.params['verbose_weights']
         if verbose_weights:
             print(f"Training simple RNN with params: {self.params}")
-        # X_train, y_train = self.format_train_data(X_train, y_train)
+            
+        # Setup callbacks
+        if self.params["reset_states"]:
+            callbacks=callbacks+[ResetStatesCallback(self.params), TerminateOnNaN()]
+
+        # Early stopping callback requires validation data
         if validation_data is not None:
             X_val, y_val =validation_data[0], validation_data[1]
+            print("Using early stopping callback.")
+            callbacks=callbacks+[EarlyStoppingCallback(patience = self.params['early_stopping_patience'])]
         if verbose_weights:
             print(f"Formatted X_train hash: {hash_ndarray(X_train)}")
             print(f"Formatted y_train hash: {hash_ndarray(y_train)}")
@@ -1029,18 +1033,11 @@ class RNNModel(ABC):
                 print(f"Formatted X_val hash: {hash_ndarray(X_val)}")
                 print(f"Formatted y_val hash: {hash_ndarray(y_val)}")
             print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
-        # Setup callbacks
-        if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback(self.params), TerminateOnNaN()]
-        if validation_data is not None:
-            print("Using early stopping callback.")
-            callbacks=callbacks+[EarlyStoppingCallback(patience = self.params['early_stopping_patience'])]
-        
-        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
 
+        ## TODO: Hidden State Initialization
         # Evaluate Model once to set nonzero initial state
-        if self.params["batch_size"]>= X_train.shape[0]:
-            self.model_train(X_train)
+        # self.model_train(X_train[0:self.params['batch_size'],:,:])
+
         if validation_data is not None:
             history = self.model_train.fit(
                 X_train, y_train+self.params['centering'][1], 
@@ -1061,8 +1058,9 @@ class RNNModel(ABC):
                 *args, **kwargs
             )
         
-        if plot:
+        if plot_history:
             self.plot_history(history,plot_title)
+            
         if self.params["verbose_weights"]:
             print(f"Fitted Weights Hash: {hash_weights(self.model_train)}")
 
@@ -1084,33 +1082,13 @@ class RNNModel(ABC):
         np.ndarray
             The predicted values.
         """        
-        print("Predicting")
-        X_test = self.format_pred_data(X_test)
+        print("Predicting test data")
+        X_test = self._format_pred_data(X_test)
         preds = self.model_predict.predict(X_test).flatten()
         return preds
 
-    # DEPRECATED, USED WITHIN RNNData object now
-    # def format_train_data(self, X, y, verbose=False):
-    #     """
-    #     Formats the training data for RNN input.
 
-    #     Parameters:
-    #     -----------
-    #     X : np.ndarray
-    #         The input data.
-    #     y : np.ndarray
-    #         The target data.
-    #     verbose : bool, optional
-    #         If True, prints status messages. Default is False.
-
-    #     Returns:
-    #     --------
-    #     tuple
-    #         Formatted input and target data.
-    #     """        
-    #     X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
-    #     return X, y
-    def format_pred_data(self, X):
+    def _format_pred_data(self, X):
         """
         Formats the prediction data for RNN input.
 
@@ -1126,9 +1104,9 @@ class RNNModel(ABC):
         """        
         return np.reshape(X,(1, X.shape[0], self.params['n_features']))
 
-    def plot_history(self, history, plot_title):
+    def plot_history(self, history, plot_title, create_figure=True):
         """
-        Plots the training history.
+        Plots the training history. Uses log scale on y axis for readability.
 
         Parameters:
         -----------
@@ -1137,7 +1115,8 @@ class RNNModel(ABC):
         plot_title : str
             The title for the plot.
         """
-        plt.figure()
+        if create_figure:
+            plt.figure()
         plt.semilogy(history.history['loss'], label='Training loss')
         if 'val_loss' in history.history:
             plt.semilogy(history.history['val_loss'], label='Validation loss')
@@ -1149,11 +1128,11 @@ class RNNModel(ABC):
 
     def run_model(self, dict0, reproducibility_run=False, plot_period='all'):
         """
-        Runs the RNN model, including training, prediction, and reproducibility checks.
+        Runs the RNN model on input data dictionary, including training, prediction, and reproducibility checks.
 
         Parameters:
         -----------
-        dict0 : dict
+        dict0 : RNNData (dict)
             The dictionary containing the input data and configuration.
         reproducibility_run : bool, optional
             If True, performs reproducibility checks after running the model. Default is False.
@@ -1161,7 +1140,7 @@ class RNNModel(ABC):
         Returns:
         --------
         tuple
-            Model predictions and a dictionary of RMSE errors.
+            Model predictions and a dictionary of RMSE errors broken up by time period.
         """        
         verbose_fit = self.params['verbose_fit']
         verbose_weights = self.params['verbose_weights']
@@ -1376,72 +1355,7 @@ class ResetStatesCallback(Callback):
                 # Check if the layer has a reset_states method
                 if hasattr(layer, 'reset_states'):
                     layer.reset_states()          
-                   
-# class ResetStatesCallback(Callback):
-#     """
-#     Custom callback to reset the states of RNN layers at the end of each epoch and optionally after a specified number of batches.
-
-#     Parameters:
-#     -----------
-#     batch_reset : int, optional
-#         If provided, resets the states of RNN layers after every `batch_reset` batches. Default is None.
-#     """    
-#     def __init__(self, batch_reset=None, loc_batch_reset=None):
-#         """
-#         Initializes the ResetStatesCallback with an optional batch reset interval.
-
-#         Parameters:
-#         -----------
-#         batch_reset : int, optional
-#             The interval of batches after which to reset the states of RNN layers. Default is None.
-#         loc_batch_reset : int, optional
-#             The interval of batches after which the location changes for a given batch number, then reset the states of RNN layers. Default is None.            
-#         """        
-#         super(ResetStatesCallback, self).__init__()
-#         self.batch_reset = batch_reset 
-#         self.loc_batch_reset = loc_batch_reset 
-#     def on_epoch_end(self, epoch, logs=None):
-#         """
-#         Resets the states of RNN layers at the end of each epoch.
-
-#         Parameters:
-#         -----------
-#         epoch : int
-#             The index of the current epoch.
-#         logs : dict, optional
-#             A dictionary containing metrics from the epoch. Default is None.
-#         """        
-#         # Iterate over each layer in the model
-#         for layer in self.model.layers:
-#             # Check if the layer has a reset_states method
-#             if hasattr(layer, 'reset_states'):
-#                 layer.reset_states()
-#     def on_train_batch_end(self, batch, logs=None):
-#         """
-#         Resets the states of RNN layers after a specified number of batches, if `batch_reset` or `loc_batch_reset` are provided. The batch_reset parameter resets the state for stability, and the loc_batch_reset parameter resets when the underlying timeseries for the batch changes (typically when location changes). If None provided for either used parameter, set to inf so mod batch is never zero.
-
-#         Parameters:
-#         -----------
-#         batch : int
-#             The index of the current batch.
-#         logs : dict, optional
-#             A dictionary containing metrics from the batch. Default is None.
-#         """        
-#         batch_reset = self.batch_reset
-#         if batch_reset is None:
-#             batch_reset = np.inf
-#         loc_batch_reset = self.loc_batch_reset
-#         if loc_batch_reset is None:
-#             loc_batch_reset = np.inf
-#         if (batch % batch_reset == 0) or (batch % loc_batch_reset == 0):
-#             # print(f"Resetting states after batch {batch}")
-#             # Iterate over each layer in the model
-#             for layer in self.model.layers:
-#                 # Check if the layer has a reset_states method
-#                 if hasattr(layer, 'reset_states'):
-#                     layer.reset_states()
-
-
+                
 ## Learning Schedules
 ## NOT TESTED YET
 lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
@@ -1452,6 +1366,7 @@ lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
     # warmup_target=None,
     # warmup_steps=100
 )
+##
 
 def EarlyStoppingCallback(patience=5):
     """
@@ -1470,16 +1385,6 @@ def EarlyStoppingCallback(patience=5):
         mode='min',
         restore_best_weights=True
     )
-# early_stopping = EarlyStopping(
-#     monitor='val_loss',  # Metric to monitor, e.g., 'val_loss', 'val_accuracy'
-#     patience=5,          # Number of epochs with no improvement after which training will be stopped
-#     verbose=1,           # Print information about early stopping
-#     mode='min',          # 'min' means training will stop when the quantity monitored has stopped decreasing
-#     restore_best_weights=True  # Restore model weights from the epoch with the best value of the monitored quantity
-# )
-
-# with open("params.yaml") as file:
-#     phys_params = yaml.safe_load(file)["physics_initializer"]
 
 phys_params = {
     'DeltaE': [0,-1],                    # bias correction
@@ -1574,6 +1479,8 @@ class RNN(RNNModel):
         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
         x = inputs
         for i in range(self.params['rnn_layers']):
+            # Return sequences True if recurrent layer feeds into another recurrent layer. 
+            # False if feeds into dense layer
             return_sequences = True if i < self.params['rnn_layers'] - 1 else False
             x = SimpleRNN(
                 units=self.params['rnn_units'],
@@ -1590,8 +1497,6 @@ class RNN(RNNModel):
         x = Dense(units=1, activation='linear')(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
-        # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
-        # optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
@@ -1606,9 +1511,10 @@ class RNN(RNNModel):
             model.set_weights(w)
             print('initial weights hash =',hash_weights(model))
         return model
+        
     def _build_model_predict(self, return_sequences=True):
         """
-        Builds and compiles the prediction model, doesn't use batch shape nor sequence length.
+        Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
 
         Parameters:
         -----------
@@ -1701,7 +1607,7 @@ class RNN_LSTM(RNNModel):
         return model
     def _build_model_predict(self, return_sequences=True):
         """
-        Builds and compiles the prediction model, doesn't use batch shape nor sequence length.
+        Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
 
         Parameters:
         -----------
