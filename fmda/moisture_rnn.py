@@ -1126,7 +1126,7 @@ class RNNModel(ABC):
         plt.legend(loc='upper left')
         plt.show()
 
-    def run_model(self, dict0, reproducibility_run=False, plot_period='all'):
+    def run_model(self, dict0, reproducibility_run=False, plot_period='all', save_outputs=True):
         """
         Runs the RNN model on input data dictionary, including training, prediction, and reproducibility checks.
 
@@ -1136,7 +1136,9 @@ class RNNModel(ABC):
             The dictionary containing the input data and configuration.
         reproducibility_run : bool, optional
             If True, performs reproducibility checks after running the model. Default is False.
-
+        save_outputs : bool
+            If True, writes model outputs into input dictionary.
+        
         Returns:
         --------
         tuple
@@ -1144,28 +1146,34 @@ class RNNModel(ABC):
         """        
         verbose_fit = self.params['verbose_fit']
         verbose_weights = self.params['verbose_weights']
-        # Make copy to prevent changing in place
-        dict1 = copy.deepcopy(dict0)
         if verbose_weights:
             print("Input data hashes, NOT formatted for rnn sequence/batches yet")
-            dict1.print_hashes()
-        # Extract Fields
-        X_train, y_train, X_test, y_test = dict1['X_train'].copy(), dict1['y_train'].copy(), dict1["X_test"].copy(), dict1['y_test'].copy()
-        if 'X_val' in dict1:
-            X_val, y_val = dict1['X_val'].copy(), dict1['y_val'].copy()
+            dict0.print_hashes()
+        # Extract Datasets
+        X_train, y_train, X_test, y_test = dict0['X_train'], dict0['y_train'], dict0["X_test"], dict0['y_test']
+        if 'X_val' in dict0:
+            X_val, y_val = dict0['X_val'], dict0['y_val']
         else:
             X_val = None
-        case_id = dict1['case']
+        case_id = dict0['case']
         
         # Fit model
         if X_val is None:
             self.fit(X_train, y_train, plot_title=case_id)
         else:
             self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id)
+
+        # Generate Predictions and Evaluate Test Error
+        # if dict0.spatial:
+        #     m, errs = _eval_spatial(dict0)
+        # else:
+        #     m, errs = _eval_single(dict0)
+
+    
         # Generate Predictions, 
-        # run through training to get hidden state set proporly for forecast period
-        X = dict1.scale_all_X()
-        y = dict1.y.flatten()
+        # run through training to get hidden state set properly for forecast period
+        X = dict0.scale_all_X()
+        y = dict0.y.flatten()
         # Predict
         if verbose_weights:
             print(f"Predicting Training through Test")
@@ -1174,22 +1182,22 @@ class RNNModel(ABC):
         m = self.predict(X).flatten()
         if verbose_weights:
             print(f"Predictions Hash: {hash_ndarray(m)}")
-        dict1['m']=m
-        dict0['m']=m # add to outside env dictionary, should be only place this happens
+        dict0['m']=m
+        # dict0['m']=m # add to outside env dictionary, should be only place where input dict is modified
         
         if reproducibility_run:
             print("Checking Reproducibility")
             check_reproducibility(dict0, self.params, hash_ndarray(m), hash_weights(self.model_predict))
 
-        # print(dict1.keys())
+        # print(dict0.keys())
         # Plot final fit and data
-        dict1['y'] = y
-        plot_data(dict1, title="RNN", title2=dict1['case'], plot_period=plot_period)
+        # dict0['y'] = y
+        plot_data(dict0, title="RNN", title2=dict0['case'], plot_period=plot_period)
         
         # Calculate Errors
         err = rmse(m, y)
-        train_ind = dict1["train_ind"] # index of final training set value
-        test_ind = dict1["test_ind"] # index of first test set value
+        train_ind = dict0["train_ind"] # index of final training set value
+        test_ind = dict0["test_ind"] # index of first test set value
         
         err_train = rmse(m[:train_ind], y[:train_ind].flatten())
         err_pred = rmse(m[test_ind:], y[test_ind:].flatten())
@@ -1199,7 +1207,10 @@ class RNNModel(ABC):
             'prediction': err_pred
         }
         return m, rmse_dict
-
+    def _eval_single(self, dict0):
+        pass
+    def _eval_spatial(self, dict0):
+        pass
 
 
 ## Callbacks
