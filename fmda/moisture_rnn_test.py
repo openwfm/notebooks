@@ -13,6 +13,26 @@ from moisture_rnn import staircase_spatial
 # 5. Compare to expectations* (eg see Overleaf FMDA w Recurrent Notebooks - Example 4) human or code
 
 
+# DRAFT UTIL FOR PRINTING:
+# rounded_padded_X0 = round_and_pad(X[0,:,:])
+# rounded_padded_X1 = round_and_pad(X[params['batch_size']-1,:,:])
+# sample_0_str = f"[{' '.join(rounded_padded_X0[0])}]"
+# sample_1_str = f"[{' '.join(rounded_padded_X1[0])}]"
+# row_length = len(f"{sample_0_str}  ...  {sample_1_str}")
+
+
+# # Manually adjust padding to match the row length
+# total_header_length = len("Sample 0") + len(f"Sample {params['batch_size']-1}") + len("...")
+# spaces_needed = row_length - total_header_length
+# padding = " " * (spaces_needed // 2)
+
+# print("Batch 0:")
+# print(f"Sample 0{padding}...{padding}Sample {params['batch_size']-1}")
+
+# for row0, row1 in zip(rounded_padded_X0, rounded_padded_X1):
+#     print(f"[{' '.join(row0)}]  ...  [{' '.join(row1)}]")
+
+
 
 def staircase_spatial_test(total_time_steps, features, batch_size, timesteps, n_locs = 10):
     """
