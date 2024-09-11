@@ -314,8 +314,9 @@ def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = Non
             tend = t0 + hours
             # Create RNNData Dict
             # Subset data to given location and time from t0 to t0+hours
-            X_temp = X[j][t0:tend,:]
-            y_temp = y[j][t0:tend].reshape(-1,1)
+            k = locs_i[j] # Used to account for fewer locations than batch size
+            X_temp = X[k][t0:tend,:]
+            y_temp = y[k][t0:tend].reshape(-1,1)
 
             # Format sequences
             Xi, yi = staircase_2(
@@ -1241,8 +1242,9 @@ class RNNModel(ABC):
         plot_title : str
             The title for the plot.
         """
+        
         if create_figure:
-            plt.figure()
+            plt.figure(figsize=(10, 6))
         plt.semilogy(history.history['loss'], label='Training loss')
         if 'val_loss' in history.history:
             plt.semilogy(history.history['val_loss'], label='Validation loss')
@@ -1281,7 +1283,10 @@ class RNNModel(ABC):
             X_val, y_val = dict0.X_val, dict0.y_val
         else:
             X_val = None
-        case_id = dict0.case
+        if dict0.spatial:
+            case_id = "Spatial Training Set"
+        else:
+            case_id = dict0.case
         
         # Fit model
         if X_val is None:
