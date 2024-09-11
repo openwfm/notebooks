@@ -813,9 +813,9 @@ class RNNData(dict):
         spatial = self.spatial
         if self.scaler is None:
             raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
-        if hasattr(self.scaler, 'n_features_in_'):
-            warnings.warn("Scale_data has already been called. Exiting to prevent issues.")
-            return            
+        # if hasattr(self.scaler, 'n_features_in_'):
+        #     warnings.warn("Scale_data has already been called. Exiting to prevent issues.")
+        #     return            
         if not hasattr(self, "X_train"):
             raise AttributeError("No X_train within object. Run train_test_split first. This is to avoid fitting the scaler with prediction data.")
         if verbose:

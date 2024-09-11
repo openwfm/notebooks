@@ -10,13 +10,13 @@ rnn:
   dense_layers: 1 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
   dense_units: 5 # number of units for hidden dense layers
   activation: ['linear', 'linear'] # Activation type for hidden layers, dense layers respectively
-  centering: [0.0,0.0]
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
   # batch_reset: 10 # reset states after given number of batches
-  batch_schedule_type: 'constant' # Schedule to Reset Hidden State
+  batch_schedule_type: 'exp' # Schedule to Reset Hidden State
   bmin: 20 # Minimum number of batches for batch reset schedule
+  bmax: 200
   epochs: 20
   learning_rate: 0.001
   clipvalue: 10.0 # gradient clipping param, gradient can't exceed this value
@@ -31,7 +31,7 @@ rnn:
   train_frac: 0.5 # percent of input data to be used in training set
   val_frac: 0.1 # percent of input data to be used in validation set. Test set size determined from train_frac and val_frac
   early_stopping_patience: 5 # Number of epochs with no improvement after which training will be stopped.
-  
+  predict_spinup_hours: 5 # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
 
 lstm:
   batch_size: 32
@@ -43,11 +43,12 @@ lstm:
   dense_units: 1
   activation: ['linear', 'linear']
   recurrent_activation: 'sigmoid'
-  centering: [0.0,0.0]
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-  # batch_reset: 150 # reset states after given number of batches  
+  batch_schedule_type: 'constant' # Schedule to Reset Hidden State
+  bmin: 20 # Minimum number of batches for batch reset schedule
+  bmax: 200
   epochs: 100
   learning_rate: 0.0001
   clipvalue: 1.0 # gradient clipping param, gradient can't exceed this value
@@ -61,7 +62,7 @@ lstm:
   train_frac: 0.5
   val_frac: 0.1
   early_stopping_patience: 5 # Number of epochs with no improvement after which training will be stopped.
-
+  predict_spinup_hours: 5 # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
 
 # Param sets for reproducibility
 
@@ -75,11 +76,9 @@ rnn_repro:
   dense_layers: 1
   dense_units: 5
   activation: ['linear', 'linear']
-  centering: [0.0, 0.0]
   dropout: [0.2, 0.2]
   recurrent_dropout: 0.2
   reset_states: True
-  # batch_reset: null
   epochs: 300
   learning_rate: 0.001
   clipvalue: 10.0
@@ -93,7 +92,8 @@ rnn_repro:
   train_frac: 0.5
   val_frac: 0.2
   early_stopping_patience: 9999 # early stopping not used in repro case, so setting to a huge value to ignore
-
+  predict_spinup_hours: null # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
+  
 ## v2.0 params
 # rnn_repro:
 #   batch_size: 32
