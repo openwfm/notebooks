@@ -674,7 +674,131 @@ class RNNData(dict):
                 print(f"X_train shape: {self.X_train.shape}, y_train shape: {self.y_train.shape}")
                 print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
                 print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")
+    # def train_test_split(self, time_fracs=[1.,0.,0.], space_fracs=[1.,0.,0.], subset_features=True, features_list=None, verbose=True):
+    #     """
+    #     Splits the data into training, validation, and test sets.
+
+    #     Parameters:
+    #     -----------
+    #     train_frac : float
+    #         The fraction of data to be used for training.
+    #     val_frac : float, optional
+    #         The fraction of data to be used for validation. Default is 0.0.
+    #     subset_features : bool, optional
+    #         If True, subsets the data to the specified features list. Default is True.
+    #     features_list : list, optional
+    #         A list of features to use for subsetting. Default is None.
+    #     split_space : bool, optional
+    #         Whether to split the data based on space. Default is False.
+    #     verbose : bool, optional
+    #         If True, prints status messages. Default is True.
+    #     """
+    #     # Indicate whether multi timeseries or not
+    #     spatial = self.spatial
+
+    #     # Set up 
+    #     assert np.sum(time_fracs) == np.sum(space_fracs) == 1., f"Provided cross validation params don't sum to 1"
+    #     if (len(time_fracs) != 3) or (len(space_fracs) != 3):
+    #         raise ValueError("Cross-validation params `time_fracs` and `space_fracs` must be lists of length 3, representing (train/validation/test)")
+        
+    #     train_frac = time_fracs[0]
+    #     val_frac = time_fracs[1]
+    #     test_frac = time_fracs[2]
+
+    #     # Setup train/val/test in time
+    #     train_ind = int(np.floor(self.hours * train_frac)); self.train_ind = train_ind
+    #     test_ind= int(train_ind + round(self.hours * val_frac)); self.test_ind = test_ind
+    #     # Check for any potential issues with indices
+    #     if test_ind > self.hours:
+    #         print(f"Setting test index to {self.hours}")
+    #         test_ind = self.hours
+    #     if train_ind > test_ind:
+    #         raise ValueError("Train index must be less than test index.")        
+
+    #     # Setup train/val/test in space
+    #     if spatial:
+    #         train_frac_sp = space_fracs[0]
+    #         val_frac_sp = space_fracs[1]
+    #         locs = np.arange(len(self.loc['STID'])) # indices of locations
+    #         train_size = int(len(locs) * train_frac_sp)
+    #         val_size = int(len(locs) * val_frac_sp)
+    #         random.shuffle(locs)
+    #         train_locs = locs[:train_size]
+    #         val_locs = locs[train_size:train_size + val_size]
+    #         test_locs = locs[train_size + val_size:]
+    #         # Store Lists of IDs in loc subdirectory
+    #         self.loc['train_locs'] = [self.loc['STID'][i] for i in train_locs]
+    #         self.loc['val_locs'] = [self.loc['STID'][i] for i in val_locs]
+    #         self.loc['test_locs'] = [self.loc['STID'][i] for i in test_locs]
+
+            
+    #     # Extract data to desired features, copy to avoid changing input objects
+    #     X = self.X.copy()
+    #     y = self.y.copy()
+    #     if subset_features:
+    #         if verbose and self.features_list != self.all_features_list:
+    #             print(f"Subsetting input data to features_list: {self.features_list}")
+    #         # Indices to subset all features with based on params features
+    #         indices = []
+    #         for item in self.features_list:
+    #             if item in self.all_features_list:
+    #                 indices.append(self.all_features_list.index(item))
+    #             else:
+    #                 print(f"Warning: feature name '{item}' not found in list of all features from input data")
+    #         if spatial:
+    #             X = [Xi[:, indices] for Xi in X]
+    #         else:
+    #             X = X[:, indices]
                 
+    #     # Training data from 0 to train_ind
+    #     # Validation data from train_ind to test_ind
+    #     # Test data from test_ind to end
+    #     if spatial:           
+    #         X_train = [X[i] for i in train_locs]
+    #         X_val = [X[i] for i in val_locs]
+    #         X_test = [X[i] for i in test_locs]
+    #         y_train = [y[i] for i in train_locs]
+    #         y_val = [y[i] for i in val_locs]
+    #         y_test = [y[i] for i in test_locs]
+            
+    #         self.X_train = [Xi[:train_ind] for Xi in X_train]
+    #         self.y_train = [yi[:train_ind].reshape(-1,1) for yi in y_train]
+    #         if (val_frac >0) and (val_frac_sp)>0:
+    #             self.X_val = [Xi[train_ind:test_ind] for Xi in X_val]
+    #             self.y_val = [yi[train_ind:test_ind].reshape(-1,1) for yi in y_val]
+    #         self.X_test = [Xi[test_ind:] for Xi in X_test]
+    #         self.y_test = [yi[test_ind:].reshape(-1,1) for yi in y_test]
+    #     else:
+    #         self.X_train = X[:train_ind]
+    #         self.y_train = y[:train_ind].reshape(-1,1) # assumes y 1-d, change this if vector output
+    #         if val_frac >0:
+    #             self.X_val = X[train_ind:test_ind]
+    #             self.y_val = y[train_ind:test_ind].reshape(-1,1) # assumes y 1-d, change this if vector output                
+    #         self.X_test = X[test_ind:]
+    #         self.y_test = y[test_ind:].reshape(-1,1) # assumes y 1-d, change this if vector output
+        
+
+
+    #     # Print statements if verbose
+    #     if verbose:
+    #         print(f"Train index: 0 to {train_ind}")
+    #         print(f"Validation index: {train_ind} to {test_ind}")
+    #         print(f"Test index: {test_ind} to {self.hours}")
+
+    #         if spatial:
+    #             print("Subsetting locations into train/val/test")
+    #             print(f"Total Locations: {len(locs)}")
+    #             print(f"Train Locations: {len(train_locs)}")
+    #             print(f"Val. Locations: {len(val_locs)}")
+    #             print(f"Test Locations: {len(test_locs)}")
+    #             print(f"X_train[0] shape: {self.X_train[0].shape}, y_train[0] shape: {self.y_train[0].shape}")
+    #             print(f"X_val[0] shape: {self.X_val[0].shape}, y_val[0] shape: {self.y_val[0].shape}")
+    #             print(f"X_test[0] shape: {self.X_test[0].shape}, y_test[0] shape: {self.y_test[0].shape}")
+    #         else:
+    #             print(f"X_train shape: {self.X_train.shape}, y_train shape: {self.y_train.shape}")
+    #             if hasattr(self, "X_val"):
+    #                 print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
+    #             print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")                
     def scale_data(self, verbose=True):
         """
         Scales the training data using the set scaler.
@@ -688,6 +812,9 @@ class RNNData(dict):
         spatial = self.spatial
         if self.scaler is None:
             raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
+        if hasattr(self.scaler, 'n_features_in_'):
+            warnings.warn("Scale_data has already been called. Exiting to prevent issues.")
+            return            
         if not hasattr(self, "X_train"):
             raise AttributeError("No X_train within object. Run train_test_split first. This is to avoid fitting the scaler with prediction data.")
         if verbose:
