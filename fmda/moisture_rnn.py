@@ -1,6 +1,7 @@
 # v2 training and prediction class infrastructure
 
 # Environment
+import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -586,7 +587,7 @@ class RNNData(dict):
             self.scaler = scalers[scaler]
         else:
             raise ValueError(f"Unrecognized scaler '{scaler}'. Recognized scalers are: {recognized_scalers}.")
-    def train_test_split(self, train_frac, val_frac=0.0, subset_features=True, features_list=None, split_time=True, split_space=False, verbose=True):
+    def train_test_split(self, train_frac, val_frac=0.0, subset_features=True, features_list=None, split_space=False, verbose=True):
         """
         Splits the data into training, validation, and test sets.
 
@@ -600,8 +601,6 @@ class RNNData(dict):
             If True, subsets the data to the specified features list. Default is True.
         features_list : list, optional
             A list of features to use for subsetting. Default is None.
-        split_time : bool, optional
-            Whether to split the data based on time. Default is True.
         split_space : bool, optional
             Whether to split the data based on space. Default is False.
         verbose : bool, optional
@@ -610,7 +609,7 @@ class RNNData(dict):
         # Indicate whether multi timeseries or not
         spatial = self.spatial
         
-        # Extract data to desired features
+        # Extract data to desired features, copy to avoid changing input objects
         X = self.X.copy()
         y = self.y.copy()
         if subset_features:
@@ -1040,7 +1039,7 @@ class RNNModel(ABC):
 
         if validation_data is not None:
             history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
+                X_train, y_train, 
                 epochs=self.params['epochs'], 
                 batch_size=self.params['batch_size'],
                 callbacks = callbacks,
@@ -1050,7 +1049,7 @@ class RNNModel(ABC):
             )
         else:
             history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
+                X_train, y_train, 
                 epochs=self.params['epochs'], 
                 batch_size=self.params['batch_size'],
                 callbacks = callbacks,
