@@ -728,9 +728,9 @@ class RNNData(dict):
             val_locs = locs[train_size:train_size + val_size]
             test_locs = locs[train_size + val_size:]
             # Store Lists of IDs in loc subdirectory
-            self.loc['train_locs'] = [self.loc['STID'][i] for i in train_locs]
-            self.loc['val_locs'] = [self.loc['STID'][i] for i in val_locs]
-            self.loc['test_locs'] = [self.loc['STID'][i] for i in test_locs]
+            self.loc['train_locs'] = [self.case[i] for i in train_locs]
+            self.loc['val_locs'] = [self.case[i] for i in val_locs]
+            self.loc['test_locs'] = [self.case[i] for i in test_locs]
 
             
         # Extract data to desired features, copy to avoid changing input objects
