@@ -40,7 +40,7 @@ lstm:
   rnn_units: 6
   dense_layers: 1
   dense_units: 1
-  activation: ['linear', 'linear']
+  activation: ['relu', 'relu']
   recurrent_activation: 'sigmoid'
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
