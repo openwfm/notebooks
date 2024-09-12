@@ -1275,7 +1275,6 @@ class RNNModel(ABC):
         verbose_fit = self.params['verbose_fit']
         verbose_weights = self.params['verbose_weights']
         if verbose_weights:
-            print("Input data hashes, NOT formatted for rnn sequence/batches yet")
             dict0.print_hashes()
         # Extract Datasets
         X_train, y_train, X_test, y_test = dict0.X_train, dict0.y_train, dict0.X_test, dict0.y_test
@@ -1523,8 +1522,8 @@ class ResetStatesCallback(Callback):
 ## Learning Schedules
 ## NOT TESTED YET
 lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
-    initial_learning_rate=0.001,
-    decay_steps=1000,
+    initial_learning_rate=0.01,
+    decay_steps=200,
     alpha=0.0,
     name='CosineDecay',
     # warmup_target=None,
@@ -1661,6 +1660,7 @@ class RNN(RNNModel):
         x = Dense(units=1, activation='linear')(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        # optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
