@@ -1117,7 +1117,7 @@ class RNNModel(ABC):
         return False
         
     def fit(self, X_train, y_train, plot_history=True, plot_title = '', 
-            weights=None, callbacks=[], validation_data=None, *args, **kwargs):
+            weights=None, callbacks=[], validation_data=None, return_epochs=False, *args, **kwargs):
         """
         Trains the model on the provided training data. Uses the fit method of the training model and then copies the weights over to the prediction model, which has a less restrictive input shape. Formats a list of callbacks to use within the fit method based on params input
 
@@ -1137,6 +1137,8 @@ class RNNModel(ABC):
             A list of callback functions to use during training. Default is an empty list.
         validation_data : tuple, optional
             Validation data to use during training, expected format (X_val, y_val). Default is None.
+        return_epochs : bool
+            If True, return the number of epochs that training took. Used to test and optimize early stopping
         """        
         # verbose_fit argument is for printing out update after each epoch, which gets very long
         verbose_fit = self.params['verbose_fit'] 
@@ -1152,7 +1154,8 @@ class RNNModel(ABC):
         if validation_data is not None:
             X_val, y_val =validation_data[0], validation_data[1]
             print("Using early stopping callback.")
-            callbacks=callbacks+[EarlyStoppingCallback(patience = self.params['early_stopping_patience'])]
+            early_stop = EarlyStoppingCallback(patience = self.params['early_stopping_patience'])
+            callbacks=callbacks+[early_stop]
         if verbose_weights:
             print(f"Formatted X_train hash: {hash_ndarray(X_train)}")
             print(f"Formatted y_train hash: {hash_ndarray(y_train)}")
@@ -1194,6 +1197,10 @@ class RNNModel(ABC):
         # Update Weights for Prediction Model
         w_fitted = self.model_train.get_weights()
         self.model_predict.set_weights(w_fitted)
+
+        if return_epochs:
+            # Epoch counting starts at 0, adding 1 for the count
+            return early_stop.best_epoch + 1
 
     def predict(self, X_test):
         """
@@ -1254,7 +1261,7 @@ class RNNModel(ABC):
         plt.legend(loc='upper left')
         plt.show()
 
-    def run_model(self, dict0, reproducibility_run=False, plot_period='all', save_outputs=True):
+    def run_model(self, dict0, reproducibility_run=False, plot_period='all', save_outputs=True, return_epochs=False):
         """
         Runs the RNN model on input data dictionary, including training, prediction, and reproducibility checks.
 
@@ -1266,6 +1273,8 @@ class RNNModel(ABC):
             If True, performs reproducibility checks after running the model. Default is False.
         save_outputs : bool
             If True, writes model outputs into input dictionary.
+        return_epochs : bool
+            If True, returns how many epochs of training happened. Used to optimize params related to early stopping
         
         Returns:
         --------
@@ -1289,9 +1298,9 @@ class RNNModel(ABC):
         
         # Fit model
         if X_val is None:
-            self.fit(X_train, y_train, plot_title=case_id)
+            eps = self.fit(X_train, y_train, plot_title=case_id, return_epochs=return_epochs)
         else:
-            self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id)
+            eps = self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id, return_epochs=return_epochs)
 
         # Generate Predictions and Evaluate Test Error
         if dict0.spatial:
@@ -1303,8 +1312,11 @@ class RNNModel(ABC):
             if save_outputs:
                 dict0['m']=m
             plot_data(dict0, title="RNN", title2=dict0.case, plot_period=plot_period)
-    
-        return m, errs
+
+        if return_epochs:
+            return m, errs, eps
+        else:
+            return m, errs
 
     def _eval_single(self, dict0, verbose_weights, reproducibility_run):
         # Generate Predictions, 
