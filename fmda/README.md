@@ -24,6 +24,9 @@ Build and activate environment:
     - Trains and predicts the model at multiple locations in serial fashion
          1. Train separate models at multiple locations and compare predictions on that location itself
          2. Train single model with data from multiple locations. Take same model object and call .fit multiple times. Compare predictions for new locations
+* synoptic_tutorial.ipynb
+    - Use to manually read in RAWS data from Synoptic
+
 
 ## Data
 
