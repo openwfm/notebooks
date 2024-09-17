@@ -6,8 +6,7 @@
 ## Solar Rad: W/m^2, see https://viirsland.gsfc.nasa.gov/PDF/VIIRS_DSRPAR_UserGuide_v1.2.pdf
 ## Soil Moisture: % (fraction)
 
-max_pct_na: 0.2 # maximum percentage of na values for a timeseries, greater than threshold drop the timeseries entirely
-max_intp_time: 10 # maximum number of hours that will be interpolated 
+max_intp_time: 10 # maximum number of hours that can be interpolated 
 zero_lag_threshold: 10 # number of hours where flagged if zero change in FMC content over that period
 hours: 720 # total hours to build timeseries, break up longer into this length. Used to help with filters related to over-interpolation
 min_fm: 1 # minimum FMC value allowed (assumes scaled 0-100)

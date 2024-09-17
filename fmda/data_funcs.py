@@ -31,6 +31,7 @@ def process_train_dict(input_file_path, data_params, atm_dict = "HRRR", verbose=
     remove_key_list(d, flagged_cases, verbose=verbose)
     return d
 
+
 feature_types = {
     # Static features are based on physical location, e.g. location of RAWS site
     'static': ['elev', 'lon', 'lat'],
@@ -113,7 +114,6 @@ def build_train_dict(input_file_path,
             
             # Set up static vars
             columns=[]
-
             missing_features = []
             for feat in features_list:
                 # For atmospheric features,
@@ -123,14 +123,13 @@ def build_train_dict(input_file_path,
                     elif atm_dict == "RAWS":
                         if feat in subdict['RAWS'].keys():
                             vec = time_intp(time_raws, subdict['RAWS'][feat], time_hrrr)
+                            columns.append(vec)
                         else:
                             missing_features.append(feat)
-                    columns.append(vec)
                 
                 # For static features, repeat to fit number of time observations
                 elif feat in feature_types['static']:
                     columns.append(np.full(hours,loc[feat]))
-            
             # compute rain as difference of accumulated precipitation
             if 'rain' in features_list:
                 if atm_dict == "HRRR":
@@ -146,7 +145,7 @@ def build_train_dict(input_file_path,
                 columns.append( rain ) # add rain feature         
             else:
                 missing_features.append('rain')
-                
+
             train[key]['X'] = np.column_stack(columns)
             train[key]['features_list'] = [item for item in features_list if item not in missing_features]
             
