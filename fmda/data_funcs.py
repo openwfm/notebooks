@@ -120,6 +120,7 @@ def build_train_dict(input_file_path,
                 if feat in feature_types['atm']:
                     if atm_dict == "HRRR":
                         vec = subdict['HRRR'][fstep][feat]
+                        columns.append(vec)
                     elif atm_dict == "RAWS":
                         if feat in subdict['RAWS'].keys():
                             vec = time_intp(time_raws, subdict['RAWS'][feat], time_hrrr)
@@ -221,7 +222,7 @@ def split_timeseries(dict0, hours, naming_convention = "_set_", verbose=False):
         current_time = start_time
         portion_index = 1
         while current_time < end_time:
-            next_time = current_time + timedelta(hours=720)
+            next_time = current_time + timedelta(hours=hours)
             
             # Create a mask for the time range
             mask = (time >= current_time) & (time < next_time)
@@ -242,6 +243,10 @@ def split_timeseries(dict0, hours, naming_convention = "_set_", verbose=False):
             for key2 in dict0[key].keys():
                 if key2 not in ['time', 'X', 'y']:
                     dict1[new_key][key2] = dict0[key][key2]
+            # Update Case name and Id (same for now, overloaded terminology)
+            dict1[new_key]['case'] = new_key
+            dict1[new_key]['id'] = new_key
+            
             
             # Move to the next portion
             current_time = next_time
