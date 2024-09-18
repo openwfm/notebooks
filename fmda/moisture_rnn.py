@@ -289,7 +289,7 @@ def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = Non
     # Generate ids based on number of distinct timeseries provided
     n_loc = len(y) # assuming each list entry for y is a separate location
     loc_ids = np.arange(n_loc)
-
+    
     # Generate hours and start_times if None
     if hours is None:
         print("Setting total hours to minimum length of y in provided dictionary")
@@ -868,6 +868,8 @@ class RNNData(dict):
             if hasattr(self, "X_val"):
                 print(f"Reshaping validation data using batch size: {batch_size} and timesteps: {timesteps}")
                 self.X_val, self.y_val = staircase_2(self.X_val, self.y_val, timesteps = timesteps, batch_size=batch_size, verbose=verbose)
+        if self.X_train.shape[0] == 0:
+            raise ValueError("X_train has zero rows. Try different combo of cross-validation fractions, batch size or start_times. Train/val/test data partially processed, need to return train_test_split")
         
     def print_hashes(self, attrs_to_check = ['X', 'y', 'X_train', 'y_train', 'X_val', 'y_val', 'X_test', 'y_test']):
         """
