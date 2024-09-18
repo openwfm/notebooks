@@ -250,6 +250,7 @@ def split_timeseries(dict0, hours, naming_convention = "_set_", verbose=False):
             # Update Case name and Id (same for now, overloaded terminology)
             dict1[new_key]['case'] = new_key
             dict1[new_key]['id'] = new_key
+            dict1[new_key]['hours'] = len(dict1[new_key]['y'])
             
             
             # Move to the next portion
