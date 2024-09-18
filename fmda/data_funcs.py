@@ -16,16 +16,18 @@ import subprocess
 import os.path as osp
 from utils import Dict, str2time, check_increment, time_intp
 
-def process_train_dict(input_file_paths, data_params, atm_dict = "HRRR", verbose=False):
+def process_train_dict(input_file_paths, params_data, atm_dict = "HRRR", verbose=False):
+    if type(input_file_paths) is not list:
+        raise ValueError(f"Argument `input_file_paths` must be list, received {type(input_file_paths)}")
     train = {}
     for file_path in input_file_paths:
         # Extract target and features
-        di = build_train_dict(file_path, atm=atm_dict, features_all=data_params['features_all'], verbose=verbose)
+        di = build_train_dict(file_path, atm=atm_dict, features_all=params_data['features_all'], verbose=verbose)
         # Subset timeseries into shorter stretches
-        di = split_timeseries(di, hours=data_params['hours'], verbose=verbose)
-        di = discard_keys_with_short_y(di, hours=data_params['hours'], verbose=False)
+        di = split_timeseries(di, hours=params_data['hours'], verbose=verbose)
+        di = discard_keys_with_short_y(di, hours=params_data['hours'], verbose=False)
         # Check for suspect data
-        flags = flag_dict_keys(di, data_params['zero_lag_threshold'], data_params['max_intp_time'], max_y = data_params['max_fm'], min_y = data_params['min_fm'], verbose=verbose)
+        flags = flag_dict_keys(di, params_data['zero_lag_threshold'], params_data['max_intp_time'], max_y = params_data['max_fm'], min_y = params_data['min_fm'], verbose=verbose)
         # Remove flagged cases
         cases = list([*di.keys()])
         flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
