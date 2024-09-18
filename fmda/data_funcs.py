@@ -16,20 +16,22 @@ import subprocess
 import os.path as osp
 from utils import Dict, str2time, check_increment, time_intp
 
-def process_train_dict(input_file_path, data_params, atm_dict = "HRRR", verbose=False):
-    # Extract target and features
-    train = build_train_dict(input_file_path, atm=atm_dict, features_all=data_params['features_all'], verbose=verbose)
-    # Subset timeseries into shorter stretches
-    d = split_timeseries(train, hours=data_params['hours'], verbose=verbose)
-    d = discard_keys_with_short_y(d, hours=data_params['hours'], verbose=False)
-    # Check for suspect data
-    flags = flag_dict_keys(d, data_params['zero_lag_threshold'], data_params['max_intp_time'], 
-                       max_y = data_params['max_fm'], min_y = data_params['min_fm'], verbose=verbose)
-    # Remove flagged cases
-    cases = list([*d.keys()])
-    flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
-    remove_key_list(d, flagged_cases, verbose=verbose)
-    return d
+def process_train_dict(input_file_paths, data_params, atm_dict = "HRRR", verbose=False):
+    train = {}
+    for file_path in input_file_paths:
+        # Extract target and features
+        di = build_train_dict(file_path, atm=atm_dict, features_all=data_params['features_all'], verbose=verbose)
+        # Subset timeseries into shorter stretches
+        di = split_timeseries(di, hours=data_params['hours'], verbose=verbose)
+        di = discard_keys_with_short_y(di, hours=data_params['hours'], verbose=False)
+        # Check for suspect data
+        flags = flag_dict_keys(di, data_params['zero_lag_threshold'], data_params['max_intp_time'], max_y = data_params['max_fm'], min_y = data_params['min_fm'], verbose=verbose)
+        # Remove flagged cases
+        cases = list([*di.keys()])
+        flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
+        remove_key_list(di, flagged_cases, verbose=verbose)
+        train.update(di)
+    return train
 
 
 feature_types = {
