@@ -9,7 +9,7 @@ rnn:
   rnn_units: 20 # Number of units per hidden recurrent layer
   dense_layers: 1 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
   dense_units: 5 # number of units for hidden dense layers
-  activation: ['linear', 'linear'] # Activation type for hidden layers, dense layers respectively
+  activation: ['relu', 'relu'] # Activation type for hidden layers, dense layers respectively
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
