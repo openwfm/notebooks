@@ -99,6 +99,7 @@ def retrieve_url(url, dest_path, force_download=False):
     destination path.
     """    
     if not osp.exists(dest_path) or force_download:
+        print(f"Attempting to downloaded {url} to {dest_path}")
         target_extension = osp.splitext(dest_path)[1]
         url_extension = osp.splitext(urlparse(url).path)[1]
         if target_extension != url_extension:
