@@ -1706,6 +1706,7 @@ class RNN_LSTM(RNNModel):
             x = Dropout(self.params["dropout"][1])(x)            
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        x = Dense(units=1, activation="linear")(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
@@ -1737,6 +1738,7 @@ class RNN_LSTM(RNNModel):
                 stateful=False,return_sequences=return_sequences)(x)
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        x = Dense(units=1, activation="linear")(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
         model.compile(loss='mean_squared_error', optimizer=optimizer)  
