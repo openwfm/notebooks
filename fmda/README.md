@@ -8,9 +8,10 @@ Clone repository:
 	git clone https://github.com/openwfm/notebooks
 
 Build and activate environment:
-    * cd ./fmda/install
-    * conda env create -f fmda_ml.yml
-    * conda activate fmda_ml
+
+* cd ./fmda/install
+* conda env create -f fmda_ml.yml
+* conda activate fmda_ml
 
 
 ## Main Notebooks
@@ -24,6 +25,12 @@ Build and activate environment:
     - Trains and predicts the model at multiple locations in serial fashion
          1. Train separate models at multiple locations and compare predictions on that location itself
          2. Train single model with data from multiple locations. Take same model object and call .fit multiple times. Compare predictions for new locations
+
+* fmda_rnn_spatial.ipynb
+    - Automatically retrieves fmda dictionary from OpenWFM Demo
+    - Runs RNN with spatial training scheme, RNN with serial training scheme (see above), and ODE+KF
+    - Compares prediction RMSE
+
 * synoptic_tutorial.ipynb
     - Use to manually read in RAWS data from Synoptic
 
