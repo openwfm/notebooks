@@ -784,6 +784,19 @@ class RNNData(dict):
 
         return X    
 
+    def subset_X_features(self, verbose=True):
+        if self.spatial:
+            raise ValueError("Not implemented for spatial data")
+        # Subset features
+        indices = []
+        for item in self.features_list:
+            if item in self.all_features_list:
+                indices.append(self.all_features_list.index(item))
+            else:
+                print(f"Warning: feature name '{item}' not found in list of all features from input data")
+        X = self.X[:, indices]    
+        return X
+
     def inverse_scale(self, return_X = 'all_hours', save_changes=False, verbose=True):
         """
         Inversely scales the data to its original form.
@@ -1237,7 +1250,10 @@ class RNNModel(ABC):
         # Generate Predictions, 
         # run through training to get hidden state set properly for forecast period
         print(f"Running prediction on all input data, Training through Test")
-        X = dict0.scale_all_X()
+        if dict0.scaler is not None:
+            X = dict0.scale_all_X()
+        else:
+            X = dict0.subset_X_features()
         y = dict0.y.flatten()
         # Predict
         if verbose_weights:
@@ -1494,7 +1510,7 @@ def get_initial_weights(model_fit,params,scale_fm=1):
     DeltaE = phys_params['DeltaE']
     T1 = phys_params['T1']
     fmr = phys_params['fm_raise_vs_rain']
-    centering = params['centering']  # shift activation down
+    centering = [0] # shift activation down
     
     w0_initial={'Ed':(1.-np.exp(-T1))/2, 
                 'Ew':(1.-np.exp(-T1))/2,
@@ -1514,6 +1530,7 @@ def get_initial_weights(model_fit,params,scale_fm=1):
             feature = params['features_list'][j]
             for k in range(w[0].shape[1]):
                     w[0][j][k]=w0_initial[feature]
+    
     for i in range(1,len(w)):            # number of the weight
         for j in range(w[i].shape[0]):   # number of the inputs
             if w[i].ndim==2:
@@ -1595,8 +1612,9 @@ class RNN(RNNModel):
             # print(model.get_weights())
 
         if self.params['phys_initialize']:
-            assert self.params['scaler'] == 'reproducibility', f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
+            assert self.params['scaler'] is None, f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
             assert self.params['features_list'] == ['Ed', 'Ew', 'rain'], f"Physics initiation can only be done with features ['Ed', 'Ew', 'rain'], but given features {self.params['features_list']}"
+            assert self.params['dense_layers'] == 0, f"Physics initiation requires no hidden dense layers, received params['dense_layers'] = {self.params['dense_layers']}"
             print("Initializing Model with Physics based weights")
             w, w_name=get_initial_weights(model, self.params)
             model.set_weights(w)
