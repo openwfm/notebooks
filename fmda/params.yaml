@@ -59,7 +59,7 @@ lstm:
   scale: True
   scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
   time_fracs: [.9, .05, .05] # Percentage of data based on time span for train/val/test
-  early_stopping_patience: 5 # Number of epochs with no improvement after which training will be stopped.
+  early_stopping_patience: 25 # Number of epochs with no improvement after which training will be stopped.
   predict_spinup_hours: 5 # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
 
 # Param sets for reproducibility
