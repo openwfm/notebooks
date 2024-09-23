@@ -3,6 +3,8 @@ import math
 import matplotlib.pyplot as plt
 import copy
 
+# ODE + Augmented Kalman Filter Code
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def model_decay(m0,E,partials=0,T1=0.1,tlen=1):  
     # Arguments: 
@@ -126,21 +128,6 @@ def model_moisture(m0,Eqd,Eqw,r,t=None,partials=0,T=10.0,tlen=1.0):
         return m1, dm1_dm0, dm1_dE
     raise('bad partials')
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-##  NOT TESTED
-def model_moisture_run(Eqd,Eqw,r,hours=None,T=10.0,tlen=1.0):
-# for arrays of FMC model input run the fuel moisture model
-    if hours is None:
-        hours = min(len(Eqd),len(Eqw),len(r))
-    m = np.zeros(hours)
-    m[0]=(Eqd[0]+Eqw[0])/2
-    for k in range(hours-1):
-        m[k+1]=model_moisture(m[k],Eqd[k],Eqw[k],r[k],T=T,tlen=tlen)
-    return m
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 def model_augmented(u0,Ed,Ew,r,t):
     # state u is the vector [m,dE] with dE correction to equilibria Ed and Ew at t
     # 
@@ -162,7 +149,7 @@ def model_augmented(u0,Ed,Ew,r,t):
                    [0.     ,     1.]])
     return u1, J
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 ### Default Uncertainty Matrices
 Q = np.array([[1e-3, 0.],
             [0,  1e-3]]) # process noise covariance
@@ -205,4 +192,90 @@ def run_augmented_kf(dat0,h2=None,hours=None, H=H, Q=Q, R=R):
                                   Q*0.0)
       # print('time',t,'data',d[t],'forecast',u[0,t],'Ec',u[1,t])
     return u
+
+# General Machine Learning Models
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class MLModel(ABC):
+    def __init__(self, params: dict):
+        self.params = params
+        if type(self) is MLModel:
+            raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
+        super().__init__()
+
+    @abstractmethod
+    def fit(self, X_train, y_train, weights=None):
+        pass
+
+    @abstractmethod
+    def predict(self, X):
+        pass
+
+    def eval(self, X_test, y_test):
+        preds = self.predict(X_test)
+        rmse = np.sqrt(mean_squared_error(y_test, preds))
+        rmse_ros = np.sqrt(mean_squared_error(ros_3wind(y_test), ros_3wind(preds)))
+        print(f"Test RMSE: {rmse}")
+        print(f"Test RMSE (ROS): {rmse_ros}")
+        return rmse, rmse_ros
+
+class XGB(MLModel):
+    def __init__(self, params: dict):
+        super().__init__(params)
+        self.model = XGBRegressor(**self.params)
+
+    def fit(self, X_train, y_train, weights=None):
+        print(f"Training XGB with params: {self.params}")
+        self.model.fit(X_train, y_train, sample_weight=weights)
+
+    def predict(self, X):
+        print("Predicting with XGB")
+        preds = self.model.predict(X)
+        return preds
+
+class RF(MLModel):
+    def __init__(self, params: dict):
+        super().__init__(params)
+        self.model = RandomForestRegressor(**self.params)
+
+    def fit(self, X_train, y_train, weights=None):
+        print(f"Training RF with params: {self.params}")
+        self.model.fit(X_train, y_train, sample_weight=weights)
+
+    def predict(self, X):
+        print("Predicting with RF")
+        preds = self.model.predict(X)
+        return preds
+
+class LM(MLModel):
+    def __init__(self, params: dict):
+        super().__init__(params)
+        self.model = LinearRegression(**self.params)
+
+    def fit(self, X_train, y_train, weights=None):
+        self.model.fit(X_train, y_train, sample_weight=weights)
+        print(f"Training LM with params: {self.params}")
+
+    def predict(self, X):
+        print("Predicting with LM")
+        preds = self.model.predict(X)
+        return preds
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
