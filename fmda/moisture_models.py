@@ -2,6 +2,12 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import copy
+from abc import ABC, abstractmethod
+import xgboost as xg
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 
 # ODE + Augmented Kalman Filter Code
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -214,9 +220,9 @@ class MLModel(ABC):
     def eval(self, X_test, y_test):
         preds = self.predict(X_test)
         rmse = np.sqrt(mean_squared_error(y_test, preds))
-        rmse_ros = np.sqrt(mean_squared_error(ros_3wind(y_test), ros_3wind(preds)))
+        # rmse_ros = np.sqrt(mean_squared_error(ros_3wind(y_test), ros_3wind(preds)))
         print(f"Test RMSE: {rmse}")
-        print(f"Test RMSE (ROS): {rmse_ros}")
+        # print(f"Test RMSE (ROS): {rmse_ros}")
         return rmse, rmse_ros
 
 class XGB(MLModel):

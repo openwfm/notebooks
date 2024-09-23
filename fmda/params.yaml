@@ -134,7 +134,8 @@ xgb:
   scale_pos_weight: 1
   n_estimators: 100
   gamma: .1
-  
+  scaler: 'standard'
+  features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
 
   ### Params sent by Schreck, slow and less accurate for this dataset
     # objective: "reg:squarederror"
@@ -165,7 +166,8 @@ rf:
 
 lm:
   fit_intercept: true
-
+  scaler: null
+  features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
 
 
 
