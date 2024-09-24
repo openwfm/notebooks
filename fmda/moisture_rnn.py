@@ -310,7 +310,7 @@ def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = Non
         locs_i = loc_batch[i]
         ts = t_batch[i]
         for j in range(0, len(locs_i)):
-            t0 = ts[j]
+            t0 = int(ts[j])
             tend = t0 + hours
             # Create RNNData Dict
             # Subset data to given location and time from t0 to t0+hours
