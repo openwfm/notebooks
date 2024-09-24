@@ -234,7 +234,7 @@ class MLModel(ABC):
         # rmse_ros = np.sqrt(mean_squared_error(ros_3wind(y_test), ros_3wind(preds)))
         print(f"Test RMSE: {rmse}")
         # print(f"Test RMSE (ROS): {rmse_ros}")
-        return rmse, rmse_ros
+        return rmse
 
 class XGB(MLModel):
     def __init__(self, params: dict):
@@ -242,10 +242,6 @@ class XGB(MLModel):
         model_params = self.filter_params(XGBRegressor) 
         self.model = XGBRegressor(**model_params)
         self.params['mod_type'] = "XGBoost"
-
-    # def fit(self, X_train, y_train, weights=None):
-    #     print(f"Training XGB with params: {self.params}")
-    #     self.model.fit(X_train, y_train, sample_weight=weights)
 
     def predict(self, X):
         print("Predicting with XGB")
@@ -258,15 +254,6 @@ class RF(MLModel):
         model_params = self.filter_params(RandomForestRegressor)
         self.model = RandomForestRegressor(**model_params)
         self.params['mod_type'] = "RandomForest"
-    
-    # def fit(self, X_train, y_train, weights=None):
-    #     print(f"Training RF with params: {self.params}")
-    #     self.model.fit(X_train, y_train, sample_weight=weights)
-
-    # def predict(self, X):
-    #     print("Predicting with RF")
-    #     preds = self.model.predict(X)
-    #     return preds
 
 class LM(MLModel):
     def __init__(self, params: dict):
@@ -274,15 +261,6 @@ class LM(MLModel):
         model_params = self.filter_params(LinearRegression)
         self.model = LinearRegression(**model_params)
         self.params['mod_type'] = "LinearRegression"
-    
-    # def fit(self, X_train, y_train, weights=None):
-    #     self.model.fit(X_train, y_train, sample_weight=weights)
-    #     print(f"Training LM with params: {self.params}")
-
-    # def predict(self, X):
-    #     print("Predicting with LM")
-    #     preds = self.model.predict(X)
-    #     return preds
 
 
 
