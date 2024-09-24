@@ -15,8 +15,20 @@ import copy
 import subprocess
 import os.path as osp
 from utils import Dict, str2time, check_increment, time_intp
+import warnings
 
-def process_train_dict(input_file_paths, params_data, atm_dict = "HRRR", verbose=False):
+# Wrapper Functions to Put it all together
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# TODO: ENGINEERED TIME FEATURES:
+# hod = rnn_dat.time.astype('datetime64[h]').astype(int) % 24
+# doy = np.array([dt.timetuple().tm_yday - 1 for dt in rnn_dat.time])
+
+def create_spatial_train(input_file_paths, params_data, atm_dict = "HRRR", verbose=False):
+    train = process_train_dict(file_paths, params_data = params_data, verbose=verbose)
+    train_sp = Dict(combine_nested(train))
+
+def process_train_dict(input_file_paths, params_data, atm_dict = "HRRR", spatial=False, verbose=False):
     if type(input_file_paths) is not list:
         raise ValueError(f"Argument `input_file_paths` must be list, received {type(input_file_paths)}")
     train = {}
@@ -33,8 +45,35 @@ def process_train_dict(input_file_paths, params_data, atm_dict = "HRRR", verbose
         flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
         remove_key_list(di, flagged_cases, verbose=verbose)
         train.update(di)
-    return train
+    if spatial:
+        train = combine_nested(train)
+    
+    return Dict(train)
 
+
+def subset_by_features(nested_dict, input_features):
+    """
+    Subsets a nested dictionary to only include keys where all strings in the input_features
+    are present in the dictionary's 'features_list' subkey. Primarily used for RAWS dictionaries where desired features might not be present at all ground stations.
+
+    Parameters:
+    nested_dict (dict): The nested dictionary with a 'features_list' subkey.
+    input_features (list): The list of features to be checked.
+
+    Returns:
+    dict: A subset of the input dictionary with only the matching keys.
+    """
+    # Create a new dictionary to store the result
+    result = {}
+    
+    # Iterate through the keys in the nested dictionary
+    for key, value in nested_dict.items():
+        # Check if 'features_list' key exists and all input_features are in the list
+        if 'features_list' in value and all(feature in value['features_list'] for feature in input_features):
+            # Add to the result if all features are present
+            result[key] = value
+    
+    return result
 
 feature_types = {
     # Static features are based on physical location, e.g. location of RAWS site
@@ -370,7 +409,9 @@ def _combine_key(nested_input_dict, key, subkey=None):
                 else:
                     combined_list.append(input_dict[key])
             except KeyError:
-                raise ValueError(f"Missing expected key: '{key}'{f' or subkey: {subkey}' if subkey else ''} in one of the input dictionaries")
+                warning_message = f"Missing expected key: '{key}'{f' or subkey: {subkey}' if subkey else ''} in one of the input dictionaries. Setting value to None."
+                warnings.warn(warning_message)
+                combined_list.append(None)
         else:
             raise ValueError(f"Expected a dictionary, but got {type(input_dict)}")
     return combined_list 
