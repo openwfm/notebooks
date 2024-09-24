@@ -6,7 +6,7 @@
 # Stateless RNN, batch_size declared at fit step
 rnn:
   batch_size: 32
-  timesteps: 5
+  timesteps: 12
   optimizer: adam
   rnn_layers: 1 # Number of hidden recurrent layers
   rnn_units: 20 # Number of units per hidden recurrent layer
@@ -37,7 +37,7 @@ rnn:
 
 lstm:
   batch_size: 32
-  timesteps: 5
+  timesteps: 12
   optimizer: adam
   rnn_layers: 1
   rnn_units: 6
@@ -163,12 +163,14 @@ rf:
   random_state: null # Controls both the randomness of the bootstrapping of the samples and the sampling of the features
   verbose: 0 # Controls the verbosity when fitting and predicting
   warm_start: false # When set to True, reuse the solution of the previous call to fit and add more estimators to the ensemble
-
+  scaler: null
+  features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
+  
 lm:
   fit_intercept: true
   scaler: null
   features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
-
+  
 
 
 
