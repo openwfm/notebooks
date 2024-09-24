@@ -9,3 +9,5 @@ __pycache__
 .virtual_documents
 **/*.pkl
 **/*.png
+**/*.tif
+fmda/data/*.csv
