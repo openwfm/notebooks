@@ -8,6 +8,7 @@ from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
 
 # ODE + Augmented Kalman Filter Code
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -216,7 +217,13 @@ class MLModel(ABC):
     @abstractmethod
     def predict(self, X):
         pass
-
+    def filter_params(self, model_cls):
+        """Filters out parameters that are not part of the model constructor."""
+        model_params = self.params.copy()
+        valid_keys = model_cls.__init__.__code__.co_varnames
+        filtered_params = {k: v for k, v in model_params.items() if k in valid_keys}
+        return filtered_params
+        
     def eval(self, X_test, y_test):
         preds = self.predict(X_test)
         rmse = np.sqrt(mean_squared_error(y_test, preds))
@@ -228,7 +235,8 @@ class MLModel(ABC):
 class XGB(MLModel):
     def __init__(self, params: dict):
         super().__init__(params)
-        self.model = XGBRegressor(**self.params)
+        model_params = self.filter_params(XGBRegressor) 
+        self.model = XGBRegressor(**model_params)
 
     def fit(self, X_train, y_train, weights=None):
         print(f"Training XGB with params: {self.params}")
@@ -242,7 +250,8 @@ class XGB(MLModel):
 class RF(MLModel):
     def __init__(self, params: dict):
         super().__init__(params)
-        self.model = RandomForestRegressor(**self.params)
+        model_params = self.filter_params(RandomForestRegressor)
+        self.model = RandomForestRegressor(**model_params)
 
     def fit(self, X_train, y_train, weights=None):
         print(f"Training RF with params: {self.params}")
@@ -256,7 +265,8 @@ class RF(MLModel):
 class LM(MLModel):
     def __init__(self, params: dict):
         super().__init__(params)
-        self.model = LinearRegression(**self.params)
+        model_params = self.filter_params(LinearRegression)
+        self.model = LinearRegression(**model_params)
 
     def fit(self, X_train, y_train, weights=None):
         self.model.fit(X_train, y_train, sample_weight=weights)
