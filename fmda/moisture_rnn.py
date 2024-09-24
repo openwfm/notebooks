@@ -344,7 +344,7 @@ def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = Non
     yys = []
     for i in range(0, len(loc_batch)):
         locs_i = loc_batch[i]
-        XXi = np.empty((Xs[0].shape[0]*batch_size, 5, n_features))
+        XXi = np.empty((Xs[0].shape[0]*batch_size, timesteps, n_features))
         yyi = np.empty((Xs[0].shape[0]*batch_size, 1))
         for j in range(0, len(locs_i)):
             XXi[j::(batch_size)] =  Xs[locs_i[j]]
@@ -379,10 +379,10 @@ class RNNParams(dict):
         """
         super().__init__(input_dict)
         # Automatically run checks on initialization
-        self.run_checks()           
+        self._run_checks()           
         # Automatically calculate shapes on initialization
         self.calc_param_shapes()        
-    def run_checks(self, verbose=True):
+    def _run_checks(self, verbose=True):
         """
         Validates that required keys exist and are of the correct type.
 
@@ -545,11 +545,13 @@ class RNNData(dict):
             self.features_list = self.all_features_list
         else:
             self.features_list = features_list
-        # self.run_checks()
+        
+        # self._run_checks()
         self.__dict__.update(self)
-
+        
+        
     # TODO: Fix checks for multilocation
-    def run_checks(self, verbose=True):
+    def _run_checks(self, verbose=True):
         """
         Validates that required keys are present and checks the integrity of data shapes.
 
@@ -1748,7 +1750,6 @@ class RNN_LSTM(RNNModel):
         model.set_weights(w_fitted)
         
         return model
-
 
 
 
