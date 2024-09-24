@@ -9,6 +9,7 @@ from sklearn.metrics import mean_squared_error
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from utils import Dict
 
 # ODE + Augmented Kalman Filter Code
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -205,24 +206,27 @@ def run_augmented_kf(dat0,h2=None,hours=None, H=H, Q=Q, R=R):
 
 class MLModel(ABC):
     def __init__(self, params: dict):
-        self.params = params
+        self.params = Dict(params)
         if type(self) is MLModel:
             raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
         super().__init__()
 
-    @abstractmethod
-    def fit(self, X_train, y_train, weights=None):
-        pass
-
-    @abstractmethod
-    def predict(self, X):
-        pass
     def filter_params(self, model_cls):
         """Filters out parameters that are not part of the model constructor."""
         model_params = self.params.copy()
         valid_keys = model_cls.__init__.__code__.co_varnames
         filtered_params = {k: v for k, v in model_params.items() if k in valid_keys}
         return filtered_params
+        
+    
+    def fit(self, X_train, y_train, weights=None):
+        print(f"Fitting {self.params.mod_type} with params {self.params}")
+        self.model.fit(X_train, y_train, sample_weight=weights)  
+
+    def predict(self, X):
+        print(f"Predicting with {self.params.mod_type}")
+        preds = self.model.predict(X)
+        return preds
         
     def eval(self, X_test, y_test):
         preds = self.predict(X_test)
@@ -237,10 +241,11 @@ class XGB(MLModel):
         super().__init__(params)
         model_params = self.filter_params(XGBRegressor) 
         self.model = XGBRegressor(**model_params)
+        self.params['mod_type'] = "XGBoost"
 
-    def fit(self, X_train, y_train, weights=None):
-        print(f"Training XGB with params: {self.params}")
-        self.model.fit(X_train, y_train, sample_weight=weights)
+    # def fit(self, X_train, y_train, weights=None):
+    #     print(f"Training XGB with params: {self.params}")
+    #     self.model.fit(X_train, y_train, sample_weight=weights)
 
     def predict(self, X):
         print("Predicting with XGB")
@@ -252,30 +257,32 @@ class RF(MLModel):
         super().__init__(params)
         model_params = self.filter_params(RandomForestRegressor)
         self.model = RandomForestRegressor(**model_params)
+        self.params['mod_type'] = "RandomForest"
+    
+    # def fit(self, X_train, y_train, weights=None):
+    #     print(f"Training RF with params: {self.params}")
+    #     self.model.fit(X_train, y_train, sample_weight=weights)
 
-    def fit(self, X_train, y_train, weights=None):
-        print(f"Training RF with params: {self.params}")
-        self.model.fit(X_train, y_train, sample_weight=weights)
-
-    def predict(self, X):
-        print("Predicting with RF")
-        preds = self.model.predict(X)
-        return preds
+    # def predict(self, X):
+    #     print("Predicting with RF")
+    #     preds = self.model.predict(X)
+    #     return preds
 
 class LM(MLModel):
     def __init__(self, params: dict):
         super().__init__(params)
         model_params = self.filter_params(LinearRegression)
         self.model = LinearRegression(**model_params)
+        self.params['mod_type'] = "LinearRegression"
+    
+    # def fit(self, X_train, y_train, weights=None):
+    #     self.model.fit(X_train, y_train, sample_weight=weights)
+    #     print(f"Training LM with params: {self.params}")
 
-    def fit(self, X_train, y_train, weights=None):
-        self.model.fit(X_train, y_train, sample_weight=weights)
-        print(f"Training LM with params: {self.params}")
-
-    def predict(self, X):
-        print("Predicting with LM")
-        preds = self.model.predict(X)
-        return preds
+    # def predict(self, X):
+    #     print("Predicting with LM")
+    #     preds = self.model.predict(X)
+    #     return preds
 
 
 
