@@ -11,3 +11,4 @@ __pycache__
 **/*.png
 **/*.tif
 fmda/data/*.csv
+**/*.keras
