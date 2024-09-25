@@ -660,7 +660,8 @@ class RNNData(dict):
                 if item in self.all_features_list:
                     indices.append(self.all_features_list.index(item))
                 else:
-                    print(f"Warning: feature name '{item}' not found in list of all features from input data")
+                    print(f"Warning: feature name '{item}' not found in list of all features from input data. Removing from internal features list")
+                    # self.features_list.remove(item)
             if spatial:
                 X = [Xi[:, indices] for Xi in X]
             else:
@@ -670,13 +671,15 @@ class RNNData(dict):
         # Validation data from train_ind to test_ind
         # Test data from test_ind to end
         if spatial:           
+            # Split by space
             X_train = [X[i] for i in train_locs]
             X_val = [X[i] for i in val_locs]
             X_test = [X[i] for i in test_locs]
             y_train = [y[i] for i in train_locs]
             y_val = [y[i] for i in val_locs]
             y_test = [y[i] for i in test_locs]
-            
+
+            # Split by time
             self.X_train = [Xi[:train_ind] for Xi in X_train]
             self.y_train = [yi[:train_ind].reshape(-1,1) for yi in y_train]
             if (val_frac >0) and (val_frac_sp)>0:
@@ -899,6 +902,11 @@ class RNNData(dict):
                 print(f"Reshaping validation data using batch size: {batch_size} and timesteps: {timesteps}")
                 self.X_val, self.y_val = staircase_2(self.X_val, self.y_val, timesteps = timesteps, 
                                                      batch_size=batch_size, verbose=verbose)
+            # Format Test Data. Shape should be (1, hours, features)
+            self.X_test = self.X_test.reshape((1, self.X_test.shape[0], len(self.features_list)))
+            # self.y_test = 
+            print(f"X_test shape: {self.X_test.shape}")
+            print(f"y_test shape: {self.y_test.shape}")
         if self.X_train.shape[0] == 0:
             raise ValueError("X_train has zero rows. Try different combo of cross-validation fractions, batch size or start_times. Train/val/test data partially processed, need to return train_test_split")
         
@@ -1163,8 +1171,9 @@ class RNNModel(ABC):
             The predicted values.
         """        
         print("Predicting test data")
-        X_test = self._format_pred_data(X_test)
-        preds = self.model_predict.predict(X_test).flatten()
+        # X_test = self._format_pred_data(X_test)
+        # preds = self.model_predict.predict(X_test).flatten()
+        preds = self.model_predict.predict(X_test)
         return preds
 
 
@@ -1276,7 +1285,8 @@ class RNNModel(ABC):
         # Predict
         if verbose_weights:
             print(f"All X hash: {hash_ndarray(X)}")
-        
+        # Reshape X
+        X = X.reshape(1, X.shape[0], X.shape[1])
         m = self.predict(X).flatten()
         if verbose_weights:
             print(f"Predictions Hash: {hash_ndarray(m)}")
