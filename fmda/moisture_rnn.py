@@ -873,16 +873,32 @@ class RNNData(dict):
         
         if spatial:
             print(f"Reshaping spatial training data using batch size: {batch_size} and timesteps: {timesteps}")
-            self.X_train, self.y_train, self.n_seqs = staircase_spatial(self.X_train, self.y_train, timesteps = timesteps, batch_size=batch_size, hours=hours, verbose=verbose, start_times=start_times)
+            # Format training data
+            self.X_train, self.y_train, self.n_seqs = staircase_spatial(self.X_train, self.y_train, timesteps = timesteps, 
+                                                                        batch_size=batch_size, hours=hours, verbose=verbose, start_times=start_times)
+            # Format Validation Data if provided
             if hasattr(self, "X_val"):
                 print(f"Reshaping validation data using batch size: {batch_size} and timesteps: {timesteps}")
-                self.X_val, self.y_val, _ = staircase_spatial(self.X_val, self.y_val, timesteps = timesteps, batch_size=batch_size, hours=None, verbose=verbose, start_times=start_times)
+                self.X_val, self.y_val, _ = staircase_spatial(self.X_val, self.y_val, timesteps = timesteps, 
+                                                              batch_size=batch_size, hours=None, verbose=verbose, start_times=start_times)
+            # Format Test Data. Same (batch_size, timesteps, features) format, but for prediction model batch_size and timesteps are unconstrained
+            # So here batch_size will represent the number of locations aka separate timeseries to predict
+            print(f"Reshaping test data by stacking. Output dimension will be (n_locs, test_hours, features)")
+            self.X_test = np.stack(self.X_test, axis=0)
+            self.y_test = np.stack(self.y_test, axis=0)
+            print(f"X_test shape: {self.X_test.shape}")
+            print(f"y_test shape: {self.y_test.shape}")
+            
         else:
             print(f"Reshaping training data using batch size: {batch_size} and timesteps: {timesteps}")
-            self.X_train, self.y_train = staircase_2(self.X_train, self.y_train, timesteps = timesteps, batch_size=batch_size, verbose=verbose)
+            # Format Training Data
+            self.X_train, self.y_train = staircase_2(self.X_train, self.y_train, timesteps = timesteps, 
+                                                     batch_size=batch_size, verbose=verbose)
+            # Format Validation Data if provided
             if hasattr(self, "X_val"):
                 print(f"Reshaping validation data using batch size: {batch_size} and timesteps: {timesteps}")
-                self.X_val, self.y_val = staircase_2(self.X_val, self.y_val, timesteps = timesteps, batch_size=batch_size, verbose=verbose)
+                self.X_val, self.y_val = staircase_2(self.X_val, self.y_val, timesteps = timesteps, 
+                                                     batch_size=batch_size, verbose=verbose)
         if self.X_train.shape[0] == 0:
             raise ValueError("X_train has zero rows. Try different combo of cross-validation fractions, batch size or start_times. Train/val/test data partially processed, need to return train_test_split")
         
@@ -1292,9 +1308,11 @@ class RNNModel(ABC):
         # Train Error: NOT DOING YET. DECIDE WHETHER THIS IS NEEDED
         
         # Test Error
-        new_data = np.stack(dict0.X_test, axis=0)
-        y_array = np.stack(dict0.y_test, axis=0)
-        preds = self.model_predict.predict(new_data)
+        # new_data = np.stack(dict0.X_test, axis=0)
+        # y_array = np.stack(dict0.y_test, axis=0)
+        # preds = self.model_predict.predict(new_data)
+        y_array = dict0.y_test
+        preds = self.model_predict.predict(dict0.X_test)
 
         # Calculate RMSE
         ## Note: not using util rmse function since this approach is for 3d arrays
@@ -1751,5 +1769,13 @@ class RNN_LSTM(RNNModel):
         
         return model
 
+# Wrapper Functions putting everything together. 
+# Useful for deploying from command line
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+def train_model(model, data):
+    return
+
+def forecast(model, data, spinup_hours = 0):
+    return 
 
