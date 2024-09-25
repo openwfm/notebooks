@@ -51,7 +51,7 @@ def process_train_dict(input_file_paths, params_data, atm_dict = "HRRR", spatial
     return Dict(train)
 
 
-def subset_by_features(nested_dict, input_features):
+def subset_by_features(nested_dict, input_features, verbose=True):
     """
     Subsets a nested dictionary to only include keys where all strings in the input_features
     are present in the dictionary's 'features_list' subkey. Primarily used for RAWS dictionaries where desired features might not be present at all ground stations.
@@ -63,6 +63,9 @@ def subset_by_features(nested_dict, input_features):
     Returns:
     dict: A subset of the input dictionary with only the matching keys.
     """
+    if verbose:
+        print(f"Subsetting to cases with features: {input_features}")
+    
     # Create a new dictionary to store the result
     result = {}
     
