@@ -546,7 +546,7 @@ class RNNData(dict):
         else:
             self.features_list = features_list
         
-        # self._run_checks()
+        self._run_checks()
         self.__dict__.update(self)
         
         
@@ -711,8 +711,9 @@ class RNNData(dict):
                 print(f"Val. Locations: {len(val_locs)}")
                 print(f"Test Locations: {len(test_locs)}")
                 print(f"X_train[0] shape: {self.X_train[0].shape}, y_train[0] shape: {self.y_train[0].shape}")
-                print(f"X_val[0] shape: {self.X_val[0].shape}, y_val[0] shape: {self.y_val[0].shape}")
-                print(f"X_test[0] shape: {self.X_test[0].shape}, y_test[0] shape: {self.y_test[0].shape}")
+                if hasattr(self, "X_val"):
+                    print(f"X_val[0] shape: {self.X_val[0].shape}, y_val[0] shape: {self.y_val[0].shape}")
+                    print(f"X_test[0] shape: {self.X_test[0].shape}, y_test[0] shape: {self.y_test[0].shape}")
             else:
                 print(f"X_train shape: {self.X_train.shape}, y_train shape: {self.y_train.shape}")
                 if hasattr(self, "X_val"):
@@ -1783,7 +1784,7 @@ class RNN_LSTM(RNNModel):
 # Useful for deploying from command line
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def train_model(model, data):
+def train_model(model, data, params):
     return
 
 def forecast(model, data, spinup_hours = 0):
