@@ -27,6 +27,7 @@ import warnings
 def create_spatial_train(input_file_paths, params_data, atm_dict = "HRRR", verbose=False):
     train = process_train_dict(file_paths, params_data = params_data, verbose=verbose)
     train_sp = Dict(combine_nested(train))
+    return train_sp
 
 def process_train_dict(input_file_paths, params_data, atm_dict = "HRRR", spatial=False, verbose=False):
     if type(input_file_paths) is not list:
@@ -86,7 +87,7 @@ feature_types = {
 }
 
 def build_train_dict(input_file_path,
-              forecast_step=1, atm="HRRR",features_all=['Ed', 'Ew', 'solar', 'wind', 'elev', 'lon', 'lat', 'rain'], verbose=False):
+              forecast_step=1, atm="HRRR",features_all=['Ed', 'Ew', 'solar', 'wind', 'elev', 'lon', 'lat', 'doy', 'hod', 'rain'], verbose=False):
     # in:
     #   file_path       list of strings - files as in read_test_pkl
     #   forecast_step   int - which forecast step to take atmospheric data from (maybe 03, must be >0). 
@@ -177,6 +178,11 @@ def build_train_dict(input_file_path,
                 # For static features, repeat to fit number of time observations
                 elif feat in feature_types['static']:
                     columns.append(np.full(hours,loc[feat]))
+            # Add Engineered Time features, doy and hod
+            hod = time_hrrr.astype('datetime64[h]').astype(int) % 24
+            doy = np.array([dt.timetuple().tm_yday - 1 for dt in time_hrrr])
+            columns.extend([doy, hod])
+            
             # compute rain as difference of accumulated precipitation
             if 'rain' in features_list:
                 if atm_dict == "HRRR":
