@@ -295,8 +295,8 @@ def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = Non
         print("Setting total hours to minimum length of y in provided dictionary")
         hours = min(len(yi) for yi in y)
     if start_times is None:
-        print("Setting Start times to offset by 1 hour by location")
-        start_times = np.arange(n_loc)
+        print(f"Setting Start times to offset by 1 hour by location, from 0 through {batch_size} (batch_size)")
+        start_times = np.tile(np.arange(batch_size), n_loc // batch_size + 1)[:n_loc]
     # Set up batches
     loc_batch, t_batch =  batch_setup(loc_ids, batch_size), batch_setup(start_times, batch_size)
     if verbose:
@@ -545,6 +545,8 @@ class RNNData(dict):
             self.features_list = self.all_features_list
         else:
             self.features_list = features_list
+
+        print(f"Setting features_list to {features_list}. \n  NOTE: not subsetting features yet. That happens in train_test_split.")
         
         self._run_checks()
         self.__dict__.update(self)
@@ -563,10 +565,6 @@ class RNNData(dict):
         missing_keys = self.required_keys - self.keys()
         if missing_keys:
             raise KeyError(f"Missing required keys: {missing_keys}")
-        # # Check y 1-d
-        # y_shape = np.shape(self.y)
-        # if not (len(y_shape) == 1 or (len(y_shape) == 2 and y_shape[1] == 1)):
-        #     raise ValueError(f"'y' must be one-dimensional, with shape (N,) or (N, 1). Current shape is {y_shape}.")
         
         # # Check if 'hours' is provided and matches len(y)
         # if 'hours' in self:
@@ -719,6 +717,10 @@ class RNNData(dict):
                 if hasattr(self, "X_val"):
                     print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
                 print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")                
+        # Make Test Data None if zero length
+        if len(self.X_test) == 0:
+            self.X_test = None
+            warnings.warn("Zero Test Data, setting X_test to None")
     def scale_data(self, verbose=True):
         """
         Scales the training data using the set scaler.
@@ -746,8 +748,10 @@ class RNNData(dict):
             # Transform data using fitted scaler
             self.X_train = [self.scaler.transform(Xi) for Xi in self.X_train]
             if hasattr(self, 'X_val'):
-                self.X_val = [self.scaler.transform(Xi) for Xi in self.X_val]
-            self.X_test = [self.scaler.transform(Xi) for Xi in self.X_test]
+                if self.X_val is not None:
+                    self.X_val = [self.scaler.transform(Xi) for Xi in self.X_val]
+            if self.X_test is not None:
+                self.X_test = [self.scaler.transform(Xi) for Xi in self.X_test]
         else:
             # Fit the scaler on the training data
             self.scaler.fit(self.X_train)      
@@ -887,11 +891,12 @@ class RNNData(dict):
                                                               batch_size=batch_size, hours=None, verbose=verbose, start_times=start_times)
             # Format Test Data. Same (batch_size, timesteps, features) format, but for prediction model batch_size and timesteps are unconstrained
             # So here batch_size will represent the number of locations aka separate timeseries to predict
-            print(f"Reshaping test data by stacking. Output dimension will be (n_locs, test_hours, features)")
-            self.X_test = np.stack(self.X_test, axis=0)
-            self.y_test = np.stack(self.y_test, axis=0)
-            print(f"X_test shape: {self.X_test.shape}")
-            print(f"y_test shape: {self.y_test.shape}")
+            if self.X_test is not None:
+                print(f"Reshaping test data by stacking. Output dimension will be (n_locs, test_hours, features)")
+                self.X_test = np.stack(self.X_test, axis=0)
+                self.y_test = np.stack(self.y_test, axis=0)
+                print(f"X_test shape: {self.X_test.shape}")
+                print(f"y_test shape: {self.y_test.shape}")
             
         else:
             print(f"Reshaping training data using batch size: {batch_size} and timesteps: {timesteps}")
@@ -904,10 +909,11 @@ class RNNData(dict):
                 self.X_val, self.y_val = staircase_2(self.X_val, self.y_val, timesteps = timesteps, 
                                                      batch_size=batch_size, verbose=verbose)
             # Format Test Data. Shape should be (1, hours, features)
-            self.X_test = self.X_test.reshape((1, self.X_test.shape[0], len(self.features_list)))
-            # self.y_test = 
-            print(f"X_test shape: {self.X_test.shape}")
-            print(f"y_test shape: {self.y_test.shape}")
+            if self.X_test is not None:
+                self.X_test = self.X_test.reshape((1, self.X_test.shape[0], len(self.features_list)))
+                # self.y_test = 
+                print(f"X_test shape: {self.X_test.shape}")
+                print(f"y_test shape: {self.y_test.shape}")
         if self.X_train.shape[0] == 0:
             raise ValueError("X_train has zero rows. Try different combo of cross-validation fractions, batch size or start_times. Train/val/test data partially processed, need to return train_test_split")
         
@@ -1095,6 +1101,10 @@ class RNNModel(ABC):
         return_epochs : bool
             If True, return the number of epochs that training took. Used to test and optimize early stopping
         """        
+        # Check Compatibility, assume features dimension is last in X_train array
+        if X_train.shape[-1] != self.params['n_features']:
+            raise ValueError(f"X_train and number of features from params not equal. \n X_train shape: {X_train.shape} \n params['n_features']: {self.params['n_features']}. \n Try recreating RNNData object with features list from params: `RNNData(..., features_list = parmas['features_list'])`")
+        
         # verbose_fit argument is for printing out update after each epoch, which gets very long
         verbose_fit = self.params['verbose_fit'] 
         verbose_weights = self.params['verbose_weights']
@@ -1236,7 +1246,10 @@ class RNNModel(ABC):
         --------
         tuple
             Model predictions and a dictionary of RMSE errors broken up by time period.
-        """        
+        """      
+        if dict0.X_test is None:
+            raise ValueError("No test data X_test in input dictionary. Provide test data or just run .fit")
+        
         verbose_fit = self.params['verbose_fit']
         verbose_weights = self.params['verbose_weights']
         if verbose_weights:
