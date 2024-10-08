@@ -2,7 +2,17 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import copy
+from abc import ABC, abstractmethod
+# import xgboost as xg
+# from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from utils import Dict
 
+# ODE + Augmented Kalman Filter Code
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def model_decay(m0,E,partials=0,T1=0.1,tlen=1):  
     # Arguments: 
@@ -126,21 +136,6 @@ def model_moisture(m0,Eqd,Eqw,r,t=None,partials=0,T=10.0,tlen=1.0):
         return m1, dm1_dm0, dm1_dE
     raise('bad partials')
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-##  NOT TESTED
-def model_moisture_run(Eqd,Eqw,r,hours=None,T=10.0,tlen=1.0):
-# for arrays of FMC model input run the fuel moisture model
-    if hours is None:
-        hours = min(len(Eqd),len(Eqw),len(r))
-    m = np.zeros(hours)
-    m[0]=(Eqd[0]+Eqw[0])/2
-    for k in range(hours-1):
-        m[k+1]=model_moisture(m[k],Eqd[k],Eqw[k],r[k],T=T,tlen=tlen)
-    return m
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 def model_augmented(u0,Ed,Ew,r,t):
     # state u is the vector [m,dE] with dE correction to equilibria Ed and Ew at t
     # 
@@ -162,7 +157,7 @@ def model_augmented(u0,Ed,Ew,r,t):
                    [0.     ,     1.]])
     return u1, J
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 ### Default Uncertainty Matrices
 Q = np.array([[1e-3, 0.],
             [0,  1e-3]]) # process noise covariance
@@ -205,4 +200,83 @@ def run_augmented_kf(dat0,h2=None,hours=None, H=H, Q=Q, R=R):
                                   Q*0.0)
       # print('time',t,'data',d[t],'forecast',u[0,t],'Ec',u[1,t])
     return u
+
+# General Machine Learning Models
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class MLModel(ABC):
+    def __init__(self, params: dict):
+        self.params = Dict(params)
+        if type(self) is MLModel:
+            raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
+        super().__init__()
+
+    def filter_params(self, model_cls):
+        """Filters out parameters that are not part of the model constructor."""
+        model_params = self.params.copy()
+        valid_keys = model_cls.__init__.__code__.co_varnames
+        filtered_params = {k: v for k, v in model_params.items() if k in valid_keys}
+        return filtered_params
+        
+    
+    def fit(self, X_train, y_train, weights=None):
+        print(f"Fitting {self.params.mod_type} with params {self.params}")
+        self.model.fit(X_train, y_train, sample_weight=weights)  
+
+    def predict(self, X):
+        print(f"Predicting with {self.params.mod_type}")
+        preds = self.model.predict(X)
+        return preds
+        
+    def eval(self, X_test, y_test):
+        preds = self.predict(X_test)
+        rmse = np.sqrt(mean_squared_error(y_test, preds))
+        # rmse_ros = np.sqrt(mean_squared_error(ros_3wind(y_test), ros_3wind(preds)))
+        print(f"Test RMSE: {rmse}")
+        # print(f"Test RMSE (ROS): {rmse_ros}")
+        return rmse
+
+class XGB(MLModel):
+    def __init__(self, params: dict):
+        super().__init__(params)
+        model_params = self.filter_params(XGBRegressor) 
+        self.model = XGBRegressor(**model_params)
+        self.params['mod_type'] = "XGBoost"
+
+    def predict(self, X):
+        print("Predicting with XGB")
+        preds = self.model.predict(X)
+        return preds
+
+class RF(MLModel):
+    def __init__(self, params: dict):
+        super().__init__(params)
+        model_params = self.filter_params(RandomForestRegressor)
+        self.model = RandomForestRegressor(**model_params)
+        self.params['mod_type'] = "RandomForest"
+
+class LM(MLModel):
+    def __init__(self, params: dict):
+        super().__init__(params)
+        model_params = self.filter_params(LinearRegression)
+        self.model = LinearRegression(**model_params)
+        self.params['mod_type'] = "LinearRegression"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

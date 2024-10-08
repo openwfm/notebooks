@@ -1,0 +1,17 @@
+name: fmda_ml2
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.12
+  - pandas
+  - scikit-learn
+  - jupyterlab
+  - pip
+  - pip:
+      - tensorflow>=2.16
+      - synopticpy
+      - xgboost
+
+
+
+

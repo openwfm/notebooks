@@ -1,6 +1,7 @@
 # v2 training and prediction class infrastructure
 
 # Environment
+import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -185,152 +186,180 @@ scalers = {
 }
 
 
-## DEPRECATED, use RNNData class instead
-def create_rnn_data2(dict1, params, atm_dict="HRRR", verbose=False, train_ind=None, test_ind=None):
-    # Given fmda data and hyperparameters, return formatted dictionary to be used in RNN
-    # Inputs:
-    # d: (dict) fmda dictionary
-    # params: (dict) hyperparameters
-    # atm_dict: (str) string specifying name of subdictionary for atmospheric vars
-    # train_frac: (float) fraction of data to use for training (starting from time 0)
-    # val_frac: (float) fraction of data to use for validation data (starting from end of train)
-    # Returns: (dict) formatted data used in RNN 
-    logging.info('create_rnn_data start')
-    # Copy Dictionary to avoid changing the input to this function
-    d=copy.deepcopy(dict1)
-    scale = params['scale']
-    scaler= params['scaler']
-    # Features list given by params dict to be used in training
-    features_list = params["features_list"]
-    # All available features list, corresponds to shape of X
-    features_all = d["features_list"]
-    # Indices to subset all features with based on params features
-    indices = []
-    for item in features_list:
-        if item in features_all:
-            indices.append(features_all.index(item))
-        else:
-            print(f"Warning: feature name '{item}' not found in list of all features from input data")
+def batch_setup(ids, batch_size):
+    """
+    Sets up stateful batched training data scheme for RNN training.
+
+    This function takes a list or array of identifiers (`ids`) and divides them into batches of a specified size (`batch_size`). If the last batch does not have enough elements to meet the `batch_size`, the function will loop back to the start of the identifiers and continue filling the batch until it reaches the required size.
+
+    Parameters:
+    -----------
+    ids : list or numpy array
+        A list or numpy array containing the ids to be batched.
+
+    batch_size : int
+        The desired size of each batch. 
+
+    Returns:
+    --------
+    batches : list of lists
+        A list where each element is a batch (itself a list) of identifiers. Each batch will contain exactly `batch_size` elements.
+
+    Example:
+    --------
+    >>> ids = [1, 2, 3, 4, 5]
+    >>> batch_size = 3
+    >>> batch_setup(ids, batch_size)
+    [[1, 2, 3], [4, 5, 1]]
+
+    Notes:
+    ------
+    - If `ids` is shorter than `batch_size`, the returned list will contain a single batch where identifiers are repeated from the start of `ids` until the batch is filled.
+    """   
+    # Ensure ids is a numpy array
+    x = np.array(ids)
+    
+    # Initialize the list to hold the batches
+    batches = []
+    
+    # Use a loop to slice the list/array into batches
+    for i in range(0, len(x), batch_size):
+        batch = list(x[i:i + batch_size])
         
-    # Extract desired features based on params, combine into matrix
-    # Extract response vector 
-    y = d['y']
-    y = np.reshape(y,(-1,1))
-    # Extract Features matrix, subset to desired features
-    X_raw = d['X'][:, indices].copy() # saw untransformed features matrix 
-    X = d['X']
-    X = X[:, indices]
-
-    # Check total observed hours
-    hours=d['hours']    
-    assert hours == y.shape[0] # Check that it matches response
+        # If the batch is not full, continue from the start
+        while len(batch) < batch_size:
+            # Calculate the remaining number of items needed
+            remaining = batch_size - len(batch)
+            # Append the needed number of items from the start of the array
+            batch.extend(x[:remaining])
+        
+        batches.append(batch)
     
-    logging.info('create_rnn_data: total_hours=%s',hours)
-    logging.info('feature matrix X shape %s',np.shape(X))
-    logging.info('target  matrix Y shape %s',np.shape(y))
-    logging.info('features_list: %s',features_list)
+    return batches
 
-    logging.info('splitting train/val/test')
-    if train_ind is None:
-        train_ind = round(hours * params['train_frac']) # index of last training observation
-    test_ind= train_ind + round(hours * params['val_frac'])# index of first test observation, if no validation data it is equal to train_ind
-    logging.info('Final index of training data=%s',train_ind)
-    logging.info('First index of Test data=%s',test_ind)
-    # Training data from 0 to train_ind
-    X_train = X[:train_ind]
-    y_train = y[:train_ind].reshape(-1,1)
-    # Validation data from train_ind to test_ind
-    X_val = X[train_ind:test_ind]
-    y_val = y[train_ind:test_ind].reshape(-1,1)
-    # Test data from test_ind to end
-    X_test = X[test_ind:]
-    y_test = y[test_ind:].reshape(-1,1)
+def staircase_spatial(X, y, batch_size, timesteps, hours=None, start_times = None, verbose = True):
+    """
+    Prepares spatially formatted time series data for RNN training by creating batches of sequences across different locations, stacked to be compatible with stateful models.
 
-    # Scale Data if required
-    # TODO:
-        # Remove need for "scale_fm" param
-        # Reset reproducibility with this scaling
-    if scale:
-        logging.info('Scaling feature data with scaler: %s',scaler)
-        # scale=1
-        if scaler=="reproducibility":
-            scale_fm = 17.076346687085564
-            scale_rain = 0.01
-        else:
-            scale_fm=1.0
-            scale_rain=1.0
-            # Fit scaler to training data
-            scalers[scaler].fit(X_train)
-            # Apply scaling to all data using in-place operations
-            X_train[:] = scalers[scaler].transform(X_train)
-            if X_val.shape[0] > 0:
-                X_val[:] = scalers[scaler].transform(X_val)
-            X_test[:] = scalers[scaler].transform(X_test)
-            
-            
-    else:
-        print("Not scaling data")
-        scale_fm=1.0
-        scale_rain=1.0
-        scaler=None
+    This function processes multi-location time series data by slicing it into batches and formatting it to fit into a recurrent neural network (RNN) model. It utilizes a staircase-like approach to prepare sequences for each location and then interlaces them to align with stateful RNN structures.
+
+    Parameters:
+    -----------
+    X : list of numpy arrays
+        A list where each element is a numpy array containing features for a specific location. The shape of each array is `(total_time_steps, features)`.
+
+    y : list of numpy arrays
+        A list where each element is a numpy array containing the target values for a specific location. The shape of each array is `(total_time_steps,)`.
+
+    batch_size : int
+        The number of sequences to include in each batch.
+
+    timesteps : int
+        The number of time steps to include in each sequence for the RNN.
+
+    hours : int, optional
+        The length of each time series to consider for each location. If `None`, it defaults to the minimum length of `y` across all locations.
+
+    start_times : numpy array, optional
+        The initial time step for each location. If `None`, it defaults to an array starting from 0 and incrementing by 1 for each location.
+
+    verbose : bool, optional
+        If `True`, prints additional information during processing. Default is `True`.
+
+    Returns:
+    --------
+    XX : numpy array
+        A 3D numpy array with shape `(total_sequences, timesteps, features)` containing the prepared feature sequences for all locations.
+
+    yy : numpy array
+        A 2D numpy array with shape `(total_sequences, 1)` containing the corresponding target values for all locations.
+
+    n_seqs : int
+        Number of sequences per location. Used to reset states when location changes. Hidden state of RNN will be reset after n_seqs number of batches
+
+    Notes:
+    ------
+    - The function handles spatially distributed time series data by batching and formatting it for stateful RNNs.
+    - `hours` determines how much of the time series is used for each location. If not provided, it defaults to the shortest series in `y`.
+    - If `start_times` is not provided, it assumes each location starts its series at progressively later time steps.
+    - The `batch_setup` function is used internally to manage the creation of location and time step batches.
+    - The returned feature sequences `XX` and target sequences `yy` are interlaced to align with the expected input format of stateful RNNs.
+    """
     
-    logging.info('x_train shape=%s',X_train.shape)
-    logging.info('y_train shape=%s',y_train.shape)
-    if test_ind == train_ind:
-        logging.info('No validation data')
-    elif X_val.shape[0]!= 0:
-        logging.info('X_val shape=%s',X_val.shape)
-        logging.info('y_val shape=%s',y_val.shape)    
-    logging.info('X_test shape=%s',X_test.shape)
-    logging.info('y_test shape=%s',y_test.shape)
+    # Generate ids based on number of distinct timeseries provided
+    n_loc = len(y) # assuming each list entry for y is a separate location
+    loc_ids = np.arange(n_loc)
     
-    # Set up return dictionary
-    rnn_dat={
-        'case':d['case'],
-        'hours':hours,
-        'features_list':features_list,
-        'n_features': len(features_list),
-        'scaler':scaler,
-        'train_ind':train_ind,
-        'test_ind':test_ind,
-        'X_raw': X_raw,
-        'X':X,
-        'y':y,
-        'X_train': X_train,
-        'y_train': y_train,
-        'X_test': X_test,
-        'y_test': y_test
-    }
+    # Generate hours and start_times if None
+    if hours is None:
+        print("Setting total hours to minimum length of y in provided dictionary")
+        hours = min(len(yi) for yi in y)
+    if start_times is None:
+        print(f"Setting Start times to offset by 1 hour by location, from 0 through {batch_size} (batch_size)")
+        start_times = np.tile(np.arange(batch_size), n_loc // batch_size + 1)[:n_loc]
+    # Set up batches
+    loc_batch, t_batch =  batch_setup(loc_ids, batch_size), batch_setup(start_times, batch_size)
+    if verbose:
+        print(f"Location ID Batches: {loc_batch}")
+        print(f"Start Times for Batches: {t_batch}")
 
-    if X_val.shape[0] > 0:
-            rnn_dat.update({
-                'X_val': X_val,
-                'y_val': y_val
-            })
+    # Loop over batches and construct with staircase_2
+    Xs = []
+    ys = []
+    for i in range(0, len(loc_batch)):
+        locs_i = loc_batch[i]
+        ts = t_batch[i]
+        for j in range(0, len(locs_i)):
+            t0 = int(ts[j])
+            tend = t0 + hours
+            # Create RNNData Dict
+            # Subset data to given location and time from t0 to t0+hours
+            k = locs_i[j] # Used to account for fewer locations than batch size
+            X_temp = X[k][t0:tend,:]
+            y_temp = y[k][t0:tend].reshape(-1,1)
 
-    # Update RNN params using data attributes
-    logging.info('Updating model params based on data')
-    timesteps = params['timesteps']
-    batch_size = params['batch_size']
-    logging.info('batch_size=%s',batch_size)
-    logging.info('timesteps=%s',timesteps)
-    features = len(features_list)
-    # params.update({
-    #         'n_features': features,
-    #         'batch_shape': (params["batch_size"],params["timesteps"],features),
-    #         'pred_input_shape': (None, features),
-    #         'scaler': scaler,
-    #         'scale_fm': scale_fm,
-    #         'scale_rain': scale_rain
-    #     })
-    rnn_dat.update({
-        'scaler': scaler, 
-        'scale_fm': scale_fm,
-        'scale_rain': scale_rain
-    })
+            # Format sequences
+            Xi, yi = staircase_2(
+                X_temp, 
+                y_temp, 
+                timesteps = timesteps, 
+                batch_size = 1,  # note: using 1 here to format sequences for a single location, not same as target batch size for training data
+                verbose=False)
+        
+            Xs.append(Xi)
+            ys.append(yi)    
+
+    # Drop incomplete batches
+    lens = [yi.shape[0] for yi in ys]
+    n_seqs = min(lens)
+    if verbose:
+        print(f"Minimum number of sequences by location: {n_seqs}")
+        print(f"Applying minimum length to other arrays.")
+    Xs = [Xi[:n_seqs] for Xi in Xs]
+    ys = [yi[:n_seqs] for yi in ys]
+
+    # Interlace arrays to match stateful structure
+    n_features = Xi.shape[2]
+    XXs = []
+    yys = []
+    for i in range(0, len(loc_batch)):
+        locs_i = loc_batch[i]
+        XXi = np.empty((Xs[0].shape[0]*batch_size, timesteps, n_features))
+        yyi = np.empty((Xs[0].shape[0]*batch_size, 1))
+        for j in range(0, len(locs_i)):
+            XXi[j::(batch_size)] =  Xs[locs_i[j]]
+            yyi[j::(batch_size)] =  ys[locs_i[j]]
+        XXs.append(XXi)
+        yys.append(yyi)
+    yy = np.concatenate(yys, axis=0)
+    XX = np.concatenate(XXs, axis=0)
+
+    if verbose:
+        print(f"Spatially Formatted X Shape: {XX.shape}")
+        print(f"Spatially Formatted X Shape: {yy.shape}")
     
-    logging.info('create_rnn_data2 done')
-    return rnn_dat
+    
+    return XX, yy, n_seqs
 
 #***********************************************************************************************
 ### RNN Class Functionality
@@ -350,10 +379,10 @@ class RNNParams(dict):
         """
         super().__init__(input_dict)
         # Automatically run checks on initialization
-        self.run_checks()           
+        self._run_checks()           
         # Automatically calculate shapes on initialization
         self.calc_param_shapes()        
-    def run_checks(self, verbose=True):
+    def _run_checks(self, verbose=True):
         """
         Validates that required keys exist and are of the correct type.
 
@@ -374,13 +403,13 @@ class RNNParams(dict):
             assert isinstance(self[key], int), f"Key '{key}' must be an integer"      
 
         # Keys must exist and be lists
-        list_keys = ['activation', 'features_list', 'dropout']
+        list_keys = ['activation', 'features_list', 'dropout', 'time_fracs']
         for key in list_keys:
             assert key in self, f"Missing required key: {key}"
             assert isinstance(self[key], list), f"Key '{key}' must be a list" 
 
         # Keys must exist and be floats
-        float_keys = ['learning_rate', 'train_frac', 'val_frac']
+        float_keys = ['learning_rate']
         for key in float_keys:
             assert key in self, f"Missing required key: {key}"
             assert isinstance(self[key], float), f"Key '{key}' must be a float"  
@@ -418,7 +447,7 @@ class RNNParams(dict):
             
     def update(self, *args, verbose=True, **kwargs):
         """
-        Updates the dictionary, with restrictions on certain keys, and recalculates shapes if necessary.
+        Overwrites the standard update functon from dict. This is to prevent certain keys from being modified directly and to automatically update keys to be compatible with each other. The keys handled relate to the shape of the input data to the RNN.
 
         Parameters:
         -----------
@@ -484,23 +513,47 @@ class RNNData(dict):
             A subset of features to be used. Default is None which means all features.
         """
 
-        # Copy to avoid 
+        # Copy to avoid changing external input
         input_data = input_dict.copy()
+        # Initialize inherited dict class
         super().__init__(input_data)
+        
+        # Check if input data is one timeseries dataset or multiple
+        if type(self.loc['STID']) == str:
+            self.spatial = False
+            print("Input data is single timeseries.")
+        elif type(self.loc['STID']) == list:
+            self.spatial = True
+            print("Input data from multiple timeseries.")
+        else:
+            raise KeyError(f"Input locations not list or single string")
+        
+        # Set up Data Scaling
         self.scaler = None
         if scaler is not None:
             self.set_scaler(scaler)
-        # Rename and define other stuff
-        self['hours'] = len(self['y'])
+        
+        # Rename and define other stuff.
+        if self.spatial:
+            self['hours'] = min(arr.shape[0] for arr in self.y)
+        else:
+            self['hours'] = len(self['y'])
+        
         self['all_features_list'] = self.pop('features_list')
         if features_list is None:
             print("Using all input features.")
             self.features_list = self.all_features_list
         else:
             self.features_list = features_list
-        self.run_checks()
+
+        print(f"Setting features_list to {features_list}. \n  NOTE: not subsetting features yet. That happens in train_test_split.")
+        
+        self._run_checks()
         self.__dict__.update(self)
-    def run_checks(self, verbose=True):
+        
+        
+    # TODO: Fix checks for multilocation
+    def _run_checks(self, verbose=True):
         """
         Validates that required keys are present and checks the integrity of data shapes.
 
@@ -512,15 +565,11 @@ class RNNData(dict):
         missing_keys = self.required_keys - self.keys()
         if missing_keys:
             raise KeyError(f"Missing required keys: {missing_keys}")
-        # Check y 1-d
-        y_shape = np.shape(self.y)
-        if not (len(y_shape) == 1 or (len(y_shape) == 2 and y_shape[1] == 1)):
-            raise ValueError(f"'y' must be one-dimensional, with shape (N,) or (N, 1). Current shape is {y_shape}.")
         
-        # Check if 'hours' is provided and matches len(y)
-        if 'hours' in self:
-            if self.hours != len(self.y):
-                raise ValueError(f"Provided 'hours' value {self.hours} does not match the length of 'y', which is {len(self.y)}.")
+        # # Check if 'hours' is provided and matches len(y)
+        # if 'hours' in self:
+        #     if self.hours != len(self.y):
+        #         raise ValueError(f"Provided 'hours' value {self.hours} does not match the length of 'y', which is {len(self.y)}.")
         # Check desired subset of features is in all input features
         if not all_items_exist(self.features_list, self.all_features_list):
             raise ValueError(f"Provided 'features_list' {self.features_list} has elements not in input features.")
@@ -535,10 +584,11 @@ class RNNData(dict):
         """        
         recognized_scalers = ['minmax', 'standard']
         if scaler in recognized_scalers:
+            print(f"Setting data scaler: {scaler}")
             self.scaler = scalers[scaler]
         else:
             raise ValueError(f"Unrecognized scaler '{scaler}'. Recognized scalers are: {recognized_scalers}.")
-    def train_test_split(self, train_frac, val_frac=0.0, subset_features=True, features_list=None, split_time=True, split_space=False, verbose=True):
+    def train_test_split(self, time_fracs=[1.,0.,0.], space_fracs=[1.,0.,0.], subset_features=True, features_list=None, verbose=True):
         """
         Splits the data into training, validation, and test sets.
 
@@ -552,14 +602,51 @@ class RNNData(dict):
             If True, subsets the data to the specified features list. Default is True.
         features_list : list, optional
             A list of features to use for subsetting. Default is None.
-        split_time : bool, optional
-            Whether to split the data based on time. Default is True.
         split_space : bool, optional
             Whether to split the data based on space. Default is False.
         verbose : bool, optional
             If True, prints status messages. Default is True.
         """
-        # Extract data to desired features
+        # Indicate whether multi timeseries or not
+        spatial = self.spatial
+
+        # Set up 
+        assert np.sum(time_fracs) == np.sum(space_fracs) == 1., f"Provided cross validation params don't sum to 1"
+        if (len(time_fracs) != 3) or (len(space_fracs) != 3):
+            raise ValueError("Cross-validation params `time_fracs` and `space_fracs` must be lists of length 3, representing (train/validation/test)")
+        
+        train_frac = time_fracs[0]
+        val_frac = time_fracs[1]
+        test_frac = time_fracs[2]
+
+        # Setup train/val/test in time
+        train_ind = int(np.floor(self.hours * train_frac)); self.train_ind = train_ind
+        test_ind= int(train_ind + round(self.hours * val_frac)); self.test_ind = test_ind
+        # Check for any potential issues with indices
+        if test_ind > self.hours:
+            print(f"Setting test index to {self.hours}")
+            test_ind = self.hours
+        if train_ind > test_ind:
+            raise ValueError("Train index must be less than test index.")        
+
+        # Setup train/val/test in space
+        if spatial:
+            train_frac_sp = space_fracs[0]
+            val_frac_sp = space_fracs[1]
+            locs = np.arange(len(self.loc['STID'])) # indices of locations
+            train_size = int(len(locs) * train_frac_sp)
+            val_size = int(len(locs) * val_frac_sp)
+            random.shuffle(locs)
+            train_locs = locs[:train_size]
+            val_locs = locs[train_size:train_size + val_size]
+            test_locs = locs[train_size + val_size:]
+            # Store Lists of IDs in loc subdirectory
+            self.loc['train_locs'] = [self.case[i] for i in train_locs]
+            self.loc['val_locs'] = [self.case[i] for i in val_locs]
+            self.loc['test_locs'] = [self.case[i] for i in test_locs]
+
+            
+        # Extract data to desired features, copy to avoid changing input objects
         X = self.X.copy()
         y = self.y.copy()
         if subset_features:
@@ -571,60 +658,155 @@ class RNNData(dict):
                 if item in self.all_features_list:
                     indices.append(self.all_features_list.index(item))
                 else:
-                    print(f"Warning: feature name '{item}' not found in list of all features from input data")
-            X = X[:, indices]
-        # Setup train/test in time
-        train_ind = int(np.floor(self.hours * train_frac)); self.train_ind = train_ind
-        test_ind= int(train_ind + round(self.hours * val_frac)); self.test_ind = test_ind
-
-        # Check for any potential issues with indices
-        if test_ind > self.hours:
-            print(f"Setting test index to {self.hours}")
-            test_ind = self.hours
-        if train_ind >= test_ind:
-            raise ValueError("Train index must be less than test index.")        
-        
+                    print(f"Warning: feature name '{item}' not found in list of all features from input data. Removing from internal features list")
+                    # self.features_list.remove(item)
+            if spatial:
+                X = [Xi[:, indices] for Xi in X]
+            else:
+                X = X[:, indices]
+                
         # Training data from 0 to train_ind
-        self.X_train = X[:train_ind]
-        self.y_train = y[:train_ind].reshape(-1,1) # assumes y 1-d, change this if vector output
         # Validation data from train_ind to test_ind
-        if val_frac >0:
-            self.X_val = X[train_ind:test_ind]
-            self.y_val = y[train_ind:test_ind].reshape(-1,1) # assumes y 1-d, change this if vector output
         # Test data from test_ind to end
-        self.X_test = X[test_ind:]
-        self.y_test = y[test_ind:].reshape(-1,1) # assumes y 1-d, change this if vector output
+        if spatial:           
+            # Split by space
+            X_train = [X[i] for i in train_locs]
+            X_val = [X[i] for i in val_locs]
+            X_test = [X[i] for i in test_locs]
+            y_train = [y[i] for i in train_locs]
+            y_val = [y[i] for i in val_locs]
+            y_test = [y[i] for i in test_locs]
+
+            # Split by time
+            self.X_train = [Xi[:train_ind] for Xi in X_train]
+            self.y_train = [yi[:train_ind].reshape(-1,1) for yi in y_train]
+            if (val_frac >0) and (val_frac_sp)>0:
+                self.X_val = [Xi[train_ind:test_ind] for Xi in X_val]
+                self.y_val = [yi[train_ind:test_ind].reshape(-1,1) for yi in y_val]
+            self.X_test = [Xi[test_ind:] for Xi in X_test]
+            self.y_test = [yi[test_ind:].reshape(-1,1) for yi in y_test]
+        else:
+            self.X_train = X[:train_ind]
+            self.y_train = y[:train_ind].reshape(-1,1) # assumes y 1-d, change this if vector output
+            if val_frac >0:
+                self.X_val = X[train_ind:test_ind]
+                self.y_val = y[train_ind:test_ind].reshape(-1,1) # assumes y 1-d, change this if vector output                
+            self.X_test = X[test_ind:]
+            self.y_test = y[test_ind:].reshape(-1,1) # assumes y 1-d, change this if vector output
+        
+
 
         # Print statements if verbose
         if verbose:
             print(f"Train index: 0 to {train_ind}")
             print(f"Validation index: {train_ind} to {test_ind}")
             print(f"Test index: {test_ind} to {self.hours}")
-            print(f"X_train shape: {self.X_train.shape}, y_train shape: {self.y_train.shape}")
-            print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
-            print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")
+
+            if spatial:
+                print("Subsetting locations into train/val/test")
+                print(f"Total Locations: {len(locs)}")
+                print(f"Train Locations: {len(train_locs)}")
+                print(f"Val. Locations: {len(val_locs)}")
+                print(f"Test Locations: {len(test_locs)}")
+                print(f"X_train[0] shape: {self.X_train[0].shape}, y_train[0] shape: {self.y_train[0].shape}")
+                if hasattr(self, "X_val"):
+                    print(f"X_val[0] shape: {self.X_val[0].shape}, y_val[0] shape: {self.y_val[0].shape}")
+                    print(f"X_test[0] shape: {self.X_test[0].shape}, y_test[0] shape: {self.y_test[0].shape}")
+            else:
+                print(f"X_train shape: {self.X_train.shape}, y_train shape: {self.y_train.shape}")
+                if hasattr(self, "X_val"):
+                    print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
+                print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")                
+        # Make Test Data None if zero length
+        if len(self.X_test) == 0:
+            self.X_test = None
+            warnings.warn("Zero Test Data, setting X_test to None")
     def scale_data(self, verbose=True):
         """
-        Scales the data using the set scaler.
+        Scales the training data using the set scaler.
 
         Parameters:
         -----------
         verbose : bool, optional
             If True, prints status messages. Default is True.
         """        
+        # Indicate whether multi timeseries or not
+        spatial = self.spatial
         if self.scaler is None:
             raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
+        # if hasattr(self.scaler, 'n_features_in_'):
+        #     warnings.warn("Scale_data has already been called. Exiting to prevent issues.")
+        #     return            
         if not hasattr(self, "X_train"):
             raise AttributeError("No X_train within object. Run train_test_split first. This is to avoid fitting the scaler with prediction data.")
         if verbose:
-            print(f"Scaling data with scaler {self.scaler}, fitting on X_train")
-        # Fit the scaler on the training data
-        self.scaler.fit(self.X_train)      
-        # Transform the data using the fitted scaler
-        self.X_train = self.scaler.transform(self.X_train)
-        if hasattr(self, 'X_val'):
-            self.X_val = self.scaler.transform(self.X_val)
-        self.X_test = self.scaler.transform(self.X_test)
+            print(f"Scaling training data with scaler {self.scaler}, fitting on X_train")
+
+        if spatial:
+            # Fit scaler on row-joined training data
+            self.scaler.fit(np.vstack(self.X_train))
+            # Transform data using fitted scaler
+            self.X_train = [self.scaler.transform(Xi) for Xi in self.X_train]
+            if hasattr(self, 'X_val'):
+                if self.X_val is not None:
+                    self.X_val = [self.scaler.transform(Xi) for Xi in self.X_val]
+            if self.X_test is not None:
+                self.X_test = [self.scaler.transform(Xi) for Xi in self.X_test]
+        else:
+            # Fit the scaler on the training data
+            self.scaler.fit(self.X_train)      
+            # Transform the data using the fitted scaler
+            self.X_train = self.scaler.transform(self.X_train)
+            if hasattr(self, 'X_val'):
+                self.X_val = self.scaler.transform(self.X_val)
+            self.X_test = self.scaler.transform(self.X_test)
+
+    # NOTE: only works for non spatial
+    def scale_all_X(self, verbose=True):
+        """
+        Scales the all data using the set scaler.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        Returns:
+        -------
+        ndarray
+            Scaled X matrix, subsetted to features_list.
+        """      
+        if self.spatial:
+            raise ValueError("Not implemented for spatial data")
+        
+        if self.scaler is None:
+            raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
+        if verbose:
+            print(f"Scaling all X data with scaler {self.scaler}, fitted on X_train")
+        # Subset features
+        indices = []
+        for item in self.features_list:
+            if item in self.all_features_list:
+                indices.append(self.all_features_list.index(item))
+            else:
+                print(f"Warning: feature name '{item}' not found in list of all features from input data")
+        X = self.X[:, indices]
+        X = self.scaler.transform(X)
+
+        return X    
+
+    def subset_X_features(self, verbose=True):
+        if self.spatial:
+            raise ValueError("Not implemented for spatial data")
+        # Subset features
+        indices = []
+        for item in self.features_list:
+            if item in self.all_features_list:
+                indices.append(self.all_features_list.index(item))
+            else:
+                print(f"Warning: feature name '{item}' not found in list of all features from input data")
+        X = self.X[:, indices]    
+        return X
+
     def inverse_scale(self, return_X = 'all_hours', save_changes=False, verbose=True):
         """
         Inversely scales the data to its original form.
@@ -658,6 +840,83 @@ class RNNData(dict):
             return np.concatenate((X_train, X_val, X_test), axis=0)
         else:
             print(f"Unrecognized or unimplemented return value {return_X}")
+    def batch_reshape(self, timesteps, batch_size, hours=None, verbose=False, start_times=None):
+        """
+        Restructures input data to RNN using batches and sequences.
+
+        Parameters:
+        ----------
+        batch_size : int
+            The size of each training batch to reshape the data.
+        timesteps : int
+            The number of timesteps or sequence length. Consistitutes a single sample
+        timesteps : int
+            Number of timesteps or sequence length used for a single sequence in RNN training. Constitutes a single sample to the model
+
+        batch_size : int
+            Number of sequences used within a batch of training
+
+        Returns:
+        -------
+        None
+            This method reshapes the data in place.
+        Raises:
+        ------
+        AttributeError
+            If either 'X_train' or 'y_train' attributes do not exist within the instance.
+
+        Notes:
+        ------
+        The reshaping method depends on self param "spatial".
+        - spatial == False: Reshapes data assuming no spatial dimensions.
+        - spatial == True: Reshapes data considering spatial dimensions.
+        
+        """
+
+        if not hasattr(self, 'X_train') or not hasattr(self, 'y_train'):
+            raise AttributeError("Both 'X_train' and 'y_train' must be set before reshaping batches.")
+
+        # Indicator of spatial training scheme or not
+        spatial = self.spatial
+        
+        if spatial:
+            print(f"Reshaping spatial training data using batch size: {batch_size} and timesteps: {timesteps}")
+            # Format training data
+            self.X_train, self.y_train, self.n_seqs = staircase_spatial(self.X_train, self.y_train, timesteps = timesteps, 
+                                                                        batch_size=batch_size, hours=hours, verbose=verbose, start_times=start_times)
+            # Format Validation Data if provided
+            if hasattr(self, "X_val"):
+                print(f"Reshaping validation data using batch size: {batch_size} and timesteps: {timesteps}")
+                self.X_val, self.y_val, _ = staircase_spatial(self.X_val, self.y_val, timesteps = timesteps, 
+                                                              batch_size=batch_size, hours=None, verbose=verbose, start_times=start_times)
+            # Format Test Data. Same (batch_size, timesteps, features) format, but for prediction model batch_size and timesteps are unconstrained
+            # So here batch_size will represent the number of locations aka separate timeseries to predict
+            if self.X_test is not None:
+                print(f"Reshaping test data by stacking. Output dimension will be (n_locs, test_hours, features)")
+                self.X_test = np.stack(self.X_test, axis=0)
+                self.y_test = np.stack(self.y_test, axis=0)
+                print(f"X_test shape: {self.X_test.shape}")
+                print(f"y_test shape: {self.y_test.shape}")
+            
+        else:
+            print(f"Reshaping training data using batch size: {batch_size} and timesteps: {timesteps}")
+            # Format Training Data
+            self.X_train, self.y_train = staircase_2(self.X_train, self.y_train, timesteps = timesteps, 
+                                                     batch_size=batch_size, verbose=verbose)
+            # Format Validation Data if provided
+            if hasattr(self, "X_val"):
+                print(f"Reshaping validation data using batch size: {batch_size} and timesteps: {timesteps}")
+                self.X_val, self.y_val = staircase_2(self.X_val, self.y_val, timesteps = timesteps, 
+                                                     batch_size=batch_size, verbose=verbose)
+            # Format Test Data. Shape should be (1, hours, features)
+            if self.X_test is not None:
+                self.X_test = self.X_test.reshape((1, self.X_test.shape[0], len(self.features_list)))
+                # self.y_test = 
+                print(f"X_test shape: {self.X_test.shape}")
+                print(f"y_test shape: {self.y_test.shape}")
+        if self.X_train.shape[0] == 0:
+            raise ValueError("X_train has zero rows. Try different combo of cross-validation fractions, batch size or start_times. Train/val/test data partially processed, need to return train_test_split")
+        
     def print_hashes(self, attrs_to_check = ['X', 'y', 'X_train', 'y_train', 'X_val', 'y_val', 'X_test', 'y_test']):
         """
         Prints the hash of specified data attributes.
@@ -670,7 +929,10 @@ class RNNData(dict):
         for attr in attrs_to_check:
             if hasattr(self, attr):
                 value = getattr(self, attr)
-                print(f"Hash of {attr}: {hash_ndarray(value)}")        
+                if self.spatial:
+                    pass
+                else:
+                    print(f"Hash of {attr}: {hash_ndarray(value)}")        
     def __getattr__(self, key):
         """
         Allows attribute-style access to dictionary keys, a.k.a. enables the "." operator for get elements
@@ -780,8 +1042,7 @@ class RNNModel(ABC):
         params : dict
             A dictionary containing model parameters.
         """
-        self.params = copy.deepcopy(params)
-        self.params['n_features'] = len(self.params['features_list'])
+        self.params = params
         if type(self) is RNNModel:
             raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
         super().__init__()
@@ -795,11 +1056,31 @@ class RNNModel(ABC):
     def _build_model_predict(self, return_sequences=True):
         """Abstract method to build the prediction model. This model copies weights from the train model but with input structure that allows for easier prediction of arbitrary length timeseries. This model is not to be used for training, or don't use with .fit calls"""
         pass
-    
-    def fit(self, X_train, y_train, plot=True, plot_title = '', 
-            weights=None, callbacks=[], validation_data=None, *args, **kwargs):
+
+    def is_stateful(self):
         """
-        Trains the model on the provided training data.
+        Checks whether any of the layers in the internal model (self.model_train) are stateful.
+
+        Returns:
+        bool: True if at least one layer in the model is stateful, False otherwise.
+        
+        This method iterates over all the layers in the model and checks if any of them
+        have the 'stateful' attribute set to True. This is useful for determining if 
+        the model is designed to maintain state across batches during training.
+
+        Example:
+        --------
+        model.is_stateful()
+        """          
+        for layer in self.model_train.layers:
+            if hasattr(layer, 'stateful') and layer.stateful:
+                return True
+        return False
+        
+    def fit(self, X_train, y_train, plot_history=True, plot_title = '', 
+            weights=None, callbacks=[], validation_data=None, return_epochs=False, *args, **kwargs):
+        """
+        Trains the model on the provided training data. Uses the fit method of the training model and then copies the weights over to the prediction model, which has a less restrictive input shape. Formats a list of callbacks to use within the fit method based on params input
 
         Parameters:
         -----------
@@ -807,7 +1088,7 @@ class RNNModel(ABC):
             The input matrix data for training.
         y_train : np.ndarray
             The target vector data for training.
-        plot : bool, optional
+        plot_history : bool, optional
             If True, plots the training history. Default is True.
         plot_title : str, optional
             The title for the training plot. Default is an empty string.
@@ -817,17 +1098,29 @@ class RNNModel(ABC):
             A list of callback functions to use during training. Default is an empty list.
         validation_data : tuple, optional
             Validation data to use during training, expected format (X_val, y_val). Default is None.
+        return_epochs : bool
+            If True, return the number of epochs that training took. Used to test and optimize early stopping
         """        
+        # Check Compatibility, assume features dimension is last in X_train array
+        if X_train.shape[-1] != self.params['n_features']:
+            raise ValueError(f"X_train and number of features from params not equal. \n X_train shape: {X_train.shape} \n params['n_features']: {self.params['n_features']}. \n Try recreating RNNData object with features list from params: `RNNData(..., features_list = parmas['features_list'])`")
+        
         # verbose_fit argument is for printing out update after each epoch, which gets very long
-        # These print statements at the top could be turned off with a verbose argument, but then
-        # there would be a bunch of different verbose params
-        verbose_fit = self.params['verbose_fit']
+        verbose_fit = self.params['verbose_fit'] 
         verbose_weights = self.params['verbose_weights']
         if verbose_weights:
             print(f"Training simple RNN with params: {self.params}")
-        X_train, y_train = self.format_train_data(X_train, y_train)
+            
+        # Setup callbacks
+        if self.params["reset_states"]:
+            callbacks=callbacks+[ResetStatesCallback(self.params), TerminateOnNaN()]
+
+        # Early stopping callback requires validation data
         if validation_data is not None:
-            X_val, y_val = self.format_train_data(validation_data[0], validation_data[1])
+            X_val, y_val =validation_data[0], validation_data[1]
+            print("Using early stopping callback.")
+            early_stop = EarlyStoppingCallback(patience = self.params['early_stopping_patience'])
+            callbacks=callbacks+[early_stop]
         if verbose_weights:
             print(f"Formatted X_train hash: {hash_ndarray(X_train)}")
             print(f"Formatted y_train hash: {hash_ndarray(y_train)}")
@@ -835,20 +1128,14 @@ class RNNModel(ABC):
                 print(f"Formatted X_val hash: {hash_ndarray(X_val)}")
                 print(f"Formatted y_val hash: {hash_ndarray(y_val)}")
             print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
-        # Setup callbacks
-        if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback(batch_reset = self.params['batch_reset']), TerminateOnNaN()]
-        # if validation_data is not None:
-        #     callbacks=callbacks+[early_stopping]
-        
-        # Note: we overload the params here so that verbose_fit can be easily turned on/off at the .fit call 
 
+        ## TODO: Hidden State Initialization
         # Evaluate Model once to set nonzero initial state
-        if self.params["batch_size"]>= X_train.shape[0]:
-            self.model_train(X_train)
+        # self.model_train(X_train[0:self.params['batch_size'],:,:])
+
         if validation_data is not None:
             history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
+                X_train, y_train, 
                 epochs=self.params['epochs'], 
                 batch_size=self.params['batch_size'],
                 callbacks = callbacks,
@@ -858,7 +1145,7 @@ class RNNModel(ABC):
             )
         else:
             history = self.model_train.fit(
-                X_train, y_train+self.params['centering'][1], 
+                X_train, y_train, 
                 epochs=self.params['epochs'], 
                 batch_size=self.params['batch_size'],
                 callbacks = callbacks,
@@ -866,14 +1153,19 @@ class RNNModel(ABC):
                 *args, **kwargs
             )
         
-        if plot:
+        if plot_history:
             self.plot_history(history,plot_title)
+            
         if self.params["verbose_weights"]:
             print(f"Fitted Weights Hash: {hash_weights(self.model_train)}")
 
         # Update Weights for Prediction Model
         w_fitted = self.model_train.get_weights()
         self.model_predict.set_weights(w_fitted)
+
+        if return_epochs:
+            # Epoch counting starts at 0, adding 1 for the count
+            return early_stop.best_epoch + 1
 
     def predict(self, X_test):
         """
@@ -889,32 +1181,14 @@ class RNNModel(ABC):
         np.ndarray
             The predicted values.
         """        
-        print("Predicting")
-        X_test = self.format_pred_data(X_test)
-        preds = self.model_predict.predict(X_test).flatten()
+        print("Predicting test data")
+        # X_test = self._format_pred_data(X_test)
+        # preds = self.model_predict.predict(X_test).flatten()
+        preds = self.model_predict.predict(X_test)
         return preds
 
-    def format_train_data(self, X, y, verbose=False):
-        """
-        Formats the training data for RNN input.
 
-        Parameters:
-        -----------
-        X : np.ndarray
-            The input data.
-        y : np.ndarray
-            The target data.
-        verbose : bool, optional
-            If True, prints status messages. Default is False.
-
-        Returns:
-        --------
-        tuple
-            Formatted input and target data.
-        """        
-        X, y = staircase_2(X, y, timesteps = self.params["timesteps"], batch_size=self.params["batch_size"], verbose=verbose)
-        return X, y
-    def format_pred_data(self, X):
+    def _format_pred_data(self, X):
         """
         Formats the prediction data for RNN input.
 
@@ -930,9 +1204,9 @@ class RNNModel(ABC):
         """        
         return np.reshape(X,(1, X.shape[0], self.params['n_features']))
 
-    def plot_history(self, history, plot_title):
+    def plot_history(self, history, plot_title, create_figure=True):
         """
-        Plots the training history.
+        Plots the training history. Uses log scale on y axis for readability.
 
         Parameters:
         -----------
@@ -941,7 +1215,9 @@ class RNNModel(ABC):
         plot_title : str
             The title for the plot.
         """
-        plt.figure()
+        
+        if create_figure:
+            plt.figure(figsize=(10, 6))
         plt.semilogy(history.history['loss'], label='Training loss')
         if 'val_loss' in history.history:
             plt.semilogy(history.history['val_loss'], label='Validation loss')
@@ -951,87 +1227,151 @@ class RNNModel(ABC):
         plt.legend(loc='upper left')
         plt.show()
 
-    def run_model(self, dict0, reproducibility_run=False, plot_period='all'):
+    def run_model(self, dict0, reproducibility_run=False, plot_period='all', save_outputs=True, return_epochs=False):
         """
-        Runs the RNN model, including training, prediction, and reproducibility checks.
+        Runs the RNN model on input data dictionary, including training, prediction, and reproducibility checks.
 
         Parameters:
         -----------
-        dict0 : dict
+        dict0 : RNNData (dict)
             The dictionary containing the input data and configuration.
         reproducibility_run : bool, optional
             If True, performs reproducibility checks after running the model. Default is False.
-
+        save_outputs : bool
+            If True, writes model outputs into input dictionary.
+        return_epochs : bool
+            If True, returns how many epochs of training happened. Used to optimize params related to early stopping
+        
         Returns:
         --------
         tuple
-            Model predictions and a dictionary of RMSE errors.
-        """        
+            Model predictions and a dictionary of RMSE errors broken up by time period.
+        """      
+        if dict0.X_test is None:
+            raise ValueError("No test data X_test in input dictionary. Provide test data or just run .fit")
+        
         verbose_fit = self.params['verbose_fit']
         verbose_weights = self.params['verbose_weights']
-        # Make copy to prevent changing in place
-        dict1 = copy.deepcopy(dict0)
         if verbose_weights:
-            print("Input data hashes, NOT formatted for rnn sequence/batches yet")
-            dict1.print_hashes()
-        # Extract Fields
-        scale_fm = dict1['scale_fm']
-        X_train, y_train, X_test, y_test = dict1['X_train'].copy(), dict1['y_train'].copy(), dict1["X_test"].copy(), dict1['y_test'].copy()
-        if 'X_val' in dict1:
-            X_val, y_val = dict1['X_val'].copy(), dict1['y_val'].copy()
+            dict0.print_hashes()
+        # Extract Datasets
+        X_train, y_train, X_test, y_test = dict0.X_train, dict0.y_train, dict0.X_test, dict0.y_test
+        if 'X_val' in dict0:
+            X_val, y_val = dict0.X_val, dict0.y_val
         else:
             X_val = None
-        case_id = dict1['case']
+        if dict0.spatial:
+            case_id = "Spatial Training Set"
+        else:
+            case_id = dict0.case
         
         # Fit model
         if X_val is None:
-            self.fit(X_train, y_train, plot_title=case_id)
+            eps = self.fit(X_train, y_train, plot_title=case_id, return_epochs=return_epochs)
         else:
-            self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id)
+            eps = self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id, return_epochs=return_epochs)
+
+        # Generate Predictions and Evaluate Test Error
+        if dict0.spatial:
+            m, errs = self._eval_multi(dict0)
+            if save_outputs:
+                dict0['m']=m            
+        else:
+            m, errs = self._eval_single(dict0, verbose_weights, reproducibility_run)
+            if save_outputs:
+                dict0['m']=m
+            plot_data(dict0, title="RNN", title2=dict0.case, plot_period=plot_period)
+
+        if return_epochs:
+            return m, errs, eps
+        else:
+            return m, errs
+
+    def _eval_single(self, dict0, verbose_weights, reproducibility_run):
         # Generate Predictions, 
-        # run through training to get hidden state set proporly for forecast period
-        if X_val is None:
-            X = np.concatenate((X_train, X_test))
-            y = np.concatenate((y_train, y_test)).flatten()
+        # run through training to get hidden state set properly for forecast period
+        print(f"Running prediction on all input data, Training through Test")
+        if dict0.scaler is not None:
+            X = dict0.scale_all_X()
         else:
-            X = np.concatenate((X_train, X_val, X_test))
-            y = np.concatenate((y_train, y_val, y_test)).flatten()
+            X = dict0.subset_X_features()
+        y = dict0.y.flatten()
         # Predict
         if verbose_weights:
-            print(f"Predicting Training through Test")
             print(f"All X hash: {hash_ndarray(X)}")
-        
+        # Reshape X
+        X = X.reshape(1, X.shape[0], X.shape[1])
         m = self.predict(X).flatten()
         if verbose_weights:
             print(f"Predictions Hash: {hash_ndarray(m)}")
-        dict1['m']=m
-        dict0['m']=m # add to outside env dictionary, should be only place this happens
         
         if reproducibility_run:
             print("Checking Reproducibility")
             check_reproducibility(dict0, self.params, hash_ndarray(m), hash_weights(self.model_predict))
 
-        # print(dict1.keys())
+        # print(dict0.keys())
         # Plot final fit and data
-        dict1['y'] = y
-        plot_data(dict1, title="RNN", title2=dict1['case'], plot_period=plot_period)
+        # dict0['y'] = y
+        # plot_data(dict0, title="RNN", title2=dict0['case'], plot_period=plot_period)
         
         # Calculate Errors
         err = rmse(m, y)
-        train_ind = dict1["train_ind"] # index of final training set value
-        test_ind = dict1["test_ind"] # index of first test set value
-        err_train = rmse(m[:train_ind], y_train.flatten())
-        err_pred = rmse(m[test_ind:], y_test.flatten())
+        train_ind = dict0.train_ind # index of final training set value
+        test_ind = dict0.test_ind # index of first test set value
+        
+        err_train = rmse(m[:train_ind], y[:train_ind].flatten())
+        err_pred = rmse(m[test_ind:], y[test_ind:].flatten())
         rmse_dict = {
             'all': err, 
             'training': err_train, 
             'prediction': err_pred
         }
         return m, rmse_dict
+        
+    def _eval_multi(self, dict0):
+        # Train Error: NOT DOING YET. DECIDE WHETHER THIS IS NEEDED
+        
+        # Test Error
+        # new_data = np.stack(dict0.X_test, axis=0)
+        # y_array = np.stack(dict0.y_test, axis=0)
+        # preds = self.model_predict.predict(new_data)
+        y_array = dict0.y_test
+        preds = self.model_predict.predict(dict0.X_test)
 
+        # Calculate RMSE
+        ## Note: not using util rmse function since this approach is for 3d arrays
+        # Compute the squared differences
+        squared_diff = np.square(preds - y_array)
+        
+        # Mean squared error along the timesteps and dimensions (axis 1 and 2)
+        mse = np.mean(squared_diff, axis=(1, 2))
+
+        # Root mean squared error (RMSE) for each timeseries
+        rmses = np.sqrt(mse)
+        
+        return preds, rmses
 
 
 ## Callbacks
+
+# Helper functions for batch reset schedules
+def calc_exp_intervals(bmin, bmax, n_epochs, force_bmax = True):
+    # Calculate the exponential intervals for each epoch
+    epochs = np.arange(n_epochs)
+    factors = epochs / n_epochs
+    intervals = bmin * (bmax / bmin) ** factors
+    if force_bmax:
+        intervals[-1] = bmax  # Ensure the last value is exactly bmax
+    return intervals.astype(int)
+
+def calc_log_intervals(bmin, bmax, n_epochs, force_bmax = True):
+    # Calculate the logarithmic intervals for each epoch
+    epochs = np.arange(n_epochs)
+    factors = np.log(1 + epochs) / np.log(1 + n_epochs)
+    intervals = bmin + (bmax - bmin) * factors
+    if force_bmax:
+        intervals[-1] = bmax  # Ensure the last value is exactly bmax
+    return intervals.astype(int)
 
 class ResetStatesCallback(Callback):
     """
@@ -1042,17 +1382,55 @@ class ResetStatesCallback(Callback):
     batch_reset : int, optional
         If provided, resets the states of RNN layers after every `batch_reset` batches. Default is None.
     """    
-    def __init__(self, batch_reset=None):
+    # def __init__(self, bmin=None, bmax=None, epochs=None, loc_batch_reset = None, batch_schedule_type='linear', verbose=True):
+    def __init__(self, params=None, verbose=True):
         """
         Initializes the ResetStatesCallback with an optional batch reset interval.
 
         Parameters:
         -----------
-        batch_reset : int, optional
-            The interval of batches after which to reset the states of RNN layers. Default is None.
+        params: dict, optional
+            Dictionary of parameters. If None provided, only on_epoch_end will trigger reset of hidden states.
+            - bmin : int
+                Minimum for batch reset schedule
+            - bmax : int
+                Maximum for batch reset schedule
+            - epochs : int
+                Number of training epochs.
+            - loc_batch_reset : int
+                Interval of batches after which to reset the states of RNN layers for location changes. Triggers reset for training AND validation phases
+            - batch_schedule_type : str
+                Type of batch scheduling to be used. Recognized methods are following:
+                - 'constant' : Used fixed batch reset interval throughout training
+                - 'linear'   : Increases the batch reset interval linearly over epochs from bmin to bmax.
+                - 'exp'      : Increases the batch reset interval exponentially over epochs from bmin to bmax.
+                - 'log'      : Increases the batch reset interval logarithmically over epochs from bmin to bmax.
+
+                
+        Returns:
+        -----------
+        Only in-place reset of hidden states of RNN that calls uses this callback.
+        
         """        
         super(ResetStatesCallback, self).__init__()
-        self.batch_reset = batch_reset    
+
+        # Check for optional arguments, set None if missing in input params 
+        arg_list = ['bmin', 'bmax', 'epochs', 'loc_batch_reset', 'batch_schedule_type']
+        for arg in arg_list:
+            setattr(self, arg, params.get(arg, None))          
+
+        self.verbose = verbose
+        if self.verbose:
+            print(f"Using ResetStatesCallback with Batch Reset Schedule: {self.batch_schedule_type}")
+        # Calculate the reset intervals for each epoch during initialization
+        if self.batch_schedule_type is not None:
+            if self.epochs is None:
+                raise ValueError(f"Arugment `epochs` cannot be none with self.batch_schedule_type: {self.batch_schedule_type}")
+            self.batch_reset_intervals = self._calc_reset_intervals(self.batch_schedule_type)
+            if self.verbose:
+                print(f"batch_reset_intervals: {self.batch_reset_intervals}")
+        else:
+            self.batch_reset_intervals = None
     def on_epoch_end(self, epoch, logs=None):
         """
         Resets the states of RNN layers at the end of each epoch.
@@ -1064,14 +1442,34 @@ class ResetStatesCallback(Callback):
         logs : dict, optional
             A dictionary containing metrics from the epoch. Default is None.
         """        
+        # print(f" Resetting hidden state after epoch: {epoch+1}", flush=True)
         # Iterate over each layer in the model
         for layer in self.model.layers:
             # Check if the layer has a reset_states method
             if hasattr(layer, 'reset_states'):
                 layer.reset_states()
+    def _calc_reset_intervals(self,batch_schedule_type):
+        methods = ['constant', 'linear', 'exp', 'log']
+        if batch_schedule_type not in methods:
+            raise ValueError(f"Batch schedule method {batch_schedule_type} not recognized. \n Available methods: {methods}")
+        if batch_schedule_type == "constant":
+            
+            return np.repeat(self.bmin, self.epochs).astype(int)
+        elif batch_schedule_type == "linear":
+            return np.linspace(self.bmin, self.bmax, self.epochs).astype(int)
+        elif batch_schedule_type == "exp":
+            return calc_exp_intervals(self.bmin, self.bmax, self.epochs)
+        elif batch_schedule_type == "log":
+            return calc_log_intervals(self.bmin, self.bmax, self.epochs)
+    def on_epoch_begin(self, epoch, logs=None):
+        # Set the reset interval for the current epoch
+        if self.batch_reset_intervals is not None:
+            self.current_batch_reset = self.batch_reset_intervals[epoch]
+        else:
+            self.current_batch_reset = None
     def on_train_batch_end(self, batch, logs=None):
         """
-        Resets the states of RNN layers after a specified number of batches, if `batch_reset` is provided.
+        Resets the states of RNN layers during training after a specified number of batches, if `batch_reset` or `loc_batch_reset` are provided. The `batch_reset` is used for stability and to avoid exploding gradients at the beginning of training when a hidden state is being passed with weights that haven't learned yet. The `loc_batch_reset` is used to reset the states when a particular batch is from a new location and thus the hidden state should be passed.
 
         Parameters:
         -----------
@@ -1080,38 +1478,63 @@ class ResetStatesCallback(Callback):
         logs : dict, optional
             A dictionary containing metrics from the batch. Default is None.
         """        
-        batch_reset = self.batch_reset
-        if batch_reset is not None and batch % batch_reset == 0:
-            # print(f"Resetting states after batch {batch + 1}")
+        batch_reset = self.current_batch_reset
+        if (batch_reset is not None and batch % batch_reset == 0):
+            # print(f" Resetting states after batch {batch + 1}")
             # Iterate over each layer in the model
             for layer in self.model.layers:
                 # Check if the layer has a reset_states method
                 if hasattr(layer, 'reset_states'):
-                    layer.reset_states()
+                    layer.reset_states()  
+    def on_test_batch_end(self, batch, logs=None):
+        """
+        Resets the states of RNN layers during validation if `loc_batch_reset` is provided to demarcate a new location and thus avoid passing a hidden state to a wrong location.
 
-
+        Parameters:
+        -----------
+        batch : int
+            The index of the current batch.
+        logs : dict, optional
+            A dictionary containing metrics from the batch. Default is None.
+        """          
+        loc_batch_reset = self.loc_batch_reset
+        if (loc_batch_reset is not None and batch % loc_batch_reset == 0):
+            # print(f"Resetting states in Validation mode after batch {batch + 1}")
+            # Iterate over each layer in the model
+            for layer in self.model.layers:
+                # Check if the layer has a reset_states method
+                if hasattr(layer, 'reset_states'):
+                    layer.reset_states()          
+                
 ## Learning Schedules
 ## NOT TESTED YET
 lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
-    initial_learning_rate=0.001,
-    decay_steps=1000,
+    initial_learning_rate=0.01,
+    decay_steps=200,
     alpha=0.0,
     name='CosineDecay',
     # warmup_target=None,
     # warmup_steps=100
 )
+##
 
-## NOT TESTED YET
-early_stopping = EarlyStopping(
-    monitor='val_loss',  # Metric to monitor, e.g., 'val_loss', 'val_accuracy'
-    patience=5,          # Number of epochs with no improvement after which training will be stopped
-    verbose=1,           # Print information about early stopping
-    mode='min',          # 'min' means training will stop when the quantity monitored has stopped decreasing
-    restore_best_weights=True  # Restore model weights from the epoch with the best value of the monitored quantity
-)
+def EarlyStoppingCallback(patience=5):
+    """
+    Creates an EarlyStopping callback with the specified patience.
 
-# with open("params.yaml") as file:
-#     phys_params = yaml.safe_load(file)["physics_initializer"]
+    Args:
+        patience (int): Number of epochs with no improvement after which training will be stopped.
+
+    Returns:
+        EarlyStopping: Configured EarlyStopping callback.
+    """
+    return EarlyStopping(
+        monitor='val_loss',
+        patience=patience,
+        verbose=1,
+        mode='min',
+        restore_best_weights=True
+    )
 
 phys_params = {
     'DeltaE': [0,-1],                    # bias correction
@@ -1121,7 +1544,7 @@ phys_params = {
 
 
 
-def get_initial_weights(model_fit,params,scale_fm):
+def get_initial_weights(model_fit,params,scale_fm=1):
     # Given a RNN architecture and hyperparameter dictionary, return array of physics-initiated weights
     # Inputs:
     # model_fit: output of create_RNN_2 with no training
@@ -1131,7 +1554,7 @@ def get_initial_weights(model_fit,params,scale_fm):
     DeltaE = phys_params['DeltaE']
     T1 = phys_params['T1']
     fmr = phys_params['fm_raise_vs_rain']
-    centering = params['centering']  # shift activation down
+    centering = [0] # shift activation down
     
     w0_initial={'Ed':(1.-np.exp(-T1))/2, 
                 'Ew':(1.-np.exp(-T1))/2,
@@ -1151,6 +1574,7 @@ def get_initial_weights(model_fit,params,scale_fm):
             feature = params['features_list'][j]
             for k in range(w[0].shape[1]):
                     w[0][j][k]=w0_initial[feature]
+    
     for i in range(1,len(w)):            # number of the weight
         for j in range(w[i].shape[0]):   # number of the inputs
             if w[i].ndim==2:
@@ -1206,6 +1630,8 @@ class RNN(RNNModel):
         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
         x = inputs
         for i in range(self.params['rnn_layers']):
+            # Return sequences True if recurrent layer feeds into another recurrent layer. 
+            # False if feeds into dense layer
             return_sequences = True if i < self.params['rnn_layers'] - 1 else False
             x = SimpleRNN(
                 units=self.params['rnn_units'],
@@ -1222,8 +1648,7 @@ class RNN(RNNModel):
         x = Dense(units=1, activation='linear')(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
-        # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
-        # optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+        # optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
         if self.params["verbose_weights"]:
@@ -1231,16 +1656,18 @@ class RNN(RNNModel):
             # print(model.get_weights())
 
         if self.params['phys_initialize']:
-            assert self.params['scaler'] == 'reproducibility', f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
+            assert self.params['scaler'] is None, f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
             assert self.params['features_list'] == ['Ed', 'Ew', 'rain'], f"Physics initiation can only be done with features ['Ed', 'Ew', 'rain'], but given features {self.params['features_list']}"
+            assert self.params['dense_layers'] == 0, f"Physics initiation requires no hidden dense layers, received params['dense_layers'] = {self.params['dense_layers']}"
             print("Initializing Model with Physics based weights")
-            w, w_name=get_initial_weights(model, self.params, scale_fm = scale_fm)
+            w, w_name=get_initial_weights(model, self.params)
             model.set_weights(w)
             print('initial weights hash =',hash_weights(model))
         return model
+        
     def _build_model_predict(self, return_sequences=True):
         """
-        Builds and compiles the prediction model, doesn't use batch shape nor sequence length.
+        Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
 
         Parameters:
         -----------
@@ -1323,6 +1750,7 @@ class RNN_LSTM(RNNModel):
             x = Dropout(self.params["dropout"][1])(x)            
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        x = Dense(units=1, activation="linear")(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
@@ -1333,7 +1761,7 @@ class RNN_LSTM(RNNModel):
         return model
     def _build_model_predict(self, return_sequences=True):
         """
-        Builds and compiles the prediction model, doesn't use batch shape nor sequence length.
+        Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
 
         Parameters:
         -----------
@@ -1354,6 +1782,7 @@ class RNN_LSTM(RNNModel):
                 stateful=False,return_sequences=return_sequences)(x)
         for i in range(self.params['dense_layers']):
             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+        x = Dense(units=1, activation="linear")(x)
         model = tf.keras.Model(inputs=inputs, outputs=x)
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
         model.compile(loss='mean_squared_error', optimizer=optimizer)  
@@ -1364,6 +1793,13 @@ class RNN_LSTM(RNNModel):
         
         return model
 
+# Wrapper Functions putting everything together. 
+# Useful for deploying from command line
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+def train_model(model, data, params):
+    return
 
+def forecast(model, data, spinup_hours = 0):
+    return 
 
