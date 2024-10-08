@@ -3,8 +3,8 @@ import math
 import matplotlib.pyplot as plt
 import copy
 from abc import ABC, abstractmethod
-import xgboost as xg
-from xgboost import XGBRegressor
+# import xgboost as xg
+# from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
