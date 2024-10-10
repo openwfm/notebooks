@@ -1,4 +1,6 @@
 ## Set of Functions to process and format fuel moisture model inputs
+## These functions are specific to the particulars of the input data, and may not be generally applicable
+## Generally applicable functions should be in utils.py
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import numpy as np, random
@@ -30,7 +32,7 @@ feature_types = {
     'engineered': ['doy', 'hod', 'rain']
 }
 
-def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HRRR", forecast_step=1, verbose=True, features_subset=None):    
+def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HRRR", forecast_step=3, verbose=True, features_subset=None, drop_na=True):    
     # TODO: process involves multiple loops over dictionary keys. Inefficient, but functionality are isolated in separate functions that call for loops so will be tedious to fix 
 
     # Define Forecast Step for atmospheric data
@@ -38,33 +40,19 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
     # For HRRR data, hard coding previous step as f00, meaning rain will be calculated as diff between forecast hour and 0th hour
     if atm_source == "RAWS":
         print("Atmospheric data source is RAWS, so forecast_step is not used")  
+        forecast_step = 0 # set to 0 for future compatibility
         fstep=fprev=None
         if spatial:
             assert features_subset is not None, "For RAWS atmospheric data as source for spatial training set, argument features_subset cannot be None. Provide a list of features to subset the RAWS locations otherwise there will be errors when trying to build models with certain features."
     elif atm_source == "HRRR":
         fstep = int2fstep(forecast_step)
         fprev = "f00"
-        
-    
-    # Define Forecast Step: NOTE: if atm_source == RAWS, this should be zero
-    # if atm_source == "RAWS":
-    #     print("Atmospheric data source is RAWS, so forecast_step set to zero")
-    #     forecast_step=0
-    #     fstep = fprev = None
-    #     if spatial:
-    #         assert features_subset is not None, "For RAWS atmospheric data as source for spatial training set, argument features_subset cannot be None. Provide a list of features to subset the RAWS locations otherwise there will be errors when trying to build models with certain features."
-    
-    # elif forecast_step > 0 and forecast_step < 100 and forecast_step == int(forecast_step):
-    #     fstep='f'+str(forecast_step).zfill(2)
-    #     # fprev='f'+str(forecast_step-1).zfill(2)
-    #     fprev = 'f00' # NOTE: hard coding this as previous timestep
-    #     # logging.info('Using data from step %s',fstep)
-    #     # logging.info('Using rain as the difference of accumulated precipitation between %s and %s',fstep,fprev)
-    # else:
-    #     # logging.critical('forecast_step must be integer between 1 and 99')
-    #     raise ValueError('bad forecast_step')
-    
 
+    # Extract hours value from data params since it might need to change based on forecast hour time shift
+    hours = params_data['hours']
+    if forecast_step > 0  and drop_na:
+        hours = int(hours - forecast_step)
+    
     # Loop over input dictionary cases, extract and calculate features, then run data filters
     new_dict = {}
     for input_file_path in input_file_paths:
@@ -73,10 +61,11 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
             print(f"Extracting data from input file {input_file_path}")
         dict0 = read_pkl(input_file_path)
         for key in dict0:
-            # if verbose:
-            #     print("~"*50)
-            #     print(f"Extracting data for case {key}")
+
+            # Extract features from subdicts
             X, names = build_features_single(dict0[key], atm=atm_source, fstep=fstep, fprev = fprev)
+            
+            # Get time from HRRR (bc always regular intervals) and interpolate RAWS data to those times
             time = str2time(dict0[key]['HRRR']['time'])
             hrrr_increment = check_increment(time,id=key+f' {"HRRR"}.time')
             if  hrrr_increment < 1:
@@ -84,7 +73,24 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
                 raise(ValueError)
             time_raws = str2time(dict0[key]['RAWS']['time_raws'])
             check_increment(time_raws,id=dict0[key]['loc']['STID']+' RAWS.time_raws')
+
+            # Extract outcome data
+            y = get_fm(dict0[key], time)
             
+            # Shift atmospheric data in time if using a forecast step
+            if forecast_step > 0:
+                # Get indices to shift
+                atm_names = feature_types['atm'] + ['rain']
+                indices = [names.index(item) for item in atm_names if item in names]
+                # Shift indices to future in time to line up forecast with desired time
+                X = shift_time(X, indices, forecast_step)
+                if drop_na:
+                    
+                    print(f"Shifted time based on forecast step {forecast_step}. Dropping NA at beginning of feature data and corresponding times of output data")
+                    X = X[forecast_step:, :]
+                    y = y[forecast_step:]
+                    time = time[forecast_step:]
+
             new_dict[key] = {
                 'id': key,
                 'case': key,
@@ -92,7 +98,7 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
                 'loc': dict0[key]['loc'],
                 'time': time,
                 'X': X,
-                'y': get_fm(dict0[key], time),
+                'y': y,
                 'features_list': names,
                 'atm_source': atm_source
             }
@@ -101,9 +107,9 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
     # Subset timeseries into shorter stretches, discard short ones
     if verbose:
         print("~"*75)
-        print(f"Splitting Timeseries into smaller portions to aid with data filtering. Input data param for max timeseries hours: {params_data['hours']}")
-    new_dict = split_timeseries(new_dict, hours=params_data['hours'], verbose=verbose)   
-    new_dict = discard_keys_with_short_y(new_dict, hours=params_data['hours'], verbose=False)
+        print(f"Splitting Timeseries into smaller portions to aid with data filtering. Input data param for max timeseries hours: {hours}")
+    new_dict = split_timeseries(new_dict, hours=hours, verbose=verbose)   
+    new_dict = discard_keys_with_short_y(new_dict, hours=hours, verbose=False)
     
     # Check for suspect data
     flags = flag_dict_keys(new_dict, params_data['zero_lag_threshold'], params_data['max_intp_time'], max_y = params_data['max_fm'], min_y = params_data['min_fm'], verbose=verbose)
@@ -189,6 +195,7 @@ def calc_time_features(time):
     return cols, names
 
 def calc_hrrr_rain(d, fstep, fprev):
+    # NOTE: if fstep and fprev are both f00, it will return all zeros which is what the f00 HRRR always is. If fprev is not hard coded as zero this might return nonsense, but not adding any checks yet for simplicity
     rain = d["HRRR"][fstep]['precip_accum']- d["HRRR"][fprev]['precip_accum']
     return rain
 
@@ -239,6 +246,44 @@ def get_fm(d, time):
     fm = d['RAWS']['fm']
     time_raws = str2time(d['RAWS']['time_raws'])
     return time_intp(time_raws,fm,time)
+
+
+def shift_time(X_array, inds, forecast_step):
+    """
+    Shifts specified columns of a numpy ndarray forward by a given number of steps.
+
+    Parameters:
+    ----------
+    X_array : numpy.ndarray
+        The input 2D array where specific columns will be shifted.
+    inds : list of int
+        Indices of the columns within X_array to be shifted.
+    forecast_step : int
+        The number of positions to shift the specified columns forward.
+
+    Returns:
+    -------
+    numpy.ndarray
+        A modified copy of the input array with specified columns shifted forward 
+        by `forecast_step` and the leading positions in those columns filled with NaN.
+    
+    Example:
+    -------
+    >>> X_array = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
+    >>> inds = [0, 2]
+    >>> shift_time(X_array, inds, 1)
+    array([[nan,  2., nan],
+           [ 1.,  5.,  3.],
+           [ 4.,  8.,  6.],
+           [ 7., 11.,  9.]])
+    """
+    if not isinstance(forecast_step, int) or forecast_step <= 0:
+        raise ValueError("forecast_step must be an integer greater than 0.")
+        
+    X_shift = X_array.astype(float).copy()
+    X_shift[:forecast_step, inds] = np.nan
+    X_shift[forecast_step:, inds] = X_array[:-forecast_step, inds]
+    return X_shift
 
 
 
