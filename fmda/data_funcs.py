@@ -46,7 +46,10 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
             assert features_subset is not None, "For RAWS atmospheric data as source for spatial training set, argument features_subset cannot be None. Provide a list of features to subset the RAWS locations otherwise there will be errors when trying to build models with certain features."
     elif atm_source == "HRRR":
         fstep = int2fstep(forecast_step)
-        fprev = "f00"
+        if forecast_step > 0:
+            fprev = int2fstep(forecast_step-1)
+        else:
+            fprev = "f00"
 
     # Extract hours value from data params since it might need to change based on forecast hour time shift
     hours = params_data['hours']
@@ -85,7 +88,6 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
                 # Shift indices to future in time to line up forecast with desired time
                 X = shift_time(X, indices, forecast_step)
                 if drop_na:
-                    
                     print(f"Shifted time based on forecast step {forecast_step}. Dropping NA at beginning of feature data and corresponding times of output data")
                     X = X[forecast_step:, :]
                     y = y[forecast_step:]
@@ -100,7 +102,8 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
                 'X': X,
                 'y': y,
                 'features_list': names,
-                'atm_source': atm_source
+                'atm_source': atm_source,
+                'forecast_step': forecast_step
             }
             
     # Run Data Filters
@@ -680,6 +683,7 @@ def combine_nested(nested_input_dict, verbose=True):
     d['X'] = _combine_key(nested_input_dict, 'X')
     d['y'] = _combine_key(nested_input_dict, 'y')
     d['atm_source'] = _combine_key(nested_input_dict, 'atm_source')
+    d['forecast_step'] = _combine_key(nested_input_dict, 'forecast_step')
 
     # Build the loc subdictionary using _combine_key for each loc key
     d['loc'] = {
