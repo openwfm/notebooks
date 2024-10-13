@@ -1797,8 +1797,27 @@ class RNN_LSTM(RNNModel):
 # Useful for deploying from command line
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def train_model(model, data, params):
-    return
+def rnn_data_wrap(dict0, params):
+    rnn_dat = RNNData(
+        dict0, # input dictionary
+        scaler="standard",  # data scaling type
+        features_list = params['features_list'] # features for predicting outcome
+    )
+    
+    
+    rnn_dat.train_test_split(   
+        time_fracs = params['time_fracs'], # Percent of total time steps used for train/val/test
+        space_fracs = params['space_fracs'] # Percent of total timeseries used for train/val/test
+    )
+    rnn_dat.scale_data()
+    
+    rnn_dat.batch_reshape(
+        timesteps = params['timesteps'], # Timesteps aka sequence length for RNN input data. 
+        batch_size = params['batch_size'], # Number of samples of length timesteps for a single round of grad. descent
+        start_times = np.zeros(len(rnn_dat.loc['train_locs']))
+    )    
+    
+    return rnn_dat
 
 def forecast(model, data, spinup_hours = 0):
     return 
