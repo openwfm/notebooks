@@ -15,7 +15,7 @@ from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
 import reproducibility
 # from utils import print_dict_summary
 from abc import ABC, abstractmethod
-from utils import hash2, all_items_exist, hash_ndarray, hash_weights
+from utils import hash2, all_items_exist, hash_ndarray, hash_weights, Dict
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
 # import yaml
@@ -1799,7 +1799,7 @@ class RNN_LSTM(RNNModel):
 
 def rnn_data_wrap(dict0, params):
     rnn_dat = RNNData(
-        dict0, # input dictionary
+        Dict(dict0), # input dictionary
         scaler="standard",  # data scaling type
         features_list = params['features_list'] # features for predicting outcome
     )
