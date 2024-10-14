@@ -1,3 +1,4 @@
+
 # v2 training and prediction class infrastructure
 
 # Environment
@@ -1282,6 +1283,8 @@ class RNNModel(ABC):
                 dict0['m']=m
             plot_data(dict0, title="RNN", title2=dict0.case, plot_period=plot_period)
 
+        print(f"Mean Test Error: {errs.mean()}")
+        
         if return_epochs:
             return m, errs, eps
         else:
@@ -1373,6 +1376,23 @@ def calc_log_intervals(bmin, bmax, n_epochs, force_bmax = True):
         intervals[-1] = bmax  # Ensure the last value is exactly bmax
     return intervals.astype(int)
 
+def calc_step_intervals(bmin, bmax, n_epochs, estep=None, force_bmax=True):
+    # Set estep to 10% of the total number of epochs if not provided
+    if estep is None:
+        estep = int(0.1 * n_epochs)
+
+    # Initialize intervals with bmin for the first part, then step up to bmax
+    intervals = np.full(n_epochs, bmin)
+
+    # Step up to bmax after 'estep' epochs
+    intervals[estep:] = bmax
+
+    # Force the last value to be exactly bmax if specified
+    if force_bmax:
+        intervals[-1] = bmax
+
+    return intervals.astype(int)
+
 class ResetStatesCallback(Callback):
     """
     Custom callback to reset the states of RNN layers at the end of each epoch and optionally after a specified number of batches.
@@ -1449,7 +1469,7 @@ class ResetStatesCallback(Callback):
             if hasattr(layer, 'reset_states'):
                 layer.reset_states()
     def _calc_reset_intervals(self,batch_schedule_type):
-        methods = ['constant', 'linear', 'exp', 'log']
+        methods = ['constant', 'linear', 'exp', 'log', 'step']
         if batch_schedule_type not in methods:
             raise ValueError(f"Batch schedule method {batch_schedule_type} not recognized. \n Available methods: {methods}")
         if batch_schedule_type == "constant":
@@ -1461,6 +1481,8 @@ class ResetStatesCallback(Callback):
             return calc_exp_intervals(self.bmin, self.bmax, self.epochs)
         elif batch_schedule_type == "log":
             return calc_log_intervals(self.bmin, self.bmax, self.epochs)
+        elif batch_schedule_type == "step":
+            return calc_step_intervals(self.bmin, self.bmax, self.epochs)
     def on_epoch_begin(self, epoch, logs=None):
         # Set the reset interval for the current epoch
         if self.batch_reset_intervals is not None:
