@@ -1797,9 +1797,11 @@ class RNN_LSTM(RNNModel):
 # Useful for deploying from command line
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def rnn_data_wrap(dict0, params):
+def rnn_data_wrap(dict0, params, features_subset=None):
+    dict1 = dict0.copy()
+    
     rnn_dat = RNNData(
-        dict0, # input dictionary
+        dict1, # input dictionary
         scaler="standard",  # data scaling type
         features_list = params['features_list'] # features for predicting outcome
     )

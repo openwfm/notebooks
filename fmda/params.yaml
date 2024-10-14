@@ -32,6 +32,7 @@ rnn:
   scale: True
   scaler: 'standard' # One of methods in scalers dictionary in moisture_rnn.py
   time_fracs: [.9, .05, .05] # Percentage of data based on time span for train/val/test
+  space_fracs: [.8, .1, .1] # Percentage of data based on location for train/val/test
   early_stopping_patience: 5 # Number of epochs with no improvement after which training will be stopped.
   predict_spinup_hours: 5 # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
 
@@ -43,7 +44,7 @@ lstm:
   rnn_units: 6
   dense_layers: 1
   dense_units: 1
-  activation: ['relu', 'relu']
+  activation: ['tanh', 'tanh']
   recurrent_activation: 'sigmoid'
   dropout: [0.2, 0.2]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
   recurrent_dropout: 0.2 # Length must match number of recurrent layers
@@ -62,6 +63,7 @@ lstm:
   scale: True
   scaler: 'minmax' # One of methods in scalers dictionary in moisture_rnn.py
   time_fracs: [.9, .05, .05] # Percentage of data based on time span for train/val/test
+  space_fracs: [.8, .1, .1] # Percentage of data based on location for train/val/test
   early_stopping_patience: 25 # Number of epochs with no improvement after which training will be stopped.
   predict_spinup_hours: 5 # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
 
