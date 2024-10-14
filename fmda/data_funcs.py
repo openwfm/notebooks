@@ -53,7 +53,7 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
 
     # Extract hours value from data params since it might need to change based on forecast hour time shift
     hours = params_data['hours']
-    if forecast_step > 0  and drop_na:
+    if forecast_step > 0  and drop_na and hours is not None:
         hours = int(hours - forecast_step)
     
     # Loop over input dictionary cases, extract and calculate features, then run data filters
@@ -108,11 +108,12 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
             
     # Run Data Filters
     # Subset timeseries into shorter stretches, discard short ones
-    if verbose:
-        print("~"*75)
-        print(f"Splitting Timeseries into smaller portions to aid with data filtering. Input data param for max timeseries hours: {hours}")
-    new_dict = split_timeseries(new_dict, hours=hours, verbose=verbose)   
-    new_dict = discard_keys_with_short_y(new_dict, hours=hours, verbose=False)
+    if hours is not None:
+        if verbose:
+            print("~"*75)
+            print(f"Splitting Timeseries into smaller portions to aid with data filtering. Input data param for max timeseries hours: {hours}")
+        new_dict = split_timeseries(new_dict, hours=hours, verbose=verbose)   
+        new_dict = discard_keys_with_short_y(new_dict, hours=hours, verbose=False)
     
     # Check for suspect data
     flags = flag_dict_keys(new_dict, params_data['zero_lag_threshold'], params_data['max_intp_time'], max_y = params_data['max_fm'], min_y = params_data['min_fm'], verbose=verbose)
