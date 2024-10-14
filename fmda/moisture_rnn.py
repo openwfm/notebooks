@@ -1802,7 +1802,7 @@ def rnn_data_wrap(dict0, params, features_subset=None):
     
     rnn_dat = RNNData(
         dict1, # input dictionary
-        scaler="standard",  # data scaling type
+        scaler=params['scaler'],  # data scaling type
         features_list = params['features_list'] # features for predicting outcome
     )
     
@@ -1811,7 +1811,8 @@ def rnn_data_wrap(dict0, params, features_subset=None):
         time_fracs = params['time_fracs'], # Percent of total time steps used for train/val/test
         space_fracs = params['space_fracs'] # Percent of total timeseries used for train/val/test
     )
-    rnn_dat.scale_data()
+    if rnn_dat.scaler is not None:
+        rnn_dat.scale_data()
     
     rnn_dat.batch_reshape(
         timesteps = params['timesteps'], # Timesteps aka sequence length for RNN input data. 
