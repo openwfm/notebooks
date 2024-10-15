@@ -1283,7 +1283,7 @@ class RNNModel(ABC):
                 dict0['m']=m
             plot_data(dict0, title="RNN", title2=dict0.case, plot_period=plot_period)
 
-        print(f"Mean Test Error: {errs.mean()}")
+        # print(f"Mean Test Error: {errs.mean()}")
         
         if return_epochs:
             return m, errs, eps
