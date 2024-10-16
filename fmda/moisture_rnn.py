@@ -1425,6 +1425,7 @@ class ResetStatesCallback(Callback):
                 - 'linear'   : Increases the batch reset interval linearly over epochs from bmin to bmax.
                 - 'exp'      : Increases the batch reset interval exponentially over epochs from bmin to bmax.
                 - 'log'      : Increases the batch reset interval logarithmically over epochs from bmin to bmax.
+                - 'step'     : Increases the batch reset interval from constant at bmin to constant at bmax after estep number o epochs
 
                 
         Returns:
@@ -1435,7 +1436,7 @@ class ResetStatesCallback(Callback):
         super(ResetStatesCallback, self).__init__()
 
         # Check for optional arguments, set None if missing in input params 
-        arg_list = ['bmin', 'bmax', 'epochs', 'loc_batch_reset', 'batch_schedule_type']
+        arg_list = ['bmin', 'bmax', 'epochs', 'estep', 'loc_batch_reset', 'batch_schedule_type']
         for arg in arg_list:
             setattr(self, arg, params.get(arg, None))          
 
@@ -1482,7 +1483,7 @@ class ResetStatesCallback(Callback):
         elif batch_schedule_type == "log":
             return calc_log_intervals(self.bmin, self.bmax, self.epochs)
         elif batch_schedule_type == "step":
-            return calc_step_intervals(self.bmin, self.bmax, self.epochs)
+            return calc_step_intervals(self.bmin, self.bmax, self.epochs, self.estep)
     def on_epoch_begin(self, epoch, logs=None):
         # Set the reset interval for the current epoch
         if self.batch_reset_intervals is not None:
