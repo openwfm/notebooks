@@ -993,7 +993,15 @@ def check_reproducibility(dict0, params, m_hash, w_hash):
     # Check Hashes
     if params['phys_initialize']:
         hashes = repro_info['phys_initialize']
-        warnings.warn("Physics Initialization not implemented yet. Not running reproduciblity checks.")
+        print(f"Fitted weights hash: {w_hash} \n Reproducibility weights hash: {hashes['fitted_weights_hash']}")
+        print(f"Model predictions hash: {m_hash} \n Reproducibility preds hash: {hashes['preds_hash']}")
+        if (w_hash != hashes['fitted_weights_hash']) or (m_hash != hashes['preds_hash']):
+            if w_hash != hashes['fitted_weights_hash']:
+                warnings.warn("The fitted weights hash does not match the reproducibility weights hash.")        
+            if m_hash != hashes['preds_hash']:
+                warnings.warn("The predictions hash does not match the reproducibility predictions hash.")
+        else:
+            print("***Reproducibility Checks passed - model weights and model predictions match expected.***")
     else:
         hashes = repro_info['rand_initialize']
         print(f"Fitted weights hash: {w_hash} \n Reproducibility weights hash: {hashes['fitted_weights_hash']}")
