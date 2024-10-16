@@ -1282,7 +1282,7 @@ class RNNModel(ABC):
 
         # Generate Predictions and Evaluate Test Error
         if dict0.spatial:
-            m, errs = self._eval_multi(dict0)
+            m, errs = self._eval_multi(dict0, reproducibility_run)
             if save_outputs:
                 dict0['m']=m            
         else:
@@ -1339,7 +1339,7 @@ class RNNModel(ABC):
         }
         return m, rmse_dict
         
-    def _eval_multi(self, dict0):
+    def _eval_multi(self, dict0, reproducibility_run):
         # Train Error: NOT DOING YET. DECIDE WHETHER THIS IS NEEDED
         
         # Test Error
@@ -1349,6 +1349,10 @@ class RNNModel(ABC):
         y_array = dict0.y_test
         preds = self.model_predict.predict(dict0.X_test)
 
+        if reproducibility_run:
+            print("Checking Reproducibility")
+            check_reproducibility(dict0, self.params, hash_ndarray(preds), hash_weights(self.model_predict))
+        
         # Calculate RMSE
         ## Note: not using util rmse function since this approach is for 3d arrays
         # Compute the squared differences

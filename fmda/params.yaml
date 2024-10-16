@@ -70,58 +70,81 @@ lstm:
 # Param sets for reproducibility
 
 ## v2.1 params
-rnn_repro:
-  batch_size: 32
-  timesteps: 5
-  optimizer: adam
-  rnn_layers: 1
-  rnn_units: 20
-  dense_layers: 1
-  dense_units: 5
-  activation: ['linear', 'linear']
-  dropout: [0.2, 0.2]
-  recurrent_dropout: 0.2
-  reset_states: True
-  epochs: 300
-  learning_rate: 0.001
-  clipvalue: 10.0
-  phys_initialize: False
-  stateful: True
-  verbose_weights: True
-  verbose_fit: False
-  features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
-  scale: True
-  scaler: 'minmax'
-  time_fracs: [.5, .2, .3] # Percentage of data based on time span for train/val/test
-  early_stopping_patience: 9999 # early stopping not used in repro case, so setting to a huge value to ignore
-  predict_spinup_hours: null # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
-  
-## v2.0 params
 # rnn_repro:
 #   batch_size: 32
 #   timesteps: 5
 #   optimizer: adam
-#   epochs: 200
 #   rnn_layers: 1
 #   rnn_units: 20
-#   dense_layers: 0 # hidden dense layers AFTER recurrent layers and BEFORE final output cell
-#   dense_units: 1
+#   dense_layers: 1
+#   dense_units: 5
 #   activation: ['linear', 'linear']
-#   centering: [0.0,0.0]
-#   dropout: [0.0, 0.0]  # NOTE: length must match total number of layers, default is 1 hidden recurrent layer and 1 dense output layer
-#   recurrent_dropout: 0.0 # Length must match number of recurrent layers
-#   reset_states: True # reset hidden states after training epoch, triggers reset_states() via callbacks
-#   epochs: 200
+#   dropout: [0.2, 0.2]
+#   recurrent_dropout: 0.2
+#   reset_states: True
+#   epochs: 300
 #   learning_rate: 0.001
-#   phys_initialize: False # physics initialization
+#   clipvalue: 10.0
+#   phys_initialize: False
 #   stateful: True
-#   verbose_weights: True # Prints out hashs of weights for tracking reproducibility
-#   verbose_fit: False # Prints out all training epochs, makes computation much slower
-#   features_list: ['Ed', 'Ew', 'rain']
+#   verbose_weights: True
+#   verbose_fit: False
+#   features_list: ['Ed', 'Ew', 'solar', 'wind', 'rain']
 #   scale: True
-#   scaler: 'reproducibility'
-#   train_frac: 0.5
-#   val_frac: 0.0
+#   scaler: 'minmax'
+#   time_fracs: [.5, .2, .3] # Percentage of data based on time span for train/val/test
+#   early_stopping_patience: 9999 # early stopping not used in repro case, so setting to a huge value to ignore
+#   predict_spinup_hours: null # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
+
+
+## v2.2 params
+rnn_repro:
+  batch_size: 32
+  timesteps: 12
+  optimizer: adam
+  rnn_layers: 1
+  rnn_units: 20
+  dense_layers: 2
+  dense_units: 20
+  activation: ['tanh', 'relu']
+  dropout: [0.2, 0.2]
+  recurrent_dropout: 0.2
+  reset_states: True
+  epochs: 300
+  learning_rate: 0.01
+  clipvalue: 10.0
+  phys_initialize: False
+  stateful: True
+  verbose_weights: True
+  verbose_fit: True
+  features_list_single: ['Ed', 'Ew', 'solar', 'wind', 'rain']
+  features_list_spatial: ['Ed', 'Ew', 'solar', 'wind', 'rain', 'lon', 'lat', 'elev']  
+  scale: True
+  scaler: 'standard'
+  time_fracs: [.5, .2, .3] # Percentage of data based on time span for train/val/test
+  space_fracs: [.7, .15, .15] # Percentage of data based on space for train/val/test  
+  early_stopping_patience: 20
+  predict_spinup_hours: null # Number of hours to run through the model before prediction errors evaluated. Used to stabilize hidden state
+  batch_schedule_type: 'step'
+  estep: 5
+  bmin: 20
+  bmax : 719
+
+
+
+# params.update({
+#     'learning_rate': 0.01,
+#     'batch_schedule_type': 'step',
+#     'estep': 5,
+#     'bmin' : 20,
+#     'bmax': repro['single']['y'].shape[0],
+#     'early_stopping_patience': 20,
+#     'dense_layers': 2,
+#     'dense_units': 20,
+#     'rnn_units': 20,
+#     'activation': ['tanh', 'relu']
+# })
+
 
 
 # Other ML Params
