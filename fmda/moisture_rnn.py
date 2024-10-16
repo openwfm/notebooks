@@ -1,3 +1,4 @@
+
 # v2 training and prediction class infrastructure
 
 # Environment
@@ -992,7 +993,15 @@ def check_reproducibility(dict0, params, m_hash, w_hash):
     # Check Hashes
     if params['phys_initialize']:
         hashes = repro_info['phys_initialize']
-        warnings.warn("Physics Initialization not implemented yet. Not running reproduciblity checks.")
+        print(f"Fitted weights hash: {w_hash} \n Reproducibility weights hash: {hashes['fitted_weights_hash']}")
+        print(f"Model predictions hash: {m_hash} \n Reproducibility preds hash: {hashes['preds_hash']}")
+        if (w_hash != hashes['fitted_weights_hash']) or (m_hash != hashes['preds_hash']):
+            if w_hash != hashes['fitted_weights_hash']:
+                warnings.warn("The fitted weights hash does not match the reproducibility weights hash.")        
+            if m_hash != hashes['preds_hash']:
+                warnings.warn("The predictions hash does not match the reproducibility predictions hash.")
+        else:
+            print("***Reproducibility Checks passed - model weights and model predictions match expected.***")
     else:
         hashes = repro_info['rand_initialize']
         print(f"Fitted weights hash: {w_hash} \n Reproducibility weights hash: {hashes['fitted_weights_hash']}")
@@ -1273,7 +1282,7 @@ class RNNModel(ABC):
 
         # Generate Predictions and Evaluate Test Error
         if dict0.spatial:
-            m, errs = self._eval_multi(dict0)
+            m, errs = self._eval_multi(dict0, reproducibility_run)
             if save_outputs:
                 dict0['m']=m            
         else:
@@ -1282,6 +1291,8 @@ class RNNModel(ABC):
                 dict0['m']=m
             plot_data(dict0, title="RNN", title2=dict0.case, plot_period=plot_period)
 
+        # print(f"Mean Test Error: {errs.mean()}")
+        
         if return_epochs:
             return m, errs, eps
         else:
@@ -1328,7 +1339,7 @@ class RNNModel(ABC):
         }
         return m, rmse_dict
         
-    def _eval_multi(self, dict0):
+    def _eval_multi(self, dict0, reproducibility_run):
         # Train Error: NOT DOING YET. DECIDE WHETHER THIS IS NEEDED
         
         # Test Error
@@ -1338,6 +1349,10 @@ class RNNModel(ABC):
         y_array = dict0.y_test
         preds = self.model_predict.predict(dict0.X_test)
 
+        if reproducibility_run:
+            print("Checking Reproducibility")
+            check_reproducibility(dict0, self.params, hash_ndarray(preds), hash_weights(self.model_predict))
+        
         # Calculate RMSE
         ## Note: not using util rmse function since this approach is for 3d arrays
         # Compute the squared differences
@@ -1373,6 +1388,23 @@ def calc_log_intervals(bmin, bmax, n_epochs, force_bmax = True):
         intervals[-1] = bmax  # Ensure the last value is exactly bmax
     return intervals.astype(int)
 
+def calc_step_intervals(bmin, bmax, n_epochs, estep=None, force_bmax=True):
+    # Set estep to 10% of the total number of epochs if not provided
+    if estep is None:
+        estep = int(0.1 * n_epochs)
+
+    # Initialize intervals with bmin for the first part, then step up to bmax
+    intervals = np.full(n_epochs, bmin)
+
+    # Step up to bmax after 'estep' epochs
+    intervals[estep:] = bmax
+
+    # Force the last value to be exactly bmax if specified
+    if force_bmax:
+        intervals[-1] = bmax
+
+    return intervals.astype(int)
+
 class ResetStatesCallback(Callback):
     """
     Custom callback to reset the states of RNN layers at the end of each epoch and optionally after a specified number of batches.
@@ -1405,6 +1437,7 @@ class ResetStatesCallback(Callback):
                 - 'linear'   : Increases the batch reset interval linearly over epochs from bmin to bmax.
                 - 'exp'      : Increases the batch reset interval exponentially over epochs from bmin to bmax.
                 - 'log'      : Increases the batch reset interval logarithmically over epochs from bmin to bmax.
+                - 'step'     : Increases the batch reset interval from constant at bmin to constant at bmax after estep number o epochs
 
                 
         Returns:
@@ -1415,7 +1448,7 @@ class ResetStatesCallback(Callback):
         super(ResetStatesCallback, self).__init__()
 
         # Check for optional arguments, set None if missing in input params 
-        arg_list = ['bmin', 'bmax', 'epochs', 'loc_batch_reset', 'batch_schedule_type']
+        arg_list = ['bmin', 'bmax', 'epochs', 'estep', 'loc_batch_reset', 'batch_schedule_type']
         for arg in arg_list:
             setattr(self, arg, params.get(arg, None))          
 
@@ -1449,7 +1482,7 @@ class ResetStatesCallback(Callback):
             if hasattr(layer, 'reset_states'):
                 layer.reset_states()
     def _calc_reset_intervals(self,batch_schedule_type):
-        methods = ['constant', 'linear', 'exp', 'log']
+        methods = ['constant', 'linear', 'exp', 'log', 'step']
         if batch_schedule_type not in methods:
             raise ValueError(f"Batch schedule method {batch_schedule_type} not recognized. \n Available methods: {methods}")
         if batch_schedule_type == "constant":
@@ -1461,6 +1494,8 @@ class ResetStatesCallback(Callback):
             return calc_exp_intervals(self.bmin, self.bmax, self.epochs)
         elif batch_schedule_type == "log":
             return calc_log_intervals(self.bmin, self.bmax, self.epochs)
+        elif batch_schedule_type == "step":
+            return calc_step_intervals(self.bmin, self.bmax, self.epochs, self.estep)
     def on_epoch_begin(self, epoch, logs=None):
         # Set the reset interval for the current epoch
         if self.batch_reset_intervals is not None:
@@ -1797,8 +1832,30 @@ class RNN_LSTM(RNNModel):
 # Useful for deploying from command line
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def train_model(model, data, params):
-    return
+def rnn_data_wrap(dict0, params, features_subset=None):
+    dict1 = dict0.copy()
+    
+    rnn_dat = RNNData(
+        dict1, # input dictionary
+        scaler=params['scaler'],  # data scaling type
+        features_list = params['features_list'] # features for predicting outcome
+    )
+    
+    
+    rnn_dat.train_test_split(   
+        time_fracs = params['time_fracs'], # Percent of total time steps used for train/val/test
+        space_fracs = params['space_fracs'] # Percent of total timeseries used for train/val/test
+    )
+    if rnn_dat.scaler is not None:
+        rnn_dat.scale_data()
+    
+    rnn_dat.batch_reshape(
+        timesteps = params['timesteps'], # Timesteps aka sequence length for RNN input data. 
+        batch_size = params['batch_size'], # Number of samples of length timesteps for a single round of grad. descent
+        start_times = np.zeros(len(rnn_dat.loc['train_locs']))
+    )    
+    
+    return rnn_dat
 
 def forecast(model, data, spinup_hours = 0):
     return 

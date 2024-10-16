@@ -1,4 +1,6 @@
 ## Set of Functions to process and format fuel moisture model inputs
+## These functions are specific to the particulars of the input data, and may not be generally applicable
+## Generally applicable functions should be in utils.py
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import numpy as np, random
@@ -29,6 +31,137 @@ feature_types = {
     # Features that require calculation. NOTE: rain only calculated in HRRR, not RAWS
     'engineered': ['doy', 'hod', 'rain']
 }
+
+def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HRRR", forecast_step=3, verbose=True, features_subset=None, drop_na=True):    
+    # TODO: process involves multiple loops over dictionary keys. Inefficient, but functionality are isolated in separate functions that call for loops so will be tedious to fix 
+
+    # Define Forecast Step for atmospheric data
+    # If atm_source is RAWS, forecast hour not used AND if spatial data must have fetures_subset input to avoid incompatibility with building training data
+    # For HRRR data, hard coding previous step as f00, meaning rain will be calculated as diff between forecast hour and 0th hour
+    if atm_source == "RAWS":
+        print("Atmospheric data source is RAWS, so forecast_step is not used")  
+        forecast_step = 0 # set to 0 for future compatibility
+        fstep=fprev=None
+        if spatial:
+            assert features_subset is not None, "For RAWS atmospheric data as source for spatial training set, argument features_subset cannot be None. Provide a list of features to subset the RAWS locations otherwise there will be errors when trying to build models with certain features."
+    elif atm_source == "HRRR":
+        fstep = int2fstep(forecast_step)
+        if forecast_step > 0:
+            fprev = int2fstep(forecast_step-1)
+        else:
+            fprev = "f00"
+
+    # Extract hours value from data params since it might need to change based on forecast hour time shift
+    hours = params_data['hours']
+    if forecast_step > 0  and drop_na and hours is not None:
+        hours = int(hours - forecast_step)
+    
+    # Loop over input dictionary cases, extract and calculate features, then run data filters
+    new_dict = {}
+    for input_file_path in input_file_paths:
+        if verbose:
+            print("~"*75)
+            print(f"Extracting data from input file {input_file_path}")
+        dict0 = read_pkl(input_file_path)
+        for key in dict0:
+
+            # Extract features from subdicts
+            X, names = build_features_single(dict0[key], atm=atm_source, fstep=fstep, fprev = fprev)
+            
+            # Get time from HRRR (bc always regular intervals) and interpolate RAWS data to those times
+            time = str2time(dict0[key]['HRRR']['time'])
+            hrrr_increment = check_increment(time,id=key+f' {"HRRR"}.time')
+            if  hrrr_increment < 1:
+                # logging.critical('HRRR increment is %s h must be at least 1 h',hrrr_increment)
+                raise(ValueError)
+            time_raws = str2time(dict0[key]['RAWS']['time_raws'])
+            check_increment(time_raws,id=dict0[key]['loc']['STID']+' RAWS.time_raws')
+
+            # Extract outcome data
+            y = get_fm(dict0[key], time)
+            
+            # Shift atmospheric data in time if using a forecast step
+            if forecast_step > 0:
+                # Get indices to shift
+                atm_names = feature_types['atm'] + ['rain']
+                indices = [names.index(item) for item in atm_names if item in names]
+                # Shift indices to future in time to line up forecast with desired time
+                X = shift_time(X, indices, forecast_step)
+                if drop_na:
+                    print(f"Shifted time based on forecast step {forecast_step}. Dropping NA at beginning of feature data and corresponding times of output data")
+                    X = X[forecast_step:, :]
+                    y = y[forecast_step:]
+                    time = time[forecast_step:]
+
+            new_dict[key] = {
+                'id': key,
+                'case': key,
+                'filename': input_file_path,
+                'loc': dict0[key]['loc'],
+                'time': time,
+                'X': X,
+                'y': y,
+                'features_list': names,
+                'atm_source': atm_source,
+                'forecast_step': forecast_step
+            }
+            
+    # Run Data Filters
+    # Subset timeseries into shorter stretches, discard short ones
+    if hours is not None:
+        if verbose:
+            print("~"*75)
+            print(f"Splitting Timeseries into smaller portions to aid with data filtering. Input data param for max timeseries hours: {hours}")
+        new_dict = split_timeseries(new_dict, hours=hours, verbose=verbose)   
+        new_dict = discard_keys_with_short_y(new_dict, hours=hours, verbose=False)
+    
+    # Check for suspect data
+    flags = flag_dict_keys(new_dict, params_data['zero_lag_threshold'], params_data['max_intp_time'], max_y = params_data['max_fm'], min_y = params_data['min_fm'], verbose=verbose)
+    
+    # Remove flagged cases
+    cases = list([*new_dict.keys()])
+    flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
+    remove_key_list(new_dict, flagged_cases, verbose=verbose)
+    
+    if spatial:
+        if atm_source == "HRRR":
+            new_dict = combine_nested(new_dict)
+        elif atm_source == "RAWS":
+            new_dict = subset_by_features(new_dict, features_subset)
+            new_dict = combine_nested(new_dict)
+        
+    return Dict(new_dict)
+
+def int2fstep(forecast_step, max_hour=5):
+    """
+    Converts an integer forecast step into a formatted string with a prefix 'f' 
+    and zero-padded to two digits. Format of HRRR data forecast hours
+
+    Parameters:
+    - forecast_step (int): The forecast step to convert. Must be an integer 
+      between 0 and max_hour (inclusive).
+    - max_hour (int, optional): The maximum allowable forecast step. 
+      Depends on how many forecast hours were collected for input data. Default is 5.
+
+    Returns:
+    - str: A formatted string representing the forecast step, prefixed with 'f' 
+      and zero-padded to two digits (e.g., 'f01', 'f02').
+
+    Raises:
+    - TypeError: If forecast_step is not an integer.
+    - ValueError: If forecast_step is not between 0 and max_hour (inclusive).
+
+    Example:
+    >>> int2fstep(3)
+    'f03'
+    """
+    if not isinstance(forecast_step, int):
+        raise TypeError(f"forecast_step must be an integer.")
+    if not (0 <= forecast_step <= max_hour):
+        raise ValueError(f"forecast_step must be between 0 and {max_hour}, the largest forecast step in input data.")
+        
+    fstep='f'+str(forecast_step).zfill(2)
+    return fstep
 
 def check_feat(feat, d):
     if feat not in d:
@@ -66,15 +199,13 @@ def calc_time_features(time):
     return cols, names
 
 def calc_hrrr_rain(d, fstep, fprev):
+    # NOTE: if fstep and fprev are both f00, it will return all zeros which is what the f00 HRRR always is. If fprev is not hard coded as zero this might return nonsense, but not adding any checks yet for simplicity
     rain = d["HRRR"][fstep]['precip_accum']- d["HRRR"][fprev]['precip_accum']
     return rain
 
 def get_raws_atm(d, time, check = True):
     # may not be the same as requested time vector, used to interpolate to input time
     time_raws=str2time(d['RAWS']['time_raws']) 
-
-    if check:
-        check_increment(time_raws,id=d['loc']['STID']+' RAWS.time_raws')
 
     cols = []
     names = []
@@ -120,129 +251,44 @@ def get_fm(d, time):
     time_raws = str2time(d['RAWS']['time_raws'])
     return time_intp(time_raws,fm,time)
 
-def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HRRR", forecast_step=1, verbose=True, features_subset=None):    
-    # TODO: process involves multiple loops over dictionary keys. Inefficient, but functionality are isolated in separate functions that call for loops so will be tedious to fix 
 
-    
-    # Define Forecast Step: NOTE: if atm_source == RAWS, this should be zero
-    if atm_source == "RAWS":
-        print("Atmospheric data source is RAWS, so forecast_step set to zero")
-        forecast_step=0
-        fstep = fprev = None
-        if spatial:
-            assert features_subset is not None, "For RAWS atmospheric data as source for spatial training set, argument features_subset cannot be None. Provide a list of features to subset the RAWS locations otherwise there will be errors when trying to build models with certain features."
-    elif forecast_step > 0 and forecast_step < 100 and forecast_step == int(forecast_step):
-        fstep='f'+str(forecast_step).zfill(2)
-        fprev='f'+str(forecast_step-1).zfill(2)
-        # logging.info('Using data from step %s',fstep)
-        # logging.info('Using rain as the difference of accumulated precipitation between %s and %s',fstep,fprev)
-    else:
-        # logging.critical('forecast_step must be integer between 1 and 99')
-        raise ValueError('bad forecast_step')
-    
+def shift_time(X_array, inds, forecast_step):
+    """
+    Shifts specified columns of a numpy ndarray forward by a given number of steps.
 
-    # Loop over input dictionary cases, extract and calculate features, then run data filters
-    new_dict = {}
-    for input_file_path in input_file_paths:
-        if verbose:
-            print("~"*75)
-            print(f"Extracting data from input file {input_file_path}")
-        dict0 = read_pkl(input_file_path)
-        for key in dict0:
-            # if verbose:
-            #     print("~"*50)
-            #     print(f"Extracting data for case {key}")
-            X, names = build_features_single(dict0[key], atm=atm_source, fstep=fstep, fprev = fprev)
-            time = str2time(dict0[key]['HRRR']['time'])
-            hrrr_increment = check_increment(time,id=key+f' {"HRRR"}.time')
-            if  hrrr_increment < 1:
-                # logging.critical('HRRR increment is %s h must be at least 1 h',hrrr_increment)
-                raise(ValueError)
-            new_dict[key] = {
-                'id': key,
-                'case': key,
-                'filename': input_file_path,
-                'loc': dict0[key]['loc'],
-                'time': time,
-                'X': X,
-                'y': get_fm(dict0[key], time),
-                'features_list': names,
-                'atm_source': atm_source
-            }
-            
-    # Run Data Filters
-    # Subset timeseries into shorter stretches, discard short ones
-    if verbose:
-        print("~"*75)
-        print(f"Splitting Timeseries into smaller portions to aid with data filtering. Input data param for max timeseries hours: {params_data['hours']}")
-    new_dict = split_timeseries(new_dict, hours=params_data['hours'], verbose=verbose)   
-    new_dict = discard_keys_with_short_y(new_dict, hours=params_data['hours'], verbose=False)
+    Parameters:
+    ----------
+    X_array : numpy.ndarray
+        The input 2D array where specific columns will be shifted.
+    inds : list of int
+        Indices of the columns within X_array to be shifted.
+    forecast_step : int
+        The number of positions to shift the specified columns forward.
+
+    Returns:
+    -------
+    numpy.ndarray
+        A modified copy of the input array with specified columns shifted forward 
+        by `forecast_step` and the leading positions in those columns filled with NaN.
     
-    # Check for suspect data
-    flags = flag_dict_keys(new_dict, params_data['zero_lag_threshold'], params_data['max_intp_time'], max_y = params_data['max_fm'], min_y = params_data['min_fm'], verbose=verbose)
-    
-    # Remove flagged cases
-    cases = list([*new_dict.keys()])
-    flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
-    remove_key_list(new_dict, flagged_cases, verbose=verbose)
-    
-    if spatial:
-        if atm_source == "HRRR":
-            new_dict = combine_nested(new_dict)
-        elif atm_source == "RAWS":
-            new_dict = subset_by_features(new_dict, features_subset)
-            new_dict = combine_nested(new_dict)
+    Example:
+    -------
+    >>> X_array = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
+    >>> inds = [0, 2]
+    >>> shift_time(X_array, inds, 1)
+    array([[nan,  2., nan],
+           [ 1.,  5.,  3.],
+           [ 4.,  8.,  6.],
+           [ 7., 11.,  9.]])
+    """
+    if not isinstance(forecast_step, int) or forecast_step <= 0:
+        raise ValueError("forecast_step must be an integer greater than 0.")
         
-    return Dict(new_dict)
+    X_shift = X_array.astype(float).copy()
+    X_shift[:forecast_step, inds] = np.nan
+    X_shift[forecast_step:, inds] = X_array[:-forecast_step, inds]
+    return X_shift
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Wrapper Functions to Put it all together
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# TODO: ENGINEERED TIME FEATURES:
-# hod = rnn_dat.time.astype('datetime64[h]').astype(int) % 24
-# doy = np.array([dt.timetuple().tm_yday - 1 for dt in rnn_dat.time])
-
-# def create_spatial_train(input_file_paths, params_data, atm_dict = "HRRR", verbose=False):
-#     train = process_train_dict(input_file_paths, params_data = params_data, verbose=verbose)
-#     train_sp = Dict(combine_nested(train))
-#     return train_sp
-
-# def process_train_dict(input_file_paths, params_data, atm_dict = "HRRR", spatial=False, verbose=False):
-#     if type(input_file_paths) is not list:
-#         raise ValueError(f"Argument `input_file_paths` must be list, received {type(input_file_paths)}")
-#     train = {}
-#     for file_path in input_file_paths:
-#         # Extract target and features
-#         di = build_train_dict(file_path, atm=atm_dict, features_all=params_data['features_all'], verbose=verbose)
-#         # Subset timeseries into shorter stretches
-#         di = split_timeseries(di, hours=params_data['hours'], verbose=verbose)
-#         di = discard_keys_with_short_y(di, hours=params_data['hours'], verbose=False)
-#         # Check for suspect data
-#         flags = flag_dict_keys(di, params_data['zero_lag_threshold'], params_data['max_intp_time'], max_y = params_data['max_fm'], min_y = params_data['min_fm'], verbose=verbose)
-#         # Remove flagged cases
-#         cases = list([*di.keys()])
-#         flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
-#         remove_key_list(di, flagged_cases, verbose=verbose)
-#         train.update(di)
-#     if spatial:
-#         train = combine_nested(train)
-    
-#     return Dict(train)
 
 
 def subset_by_features(nested_dict, input_features, verbose=True):
@@ -273,170 +319,6 @@ def subset_by_features(nested_dict, input_features, verbose=True):
             print(f"Removing {key} due to missing features")
     
     return result
-
-# feature_types = {
-#     # Static features are based on physical location, e.g. location of RAWS site
-#     'static': ['elev', 'lon', 'lat'],
-#     # Atmospheric weather features come from either RAWS subdict or HRRR
-#     'atm': ['temp', 'rh', 'wind', 'solar', 'soilm', 'canopyw', 'groundflux', 'Ed', 'Ew']
-# }
-
-# def build_train_dict(input_file_path,
-#               forecast_step=1, atm="HRRR",features_all=['Ed', 'Ew', 'solar', 'wind', 'elev', 'lon', 'lat', 'doy', 'hod', 'rain'], verbose=False):
-#     # in:
-#     #   file_path       list of strings - files as in read_test_pkl
-#     #   forecast_step   int - which forecast step to take atmospheric data from (maybe 03, must be >0). 
-#     #   atm        str - name of subdict where atmospheric vars are located
-#     #   features_list   list of strings - names of keys in subdicts to collect into features matrix. Default is everything collected
-#     # return:
-#     #   train          dictionary with structure
-#     #                  {key : {'key' : key,    # copied subdict key
-#     #                          'loc' : {...},  # copied from in dict = {key : {'loc': ... }...}
-#     #                         'time' : time,   # datetime vector, spacing tres
-#     #                            'X' : fm      # target fuel moisture from the RAWS, interpolated to time
-#     #                            'Y' : feat    # features from atmosphere and location
-#     #                            
-#     #
-
-    
-#     # TODO: fix this
-#     if 'rain' in features_all and (not features_all[-1]=='rain'):
-#         raise ValueError(f"Make rain in features list last element since (working on fix as of 24-6-24), given features list: {features_list}")
-    
-#     if forecast_step > 0 and forecast_step < 100 and forecast_step == int(forecast_step):
-#         fstep='f'+str(forecast_step).zfill(2)
-#         fprev='f'+str(forecast_step-1).zfill(2)
-#         # logging.info('Using data from step %s',fstep)
-#         # logging.info('Using rain as the difference of accumulated precipitation between %s and %s',fstep,fprev)
-#     else:
-#         # logging.critical('forecast_step must be integer between 1 and 99')
-#         raise ValueError('bad forecast_step')
-        
-#     train = {}
-#     with open(input_file_path, 'rb') as file:
-#         # logging.info("loading file %s", file_path)
-#         d = pickle.load(file)
-#     for key in d:
-#         atm_dict = atm
-#         features_list = features_all
-#         # logging.info('Processing subdictionary %s',key)
-#         if key in train:
-#             pass
-#             # logging.warning('skipping duplicate key %s',key)
-#         else:
-#             subdict=d[key]    # subdictionary for this case
-#             loc=subdict['loc']
-#             train[key] = {
-#             'id': key,  # store the key inside the dictionary, subdictionary will be used separatedly
-#             'case':key,
-#             'filename': input_file_path,
-#             'loc': loc
-#             }
-#             desc='descr'
-#             if desc in subdict:
-#                 train[desc]=subdict[desc]
-#             time_hrrr=str2time(subdict[atm_dict]['time'])
-#             # timekeeping
-#             hours=len(d[key][atm_dict]['time'])
-#             train[key]['hours']=hours
-#             # train[key]['h2']   =hours     # not doing prediction yet    
-#             hrrr_increment = check_increment(time_hrrr,id=key+f' {atm_dict}.time')
-#             # logging.info(f'{atm_dict} increment is %s h',hrrr_increment)
-#             if  hrrr_increment < 1:
-#                 # logging.critical('HRRR increment is %s h must be at least 1 h',hrrr_increment)
-#                 raise(ValueError)
-            
-#             # build matrix of features - assuming all the same length, if not column_stack will fail
-#             train[key]['time']=time_hrrr
-#             # logging.info(f"Created feature matrix train[{key}]['X'] shape {train[key]['X'].shape}")
-#             time_raws=str2time(subdict['RAWS']['time_raws']) # may not be the same as HRRR
-#             # logging.info('%s RAWS.time_raws length is %s',key,len(time_raws))
-#             check_increment(time_raws,id=key+' RAWS.time_raws')
-#             # print_first(time_raws,num=5,id='RAWS.time_raws')
-            
-#             # Set up static vars
-#             columns=[]
-#             missing_features = []
-#             for feat in features_list:
-#                 # For atmospheric features,
-#                 if feat in feature_types['atm']:
-#                     if atm_dict == "HRRR":
-#                         vec = subdict['HRRR'][fstep][feat]
-#                         columns.append(vec)
-#                     elif atm_dict == "RAWS":
-#                         if feat in subdict['RAWS'].keys():
-#                             vec = time_intp(time_raws, subdict['RAWS'][feat], time_hrrr)
-#                             columns.append(vec)
-#                         else:
-#                             missing_features.append(feat)
-                
-#                 # For static features, repeat to fit number of time observations
-#                 elif feat in feature_types['static']:
-#                     columns.append(np.full(hours,loc[feat]))
-#             # Add Engineered Time features, doy and hod
-#             # hod = time_hrrr.astype('datetime64[h]').astype(int) % 24
-#             # doy = np.array([dt.timetuple().tm_yday - 1 for dt in time_hrrr])
-#             # columns.extend([doy, hod])
-            
-#             # compute rain as difference of accumulated precipitation
-#             if 'rain' in features_list:
-#                 if atm_dict == "HRRR":
-#                     rain = subdict[atm_dict][fstep]['precip_accum']- subdict[atm_dict][fprev]['precip_accum']
-#                     # logging.info('%s rain as difference %s minus %s: min %s max %s',
-#                              # key,fstep,fprev,np.min(rain),np.max(rain))
-#                 elif atm_dict == "RAWS":
-#                     if 'rain' in subdict[atm_dict]:
-#                         rain = time_intp(time_raws,subdict[atm_dict]['rain'],time_hrrr)
-#                     else:
-#                         pass
-#                         # logging.info('No rain data found in RAWS subdictionary %s', key)
-#                 columns.append( rain ) # add rain feature         
-#             else:
-#                 missing_features.append('rain')
-
-#             train[key]['X'] = np.column_stack(columns)
-#             train[key]['features_list'] = [item for item in features_list if item not in missing_features]
-            
-#             fm=subdict['RAWS']['fm']
-#             # logging.info('%s RAWS.fm length is %s',key,len(fm))
-#             # interpolate RAWS sensors to HRRR time and over NaNs
-#             train[key]['y'] = time_intp(time_raws,fm,time_hrrr)
-#             # TODO: check endpoint interpolation when RAWS data sparse, and bail out if not enough data
-            
-#             if  train[key]['y'] is None:
-#                 pass
-#                 # logging.error('Cannot create target matrix for %s, using None',key)
-#             else:
-#                 pass
-#                 # logging.info(f"Created target matrix train[{key}]['y'] shape {train[key]['y'].shape}")
-
-#     # logging.info('Created a "train" dictionary with %s items',len(train))
- 
-#     # clean up
-    
-#     keys_to_delete = []
-#     for key in train:
-#         if train[key]['X'] is None or train[key]['y'] is None:
-#             # logging.warning('Deleting training item %s because features X or target Y are None', key)
-#             keys_to_delete.append(key)
-
-#     # Delete the items from the dictionary
-#     if len(keys_to_delete)>0:
-#         for key in keys_to_delete:
-#             del train[key]       
-#         # logging.warning('Deleted %s items with None for data. %s items remain in the training dictionary.',
-#                         # len(keys_to_delete),len(train))
-        
-#     # output
-
-#     # if output_file_path is not None:
-#     #     with open(output_file_path, 'wb') as file:
-#     #         logging.info('Writing pickle dump of the dictionary train into file %s',output_file_path)
-#     #         pickle.dump(train, file)
-    
-#     # logging.info('pkl2train done')
-    
-#     return train
 
 
 
@@ -588,6 +470,7 @@ def combine_nested(nested_input_dict, verbose=True):
     d['X'] = _combine_key(nested_input_dict, 'X')
     d['y'] = _combine_key(nested_input_dict, 'y')
     d['atm_source'] = _combine_key(nested_input_dict, 'atm_source')
+    d['forecast_step'] = _combine_key(nested_input_dict, 'forecast_step')
 
     # Build the loc subdictionary using _combine_key for each loc key
     d['loc'] = {
