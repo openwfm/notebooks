@@ -11,6 +11,7 @@ import sys
 from tensorflow.keras.callbacks import Callback, EarlyStopping, TerminateOnNaN
 # from sklearn.metrics import mean_squared_error
 import logging
+from tensorflow.keras import layers,models
 from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
 # Local modules
 import reproducibility
@@ -1038,333 +1039,333 @@ def check_reproducibility(dict0, params, m_hash, w_hash):
 
     return 
 
-class RNNModel(ABC):
-    """
-    Abstract base class for RNN models, providing structure for training, predicting, and running reproducibility checks.
-    """
-    def __init__(self, params: dict):
-        """
-        Initializes the RNNModel with the given parameters.
+# class RNNModel(ABC):
+#     """
+#     Abstract base class for RNN models, providing structure for training, predicting, and running reproducibility checks.
+#     """
+#     def __init__(self, params: dict):
+#         """
+#         Initializes the RNNModel with the given parameters.
 
-        Parameters:
-        -----------
-        params : dict
-            A dictionary containing model parameters.
-        """
-        self.params = params
-        if type(self) is RNNModel:
-            raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
-        super().__init__()
+#         Parameters:
+#         -----------
+#         params : dict
+#             A dictionary containing model parameters.
+#         """
+#         self.params = params
+#         if type(self) is RNNModel:
+#             raise TypeError("MLModel is an abstract class and cannot be instantiated directly")
+#         super().__init__()
 
-    @abstractmethod
-    def _build_model_train(self):
-        """Abstract method to build the training model."""
-        pass
+#     @abstractmethod
+#     def _build_model_train(self):
+#         """Abstract method to build the training model."""
+#         pass
 
-    @abstractmethod
-    def _build_model_predict(self, return_sequences=True):
-        """Abstract method to build the prediction model. This model copies weights from the train model but with input structure that allows for easier prediction of arbitrary length timeseries. This model is not to be used for training, or don't use with .fit calls"""
-        pass
+#     @abstractmethod
+#     def _build_model_predict(self, return_sequences=True):
+#         """Abstract method to build the prediction model. This model copies weights from the train model but with input structure that allows for easier prediction of arbitrary length timeseries. This model is not to be used for training, or don't use with .fit calls"""
+#         pass
 
-    def is_stateful(self):
-        """
-        Checks whether any of the layers in the internal model (self.model_train) are stateful.
+#     def is_stateful(self):
+#         """
+#         Checks whether any of the layers in the internal model (self.model_train) are stateful.
 
-        Returns:
-        bool: True if at least one layer in the model is stateful, False otherwise.
+#         Returns:
+#         bool: True if at least one layer in the model is stateful, False otherwise.
         
-        This method iterates over all the layers in the model and checks if any of them
-        have the 'stateful' attribute set to True. This is useful for determining if 
-        the model is designed to maintain state across batches during training.
+#         This method iterates over all the layers in the model and checks if any of them
+#         have the 'stateful' attribute set to True. This is useful for determining if 
+#         the model is designed to maintain state across batches during training.
 
-        Example:
-        --------
-        model.is_stateful()
-        """          
-        for layer in self.model_train.layers:
-            if hasattr(layer, 'stateful') and layer.stateful:
-                return True
-        return False
+#         Example:
+#         --------
+#         model.is_stateful()
+#         """          
+#         for layer in self.model_train.layers:
+#             if hasattr(layer, 'stateful') and layer.stateful:
+#                 return True
+#         return False
         
-    def fit(self, X_train, y_train, plot_history=True, plot_title = '', 
-            weights=None, callbacks=[], validation_data=None, return_epochs=False, *args, **kwargs):
-        """
-        Trains the model on the provided training data. Uses the fit method of the training model and then copies the weights over to the prediction model, which has a less restrictive input shape. Formats a list of callbacks to use within the fit method based on params input
+#     def fit(self, X_train, y_train, plot_history=True, plot_title = '', 
+#             weights=None, callbacks=[], validation_data=None, return_epochs=False, *args, **kwargs):
+#         """
+#         Trains the model on the provided training data. Uses the fit method of the training model and then copies the weights over to the prediction model, which has a less restrictive input shape. Formats a list of callbacks to use within the fit method based on params input
 
-        Parameters:
-        -----------
-        X_train : np.ndarray
-            The input matrix data for training.
-        y_train : np.ndarray
-            The target vector data for training.
-        plot_history : bool, optional
-            If True, plots the training history. Default is True.
-        plot_title : str, optional
-            The title for the training plot. Default is an empty string.
-        weights : optional
-            Initial weights for the model. Default is None.
-        callbacks : list, optional
-            A list of callback functions to use during training. Default is an empty list.
-        validation_data : tuple, optional
-            Validation data to use during training, expected format (X_val, y_val). Default is None.
-        return_epochs : bool
-            If True, return the number of epochs that training took. Used to test and optimize early stopping
-        """        
-        # Check Compatibility, assume features dimension is last in X_train array
-        if X_train.shape[-1] != self.params['n_features']:
-            raise ValueError(f"X_train and number of features from params not equal. \n X_train shape: {X_train.shape} \n params['n_features']: {self.params['n_features']}. \n Try recreating RNNData object with features list from params: `RNNData(..., features_list = parmas['features_list'])`")
+#         Parameters:
+#         -----------
+#         X_train : np.ndarray
+#             The input matrix data for training.
+#         y_train : np.ndarray
+#             The target vector data for training.
+#         plot_history : bool, optional
+#             If True, plots the training history. Default is True.
+#         plot_title : str, optional
+#             The title for the training plot. Default is an empty string.
+#         weights : optional
+#             Initial weights for the model. Default is None.
+#         callbacks : list, optional
+#             A list of callback functions to use during training. Default is an empty list.
+#         validation_data : tuple, optional
+#             Validation data to use during training, expected format (X_val, y_val). Default is None.
+#         return_epochs : bool
+#             If True, return the number of epochs that training took. Used to test and optimize early stopping
+#         """        
+#         # Check Compatibility, assume features dimension is last in X_train array
+#         if X_train.shape[-1] != self.params['n_features']:
+#             raise ValueError(f"X_train and number of features from params not equal. \n X_train shape: {X_train.shape} \n params['n_features']: {self.params['n_features']}. \n Try recreating RNNData object with features list from params: `RNNData(..., features_list = parmas['features_list'])`")
         
-        # verbose_fit argument is for printing out update after each epoch, which gets very long
-        verbose_fit = self.params['verbose_fit'] 
-        verbose_weights = self.params['verbose_weights']
-        if verbose_weights:
-            print(f"Training simple RNN with params: {self.params}")
+#         # verbose_fit argument is for printing out update after each epoch, which gets very long
+#         verbose_fit = self.params['verbose_fit'] 
+#         verbose_weights = self.params['verbose_weights']
+#         if verbose_weights:
+#             print(f"Training simple RNN with params: {self.params}")
             
-        # Setup callbacks
-        if self.params["reset_states"]:
-            callbacks=callbacks+[ResetStatesCallback(self.params), TerminateOnNaN()]
+#         # Setup callbacks
+#         if self.params["reset_states"]:
+#             callbacks=callbacks+[ResetStatesCallback(self.params), TerminateOnNaN()]
 
-        # Early stopping callback requires validation data
-        if validation_data is not None:
-            X_val, y_val =validation_data[0], validation_data[1]
-            print("Using early stopping callback.")
-            early_stop = EarlyStoppingCallback(patience = self.params['early_stopping_patience'])
-            callbacks=callbacks+[early_stop]
-        if verbose_weights:
-            print(f"Formatted X_train hash: {hash_ndarray(X_train)}")
-            print(f"Formatted y_train hash: {hash_ndarray(y_train)}")
-            if validation_data is not None:
-                print(f"Formatted X_val hash: {hash_ndarray(X_val)}")
-                print(f"Formatted y_val hash: {hash_ndarray(y_val)}")
-            print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
+#         # Early stopping callback requires validation data
+#         if validation_data is not None:
+#             X_val, y_val =validation_data[0], validation_data[1]
+#             print("Using early stopping callback.")
+#             early_stop = EarlyStoppingCallback(patience = self.params['early_stopping_patience'])
+#             callbacks=callbacks+[early_stop]
+#         if verbose_weights:
+#             print(f"Formatted X_train hash: {hash_ndarray(X_train)}")
+#             print(f"Formatted y_train hash: {hash_ndarray(y_train)}")
+#             if validation_data is not None:
+#                 print(f"Formatted X_val hash: {hash_ndarray(X_val)}")
+#                 print(f"Formatted y_val hash: {hash_ndarray(y_val)}")
+#             print(f"Initial weights before training hash: {hash_weights(self.model_train)}")
 
-        ## TODO: Hidden State Initialization
-        # Evaluate Model once to set nonzero initial state
-        # self.model_train(X_train[0:self.params['batch_size'],:,:])
+#         ## TODO: Hidden State Initialization
+#         # Evaluate Model once to set nonzero initial state
+#         # self.model_train(X_train[0:self.params['batch_size'],:,:])
 
-        if validation_data is not None:
-            history = self.model_train.fit(
-                X_train, y_train, 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                validation_data = (X_val, y_val),
-                *args, **kwargs
-            )
-        else:
-            history = self.model_train.fit(
-                X_train, y_train, 
-                epochs=self.params['epochs'], 
-                batch_size=self.params['batch_size'],
-                callbacks = callbacks,
-                verbose=verbose_fit,
-                *args, **kwargs
-            )
+#         if validation_data is not None:
+#             history = self.model_train.fit(
+#                 X_train, y_train, 
+#                 epochs=self.params['epochs'], 
+#                 batch_size=self.params['batch_size'],
+#                 callbacks = callbacks,
+#                 verbose=verbose_fit,
+#                 validation_data = (X_val, y_val),
+#                 *args, **kwargs
+#             )
+#         else:
+#             history = self.model_train.fit(
+#                 X_train, y_train, 
+#                 epochs=self.params['epochs'], 
+#                 batch_size=self.params['batch_size'],
+#                 callbacks = callbacks,
+#                 verbose=verbose_fit,
+#                 *args, **kwargs
+#             )
         
-        if plot_history:
-            self.plot_history(history,plot_title)
+#         if plot_history:
+#             self.plot_history(history,plot_title)
             
-        if self.params["verbose_weights"]:
-            print(f"Fitted Weights Hash: {hash_weights(self.model_train)}")
+#         if self.params["verbose_weights"]:
+#             print(f"Fitted Weights Hash: {hash_weights(self.model_train)}")
 
-        # Update Weights for Prediction Model
-        w_fitted = self.model_train.get_weights()
-        self.model_predict.set_weights(w_fitted)
+#         # Update Weights for Prediction Model
+#         w_fitted = self.model_train.get_weights()
+#         self.model_predict.set_weights(w_fitted)
 
-        if return_epochs:
-            # Epoch counting starts at 0, adding 1 for the count
-            return early_stop.best_epoch + 1
+#         if return_epochs:
+#             # Epoch counting starts at 0, adding 1 for the count
+#             return early_stop.best_epoch + 1
 
-    def predict(self, X_test):
-        """
-        Generates predictions on the provided test data using the internal prediction model.
+#     def predict(self, X_test):
+#         """
+#         Generates predictions on the provided test data using the internal prediction model.
 
-        Parameters:
-        -----------
-        X_test : np.ndarray
-            The input data for generating predictions.
+#         Parameters:
+#         -----------
+#         X_test : np.ndarray
+#             The input data for generating predictions.
 
-        Returns:
-        --------
-        np.ndarray
-            The predicted values.
-        """        
-        print("Predicting test data")
-        # X_test = self._format_pred_data(X_test)
-        # preds = self.model_predict.predict(X_test).flatten()
-        preds = self.model_predict.predict(X_test)
-        return preds
+#         Returns:
+#         --------
+#         np.ndarray
+#             The predicted values.
+#         """        
+#         print("Predicting test data")
+#         # X_test = self._format_pred_data(X_test)
+#         # preds = self.model_predict.predict(X_test).flatten()
+#         preds = self.model_predict.predict(X_test)
+#         return preds
 
 
-    def _format_pred_data(self, X):
-        """
-        Formats the prediction data for RNN input.
+#     def _format_pred_data(self, X):
+#         """
+#         Formats the prediction data for RNN input.
 
-        Parameters:
-        -----------
-        X : np.ndarray
-            The input data.
+#         Parameters:
+#         -----------
+#         X : np.ndarray
+#             The input data.
 
-        Returns:
-        --------
-        np.ndarray
-            The formatted input data.
-        """        
-        return np.reshape(X,(1, X.shape[0], self.params['n_features']))
+#         Returns:
+#         --------
+#         np.ndarray
+#             The formatted input data.
+#         """        
+#         return np.reshape(X,(1, X.shape[0], self.params['n_features']))
 
-    def plot_history(self, history, plot_title, create_figure=True):
-        """
-        Plots the training history. Uses log scale on y axis for readability.
+#     def plot_history(self, history, plot_title, create_figure=True):
+#         """
+#         Plots the training history. Uses log scale on y axis for readability.
 
-        Parameters:
-        -----------
-        history : History object
-            The training history object from model fitting. Output of keras' .fit command
-        plot_title : str
-            The title for the plot.
-        """
+#         Parameters:
+#         -----------
+#         history : History object
+#             The training history object from model fitting. Output of keras' .fit command
+#         plot_title : str
+#             The title for the plot.
+#         """
         
-        if create_figure:
-            plt.figure(figsize=(10, 6))
-        plt.semilogy(history.history['loss'], label='Training loss')
-        if 'val_loss' in history.history:
-            plt.semilogy(history.history['val_loss'], label='Validation loss')
-        plt.title(f'{plot_title} Model loss')
-        plt.ylabel('Loss')
-        plt.xlabel('Epoch')
-        plt.legend(loc='upper left')
-        plt.show()
+#         if create_figure:
+#             plt.figure(figsize=(10, 6))
+#         plt.semilogy(history.history['loss'], label='Training loss')
+#         if 'val_loss' in history.history:
+#             plt.semilogy(history.history['val_loss'], label='Validation loss')
+#         plt.title(f'{plot_title} Model loss')
+#         plt.ylabel('Loss')
+#         plt.xlabel('Epoch')
+#         plt.legend(loc='upper left')
+#         plt.show()
 
-    def run_model(self, dict0, reproducibility_run=False, plot_period='all', save_outputs=True, return_epochs=False):
-        """
-        Runs the RNN model on input data dictionary, including training, prediction, and reproducibility checks.
+#     def run_model(self, dict0, reproducibility_run=False, plot_period='all', save_outputs=True, return_epochs=False):
+#         """
+#         Runs the RNN model on input data dictionary, including training, prediction, and reproducibility checks.
 
-        Parameters:
-        -----------
-        dict0 : RNNData (dict)
-            The dictionary containing the input data and configuration.
-        reproducibility_run : bool, optional
-            If True, performs reproducibility checks after running the model. Default is False.
-        save_outputs : bool
-            If True, writes model outputs into input dictionary.
-        return_epochs : bool
-            If True, returns how many epochs of training happened. Used to optimize params related to early stopping
+#         Parameters:
+#         -----------
+#         dict0 : RNNData (dict)
+#             The dictionary containing the input data and configuration.
+#         reproducibility_run : bool, optional
+#             If True, performs reproducibility checks after running the model. Default is False.
+#         save_outputs : bool
+#             If True, writes model outputs into input dictionary.
+#         return_epochs : bool
+#             If True, returns how many epochs of training happened. Used to optimize params related to early stopping
         
-        Returns:
-        --------
-        tuple
-            Model predictions and a dictionary of RMSE errors broken up by time period.
-        """      
-        if dict0.X_test is None:
-            raise ValueError("No test data X_test in input dictionary. Provide test data or just run .fit")
+#         Returns:
+#         --------
+#         tuple
+#             Model predictions and a dictionary of RMSE errors broken up by time period.
+#         """      
+#         if dict0.X_test is None:
+#             raise ValueError("No test data X_test in input dictionary. Provide test data or just run .fit")
         
-        verbose_fit = self.params['verbose_fit']
-        verbose_weights = self.params['verbose_weights']
-        if verbose_weights:
-            dict0.print_hashes()
-        # Extract Datasets
-        X_train, y_train, X_test, y_test = dict0.X_train, dict0.y_train, dict0.X_test, dict0.y_test
-        if 'X_val' in dict0:
-            X_val, y_val = dict0.X_val, dict0.y_val
-        else:
-            X_val = None
-        if dict0.spatial:
-            case_id = "Spatial Training Set"
-        else:
-            case_id = dict0.case
+#         verbose_fit = self.params['verbose_fit']
+#         verbose_weights = self.params['verbose_weights']
+#         if verbose_weights:
+#             dict0.print_hashes()
+#         # Extract Datasets
+#         X_train, y_train, X_test, y_test = dict0.X_train, dict0.y_train, dict0.X_test, dict0.y_test
+#         if 'X_val' in dict0:
+#             X_val, y_val = dict0.X_val, dict0.y_val
+#         else:
+#             X_val = None
+#         if dict0.spatial:
+#             case_id = "Spatial Training Set"
+#         else:
+#             case_id = dict0.case
         
-        # Fit model
-        if X_val is None:
-            eps = self.fit(X_train, y_train, plot_title=case_id, return_epochs=return_epochs)
-        else:
-            eps = self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id, return_epochs=return_epochs)
+#         # Fit model
+#         if X_val is None:
+#             eps = self.fit(X_train, y_train, plot_title=case_id, return_epochs=return_epochs)
+#         else:
+#             eps = self.fit(X_train, y_train, validation_data = (X_val, y_val), plot_title=case_id, return_epochs=return_epochs)
 
-        # Generate Predictions and Evaluate Test Error
-        if dict0.spatial:
-            m, errs = self._eval_multi(dict0, reproducibility_run)
-            if save_outputs:
-                dict0['m']=m            
-        else:
-            m, errs = self._eval_single(dict0, verbose_weights, reproducibility_run)
-            if save_outputs:
-                dict0['m']=m
-            plot_data(dict0, title="RNN", title2=dict0.case, plot_period=plot_period)
+#         # Generate Predictions and Evaluate Test Error
+#         if dict0.spatial:
+#             m, errs = self._eval_multi(dict0, reproducibility_run)
+#             if save_outputs:
+#                 dict0['m']=m            
+#         else:
+#             m, errs = self._eval_single(dict0, verbose_weights, reproducibility_run)
+#             if save_outputs:
+#                 dict0['m']=m
+#             plot_data(dict0, title="RNN", title2=dict0.case, plot_period=plot_period)
 
-        # print(f"Mean Test Error: {errs.mean()}")
+#         # print(f"Mean Test Error: {errs.mean()}")
         
-        if return_epochs:
-            return m, errs, eps
-        else:
-            return m, errs
+#         if return_epochs:
+#             return m, errs, eps
+#         else:
+#             return m, errs
 
-    def _eval_single(self, dict0, verbose_weights, reproducibility_run):
-        # Generate Predictions, 
-        # run through training to get hidden state set properly for forecast period
-        print(f"Running prediction on all input data, Training through Test")
-        if dict0.scaler is not None:
-            X = dict0.scale_all_X()
-        else:
-            X = dict0.subset_X_features()
-        y = dict0.y.flatten()
-        # Predict
-        if verbose_weights:
-            print(f"All X hash: {hash_ndarray(X)}")
-        # Reshape X
-        X = X.reshape(1, X.shape[0], X.shape[1])
-        m = self.predict(X).flatten()
-        if verbose_weights:
-            print(f"Predictions Hash: {hash_ndarray(m)}")
+#     def _eval_single(self, dict0, verbose_weights, reproducibility_run):
+#         # Generate Predictions, 
+#         # run through training to get hidden state set properly for forecast period
+#         print(f"Running prediction on all input data, Training through Test")
+#         if dict0.scaler is not None:
+#             X = dict0.scale_all_X()
+#         else:
+#             X = dict0.subset_X_features()
+#         y = dict0.y.flatten()
+#         # Predict
+#         if verbose_weights:
+#             print(f"All X hash: {hash_ndarray(X)}")
+#         # Reshape X
+#         X = X.reshape(1, X.shape[0], X.shape[1])
+#         m = self.predict(X).flatten()
+#         if verbose_weights:
+#             print(f"Predictions Hash: {hash_ndarray(m)}")
         
-        if reproducibility_run:
-            print("Checking Reproducibility")
-            check_reproducibility(dict0, self.params, hash_ndarray(m), hash_weights(self.model_predict))
+#         if reproducibility_run:
+#             print("Checking Reproducibility")
+#             check_reproducibility(dict0, self.params, hash_ndarray(m), hash_weights(self.model_predict))
 
-        # print(dict0.keys())
-        # Plot final fit and data
-        # dict0['y'] = y
-        # plot_data(dict0, title="RNN", title2=dict0['case'], plot_period=plot_period)
+#         # print(dict0.keys())
+#         # Plot final fit and data
+#         # dict0['y'] = y
+#         # plot_data(dict0, title="RNN", title2=dict0['case'], plot_period=plot_period)
         
-        # Calculate Errors
-        err = rmse(m, y)
-        train_ind = dict0.train_ind # index of final training set value
-        test_ind = dict0.test_ind # index of first test set value
+#         # Calculate Errors
+#         err = rmse(m, y)
+#         train_ind = dict0.train_ind # index of final training set value
+#         test_ind = dict0.test_ind # index of first test set value
         
-        err_train = rmse(m[:train_ind], y[:train_ind].flatten())
-        err_pred = rmse(m[test_ind:], y[test_ind:].flatten())
-        rmse_dict = {
-            'all': err, 
-            'training': err_train, 
-            'prediction': err_pred
-        }
-        return m, rmse_dict
+#         err_train = rmse(m[:train_ind], y[:train_ind].flatten())
+#         err_pred = rmse(m[test_ind:], y[test_ind:].flatten())
+#         rmse_dict = {
+#             'all': err, 
+#             'training': err_train, 
+#             'prediction': err_pred
+#         }
+#         return m, rmse_dict
         
-    def _eval_multi(self, dict0, reproducibility_run):
-        # Train Error: NOT DOING YET. DECIDE WHETHER THIS IS NEEDED
+#     def _eval_multi(self, dict0, reproducibility_run):
+#         # Train Error: NOT DOING YET. DECIDE WHETHER THIS IS NEEDED
         
-        # Test Error
-        # new_data = np.stack(dict0.X_test, axis=0)
-        # y_array = np.stack(dict0.y_test, axis=0)
-        # preds = self.model_predict.predict(new_data)
-        y_array = dict0.y_test
-        preds = self.model_predict.predict(dict0.X_test)
+#         # Test Error
+#         # new_data = np.stack(dict0.X_test, axis=0)
+#         # y_array = np.stack(dict0.y_test, axis=0)
+#         # preds = self.model_predict.predict(new_data)
+#         y_array = dict0.y_test
+#         preds = self.model_predict.predict(dict0.X_test)
 
-        if reproducibility_run:
-            print("Checking Reproducibility")
-            check_reproducibility(dict0, self.params, hash_ndarray(preds), hash_weights(self.model_predict))
+#         if reproducibility_run:
+#             print("Checking Reproducibility")
+#             check_reproducibility(dict0, self.params, hash_ndarray(preds), hash_weights(self.model_predict))
         
-        # Calculate RMSE
-        ## Note: not using util rmse function since this approach is for 3d arrays
-        # Compute the squared differences
-        squared_diff = np.square(preds - y_array)
+#         # Calculate RMSE
+#         ## Note: not using util rmse function since this approach is for 3d arrays
+#         # Compute the squared differences
+#         squared_diff = np.square(preds - y_array)
         
-        # Mean squared error along the timesteps and dimensions (axis 1 and 2)
-        mse = np.mean(squared_diff, axis=(1, 2))
+#         # Mean squared error along the timesteps and dimensions (axis 1 and 2)
+#         mse = np.mean(squared_diff, axis=(1, 2))
 
-        # Root mean squared error (RMSE) for each timeseries
-        rmses = np.sqrt(mse)
+#         # Root mean squared error (RMSE) for each timeseries
+#         rmses = np.sqrt(mse)
         
-        return preds, rmses
+#         return preds, rmses
 
 
 ## Callbacks
@@ -1627,206 +1628,206 @@ def get_initial_weights(model_fit,params,scale_fm=1):
     
     return w, w_name
 
-class RNN(RNNModel):
-    """
-    A concrete implementation of the RNNModel abstract base class, using simple recurrent cells for hidden recurrent layers.
+# class RNN(RNNModel):
+#     """
+#     A concrete implementation of the RNNModel abstract base class, using simple recurrent cells for hidden recurrent layers.
 
-    Parameters:
-    -----------
-    params : dict
-        A dictionary of model parameters.
-    loss : str, optional
-        The loss function to use during model training. Default is 'mean_squared_error'.
-    """
-    def __init__(self, params, loss='mean_squared_error'):
-        """
-        Initializes the RNN model by building the training and prediction models.
+#     Parameters:
+#     -----------
+#     params : dict
+#         A dictionary of model parameters.
+#     loss : str, optional
+#         The loss function to use during model training. Default is 'mean_squared_error'.
+#     """
+#     def __init__(self, params, loss='mean_squared_error'):
+#         """
+#         Initializes the RNN model by building the training and prediction models.
 
-        Parameters:
-        -----------
-        params : dict or RNNParams
-            A dictionary containing the model's parameters. 
-        loss : str, optional
-            The loss function to use during model training. Default is 'mean_squared_error'.
-        """        
-        super().__init__(params)
-        self.model_train = self._build_model_train()
-        self.model_predict = self._build_model_predict()
+#         Parameters:
+#         -----------
+#         params : dict or RNNParams
+#             A dictionary containing the model's parameters. 
+#         loss : str, optional
+#             The loss function to use during model training. Default is 'mean_squared_error'.
+#         """        
+#         super().__init__(params)
+#         self.model_train = self._build_model_train()
+#         self.model_predict = self._build_model_predict()
 
-    def _build_model_train(self):
-        """
-        Builds and compiles the training model, with batch & sequence shape specifications for input.
+#     def _build_model_train(self):
+#         """
+#         Builds and compiles the training model, with batch & sequence shape specifications for input.
 
-        Returns:
-        --------
-        model : tf.keras.Model
-            The compiled Keras model for training.
-        """        
-        inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
-        x = inputs
-        for i in range(self.params['rnn_layers']):
-            # Return sequences True if recurrent layer feeds into another recurrent layer. 
-            # False if feeds into dense layer
-            return_sequences = True if i < self.params['rnn_layers'] - 1 else False
-            x = SimpleRNN(
-                units=self.params['rnn_units'],
-                activation=self.params['activation'][0],
-                dropout=self.params["dropout"][0],
-                recurrent_dropout = self.params["recurrent_dropout"],
-                stateful=self.params['stateful'],
-                return_sequences=return_sequences)(x)
-        if self.params["dropout"][1] > 0:
-            x = Dropout(self.params["dropout"][1])(x)            
-        for i in range(self.params['dense_layers']):
-            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
-        # Add final output layer, must be 1 dense cell with linear activation if continuous scalar output
-        x = Dense(units=1, activation='linear')(x)
-        model = tf.keras.Model(inputs=inputs, outputs=x)
-        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
-        # optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
-        model.compile(loss='mean_squared_error', optimizer=optimizer)
+#         Returns:
+#         --------
+#         model : tf.keras.Model
+#             The compiled Keras model for training.
+#         """        
+#         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
+#         x = inputs
+#         for i in range(self.params['rnn_layers']):
+#             # Return sequences True if recurrent layer feeds into another recurrent layer. 
+#             # False if feeds into dense layer
+#             return_sequences = True if i < self.params['rnn_layers'] - 1 else False
+#             x = SimpleRNN(
+#                 units=self.params['rnn_units'],
+#                 activation=self.params['activation'][0],
+#                 dropout=self.params["dropout"][0],
+#                 recurrent_dropout = self.params["recurrent_dropout"],
+#                 stateful=self.params['stateful'],
+#                 return_sequences=return_sequences)(x)
+#         if self.params["dropout"][1] > 0:
+#             x = Dropout(self.params["dropout"][1])(x)            
+#         for i in range(self.params['dense_layers']):
+#             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+#         # Add final output layer, must be 1 dense cell with linear activation if continuous scalar output
+#         x = Dense(units=1, activation='linear')(x)
+#         model = tf.keras.Model(inputs=inputs, outputs=x)
+#         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+#         # optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+#         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
-        if self.params["verbose_weights"]:
-            print(f"Initial Weights Hash: {hash_weights(model)}")
-            # print(model.get_weights())
+#         if self.params["verbose_weights"]:
+#             print(f"Initial Weights Hash: {hash_weights(model)}")
+#             # print(model.get_weights())
 
-        if self.params['phys_initialize']:
-            assert self.params['scaler'] is None, f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
-            assert self.params['features_list'] == ['Ed', 'Ew', 'rain'], f"Physics initiation can only be done with features ['Ed', 'Ew', 'rain'], but given features {self.params['features_list']}"
-            assert self.params['dense_layers'] == 0, f"Physics initiation requires no hidden dense layers, received params['dense_layers'] = {self.params['dense_layers']}"
-            print("Initializing Model with Physics based weights")
-            w, w_name=get_initial_weights(model, self.params)
-            model.set_weights(w)
-            print('initial weights hash =',hash_weights(model))
-        return model
+#         if self.params['phys_initialize']:
+#             assert self.params['scaler'] is None, f"Not implemented yet to do physics initialize with given data scaling {self.params['scaler']}"
+#             assert self.params['features_list'] == ['Ed', 'Ew', 'rain'], f"Physics initiation can only be done with features ['Ed', 'Ew', 'rain'], but given features {self.params['features_list']}"
+#             assert self.params['dense_layers'] == 0, f"Physics initiation requires no hidden dense layers, received params['dense_layers'] = {self.params['dense_layers']}"
+#             print("Initializing Model with Physics based weights")
+#             w, w_name=get_initial_weights(model, self.params)
+#             model.set_weights(w)
+#             print('initial weights hash =',hash_weights(model))
+#         return model
         
-    def _build_model_predict(self, return_sequences=True):
-        """
-        Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
+#     def _build_model_predict(self, return_sequences=True):
+#         """
+#         Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
 
-        Parameters:
-        -----------
-        return_sequences : bool, optional
-            Whether to return the full sequence of outputs. Default is True.
+#         Parameters:
+#         -----------
+#         return_sequences : bool, optional
+#             Whether to return the full sequence of outputs. Default is True.
 
-        Returns:
-        --------
-        model : tf.keras.Model
-            The compiled Keras model for prediction.
-        """        
-        inputs = tf.keras.Input(shape=(None,self.params['n_features']))
-        x = inputs
-        for i in range(self.params['rnn_layers']):
-            x = SimpleRNN(self.params['rnn_units'],activation=self.params['activation'][0],
-                  stateful=False,return_sequences=return_sequences)(x)
-        for i in range(self.params['dense_layers']):
-            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
-        # Add final output layer, must be 1 dense cell with linear activation if continuous scalar output
-        x = Dense(units=1, activation='linear')(x)        
-        model = tf.keras.Model(inputs=inputs, outputs=x)
-        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
-        model.compile(loss='mean_squared_error', optimizer=optimizer)  
+#         Returns:
+#         --------
+#         model : tf.keras.Model
+#             The compiled Keras model for prediction.
+#         """        
+#         inputs = tf.keras.Input(shape=(None,self.params['n_features']))
+#         x = inputs
+#         for i in range(self.params['rnn_layers']):
+#             x = SimpleRNN(self.params['rnn_units'],activation=self.params['activation'][0],
+#                   stateful=False,return_sequences=return_sequences)(x)
+#         for i in range(self.params['dense_layers']):
+#             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+#         # Add final output layer, must be 1 dense cell with linear activation if continuous scalar output
+#         x = Dense(units=1, activation='linear')(x)        
+#         model = tf.keras.Model(inputs=inputs, outputs=x)
+#         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+#         model.compile(loss='mean_squared_error', optimizer=optimizer)  
 
-        # Set Weights to model_train
-        w_fitted = self.model_train.get_weights()
-        model.set_weights(w_fitted)
+#         # Set Weights to model_train
+#         w_fitted = self.model_train.get_weights()
+#         model.set_weights(w_fitted)
         
-        return model
+#         return model
 
 
-class RNN_LSTM(RNNModel):
-    """
-    A concrete implementation of the RNNModel abstract base class, use LSTM cells for hidden recurrent layers.
+# class RNN_LSTM(RNNModel):
+#     """
+#     A concrete implementation of the RNNModel abstract base class, use LSTM cells for hidden recurrent layers.
 
-    Parameters:
-    -----------
-    params : dict
-        A dictionary of model parameters.
-    loss : str, optional
-        The loss function to use during model training. Default is 'mean_squared_error'.
-    """
-    def __init__(self, params, loss='mean_squared_error'):
-        """
-        Initializes the RNN model by building the training and prediction models.
+#     Parameters:
+#     -----------
+#     params : dict
+#         A dictionary of model parameters.
+#     loss : str, optional
+#         The loss function to use during model training. Default is 'mean_squared_error'.
+#     """
+#     def __init__(self, params, loss='mean_squared_error'):
+#         """
+#         Initializes the RNN model by building the training and prediction models.
 
-        Parameters:
-        -----------
-        params : dict or RNNParams
-            A dictionary containing the model's parameters. 
-        loss : str, optional
-            The loss function to use during model training. Default is 'mean_squared_error'.
-        """           
-        super().__init__(params)
-        self.model_train = self._build_model_train()
-        self.model_predict = self._build_model_predict()
+#         Parameters:
+#         -----------
+#         params : dict or RNNParams
+#             A dictionary containing the model's parameters. 
+#         loss : str, optional
+#             The loss function to use during model training. Default is 'mean_squared_error'.
+#         """           
+#         super().__init__(params)
+#         self.model_train = self._build_model_train()
+#         self.model_predict = self._build_model_predict()
 
-    def _build_model_train(self):
-        """
-        Builds and compiles the training model, with batch & sequence shape specifications for input.
+#     def _build_model_train(self):
+#         """
+#         Builds and compiles the training model, with batch & sequence shape specifications for input.
 
-        Returns:
-        --------
-        model : tf.keras.Model
-            The compiled Keras model for training.
-        """               
-        inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
-        x = inputs
-        for i in range(self.params['rnn_layers']):
-            return_sequences = True if i < self.params['rnn_layers'] - 1 else False
-            x = LSTM(
-                units=self.params['rnn_units'],
-                activation=self.params['activation'][0],
-                dropout=self.params["dropout"][0],
-                recurrent_dropout = self.params["recurrent_dropout"],
-                recurrent_activation=self.params["recurrent_activation"],
-                stateful=self.params['stateful'],
-                return_sequences=return_sequences)(x)
-        if self.params["dropout"][1] > 0:
-            x = Dropout(self.params["dropout"][1])(x)            
-        for i in range(self.params['dense_layers']):
-            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
-        x = Dense(units=1, activation="linear")(x)
-        model = tf.keras.Model(inputs=inputs, outputs=x)
-        # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
-        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
-        model.compile(loss='mean_squared_error', optimizer=optimizer)
+#         Returns:
+#         --------
+#         model : tf.keras.Model
+#             The compiled Keras model for training.
+#         """               
+#         inputs = tf.keras.Input(batch_shape=self.params['batch_shape'])
+#         x = inputs
+#         for i in range(self.params['rnn_layers']):
+#             return_sequences = True if i < self.params['rnn_layers'] - 1 else False
+#             x = LSTM(
+#                 units=self.params['rnn_units'],
+#                 activation=self.params['activation'][0],
+#                 dropout=self.params["dropout"][0],
+#                 recurrent_dropout = self.params["recurrent_dropout"],
+#                 recurrent_activation=self.params["recurrent_activation"],
+#                 stateful=self.params['stateful'],
+#                 return_sequences=return_sequences)(x)
+#         if self.params["dropout"][1] > 0:
+#             x = Dropout(self.params["dropout"][1])(x)            
+#         for i in range(self.params['dense_layers']):
+#             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+#         x = Dense(units=1, activation="linear")(x)
+#         model = tf.keras.Model(inputs=inputs, outputs=x)
+#         # optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'], clipvalue=self.params['clipvalue'])
+#         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+#         model.compile(loss='mean_squared_error', optimizer=optimizer)
         
-        if self.params["verbose_weights"]:
-            print(f"Initial Weights Hash: {hash_weights(model)}")
-        return model
-    def _build_model_predict(self, return_sequences=True):
-        """
-        Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
+#         if self.params["verbose_weights"]:
+#             print(f"Initial Weights Hash: {hash_weights(model)}")
+#         return model
+#     def _build_model_predict(self, return_sequences=True):
+#         """
+#         Builds and compiles the prediction model, doesn't use batch shape nor sequence length to make it easier to predict arbitrary number of timesteps. This model has weights copied over from training model is not directly used for training itself.
 
-        Parameters:
-        -----------
-        return_sequences : bool, optional
-            Whether to return the full sequence of outputs. Default is True.
+#         Parameters:
+#         -----------
+#         return_sequences : bool, optional
+#             Whether to return the full sequence of outputs. Default is True.
 
-        Returns:
-        --------
-        model : tf.keras.Model
-            The compiled Keras model for prediction.
-        """           
-        inputs = tf.keras.Input(shape=(None,self.params['n_features']))
-        x = inputs
-        for i in range(self.params['rnn_layers']):
-            x = LSTM(
-                units=self.params['rnn_units'],
-                activation=self.params['activation'][0],
-                stateful=False,return_sequences=return_sequences)(x)
-        for i in range(self.params['dense_layers']):
-            x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
-        x = Dense(units=1, activation="linear")(x)
-        model = tf.keras.Model(inputs=inputs, outputs=x)
-        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
-        model.compile(loss='mean_squared_error', optimizer=optimizer)  
+#         Returns:
+#         --------
+#         model : tf.keras.Model
+#             The compiled Keras model for prediction.
+#         """           
+#         inputs = tf.keras.Input(shape=(None,self.params['n_features']))
+#         x = inputs
+#         for i in range(self.params['rnn_layers']):
+#             x = LSTM(
+#                 units=self.params['rnn_units'],
+#                 activation=self.params['activation'][0],
+#                 stateful=False,return_sequences=return_sequences)(x)
+#         for i in range(self.params['dense_layers']):
+#             x = Dense(self.params['dense_units'], activation=self.params['activation'][1])(x)
+#         x = Dense(units=1, activation="linear")(x)
+#         model = tf.keras.Model(inputs=inputs, outputs=x)
+#         optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+#         model.compile(loss='mean_squared_error', optimizer=optimizer)  
 
-        # Set Weights to model_train
-        w_fitted = self.model_train.get_weights()
-        model.set_weights(w_fitted)
+#         # Set Weights to model_train
+#         w_fitted = self.model_train.get_weights()
+#         model.set_weights(w_fitted)
         
-        return model
+#         return model
 
 # Wrapper Functions putting everything together. 
 # Useful for deploying from command line
@@ -1859,4 +1860,440 @@ def rnn_data_wrap(dict0, params, features_subset=None):
 
 def forecast(model, data, spinup_hours = 0):
     return 
+
+
+# v2.3 method
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class RNN():
+    """
+    TEST
+    """
+    def __init__(self, params: dict):
+        """
+        Initializes the RNNModel with the given parameters.
+
+        Parameters:
+        -----------
+        params : dict
+            A dictionary containing model parameters.
+        """
+        self.params = params
+        # Build model architectures based on input params
+        self.model_train = self._build_model_train()
+        self.model_predict = self._build_model_predict()
+        # Compile Models
+        optimizer=tf.keras.optimizers.Adam(learning_rate=self.params['learning_rate'])
+        self.model_train.compile(loss='mean_squared_error', optimizer=optimizer)
+        self.model_predict.compile(loss='mean_squared_error', optimizer=optimizer)
+
+    def _build_hidden_layers(self, x, stateful=True, return_sequences=True):
+        params = self.params
+        last_recurrent = None
+
+        # Identify the last RNN/LSTM layer, unless an Attention layer follows it
+        for i, layer_type in enumerate(params['hidden_layers']):
+            if layer_type in ['rnn', 'lstm']:
+                # Check if there's an Attention layer following the current RNN/LSTM layer
+                if i < len(params['hidden_layers']) - 1 and params['hidden_layers'][i + 1] == 'attention':
+                    continue
+                last_recurrent = i        
+        
+        # Loop over each layer specified in 'hidden_layers'
+        for i, layer_type in enumerate(params['hidden_layers']):
+            units = params['hidden_units'][i]
+            activation = params['hidden_activation'][i]
+    
+            if layer_type == 'dense':
+                x = layers.Dense(units=units, activation=activation)(x)
+    
+            elif layer_type == 'dropout':
+                x = layers.Dropout(params['dropout'])(x)
+            
+            elif layer_type == 'rnn':
+
+                print()
+                
+                is_last_recurrent = (i == last_recurrent)
+                return_seqs_logic = not is_last_recurrent or return_sequences
+                x = layers.SimpleRNN(units=units, activation=activation, dropout=params['dropout'], recurrent_dropout=params['recurrent_dropout'], stateful=stateful,
+                                     return_sequences=return_seqs_logic)(x)
+            
+            elif layer_type == 'lstm':
+                is_last_recurrent = (i == last_recurrent)
+                return_seqs_logic = not is_last_recurrent or return_sequences
+                x = layers.LSTM(units=units, activation=activation, dropout=params['dropout'], recurrent_dropout=params['recurrent_dropout'], stateful=stateful,
+                                return_sequences=return_seqs_logic)(x)    
+            
+            elif layer_type == 'attention':
+                # Self-attention mechanism
+                x = layers.Attention()([x, x])
+        return x
+            
+    def _build_model_train(self):
+        params = self.params
+        
+        # Define the input layer with the specified batch size, timesteps, and features
+        inputs = tf.keras.Input(batch_shape=(params['batch_size'], params['timesteps'], params['n_features']))
+        x = inputs
+        # Build hidden layers
+        x = self._build_hidden_layers(x, stateful = params['stateful'], return_sequences = params['return_sequences'])    
+
+        # Add the output layer
+        if params['output_layer'] == 'dense':
+            outputs = layers.Dense(units=params['output_dimension'], activation=params['output_activation'])(x)
+        else:
+            raise ValueError("Unsupported output layer type: {}".format(params['output_layer']))
+        
+        # Create the model
+        model = models.Model(inputs=inputs, outputs=outputs)
+
+        if self.params["verbose_weights"]:
+            print(f"Initial Weights Hash: {hash_weights(model)}")
+        
+        return model
+
+    def _build_model_predict(self, return_sequences=True):
+        params = self.params
+        
+        # Define the input layer with flexible batch size and sequence length
+        inputs = tf.keras.Input(shape=(None, params['n_features']))
+        x = inputs
+        # Build hidden layers
+        x = self._build_hidden_layers(x, stateful=False, return_sequences = True)    
+    
+        # Add the output layer
+        if params['output_layer'] == 'dense':
+            outputs = layers.Dense(units=params['output_dimension'], activation=params['output_activation'])(x)
+        else:
+            raise ValueError("Unsupported output layer type: {}".format(params['output_layer']))
+        
+        # Create the prediction model
+        model = models.Model(inputs=inputs, outputs=outputs)
+        return model
+
+    def _setup_callbacks(self, val=False):
+
+        callbacks = [TerminateOnNaN()]
+        
+        if self.params["reset_states"]:
+            print("Using ResetStatesCallback.")
+            callbacks=callbacks+[ResetStatesCallback(self.params)]
+
+        if val:
+            print("Using EarlyStoppingCallback")
+            early_stop = EarlyStoppingCallback(patience = self.params['early_stopping_patience'])
+            callbacks=callbacks+[early_stop]
+        
+        return callbacks
+
+    def is_stateful(self):
+        """
+        Checks whether any of the layers in the internal model (self.model_train) are stateful.
+
+        Returns:
+        bool: True if at least one layer in the model is stateful, False otherwise.
+        
+        This method iterates over all the layers in the model and checks if any of them
+        have the 'stateful' attribute set to True. This is useful for determining if 
+        the model is designed to maintain state across batches during training.
+
+        Example:
+        --------
+        model.is_stateful()
+        """          
+        for layer in self.model_train.layers:
+            if hasattr(layer, 'stateful') and layer.stateful:
+                return True
+        return False
+
+    def plot_history(self, history, plot_title, create_figure=True):
+        """
+        Plots the training history. Uses log scale on y axis for readability.
+
+        Parameters:
+        -----------
+        history : History object
+            The training history object from model fitting. Output of keras' .fit command
+        plot_title : str
+            The title for the plot.
+        """
+        
+        if create_figure:
+            plt.figure(figsize=(10, 6))
+        plt.semilogy(history.history['loss'], label='Training loss')
+        if 'val_loss' in history.history:
+            plt.semilogy(history.history['val_loss'], label='Validation loss')
+        plt.title(f'{plot_title} Model loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.legend(loc='upper left')
+        plt.show()
+
+
+    def fit(self, X_train, y_train, verbose_fit = False, verbose_weights=False, 
+            plot_history=True, plot_title = '', 
+            weights=None, callbacks=[], validation_data=None, return_epochs=False, *args, **kwargs):
+        """
+        Trains the model on the provided training data. Uses the fit method of the training model and then copies the weights over to the prediction model, which has a less restrictive input shape. Formats a list of callbacks to use within the fit method based on params input
+
+        Parameters:
+        -----------
+        X_train : np.ndarray
+            The input matrix data for training.
+        y_train : np.ndarray
+            The target vector data for training.
+        plot_history : bool, optional
+            If True, plots the training history. Default is True.
+        plot_title : str, optional
+            The title for the training plot. Default is an empty string.
+        weights : optional
+            Initial weights for the model. Default is None.
+        callbacks : list, optional
+            A list of callback functions to use during training. Default is an empty list.
+        validation_data : tuple, optional
+            Validation data to use during training, expected format (X_val, y_val). Default is None.
+        return_epochs : bool
+            If True, return the number of epochs that training took. Used to test and optimize early stopping
+        """        
+        if verbose_weights:
+            print(f"Training simple RNN with params: {self.params}")
+            
+        # Setup callbacks
+        # if self.params["reset_states"]:
+        #     callbacks=callbacks+[ResetStatesCallback(self.params), TerminateOnNaN()]
+        
+        # Check if validation data exists to modify callbacks
+        val = validation_data is not None
+        callbacks = self._setup_callbacks(val)
+        
+        # if validation_data is not None:
+        history = self.model_train.fit(
+            X_train, y_train, 
+            epochs=self.params['epochs'], 
+            batch_size=self.params['batch_size'],
+            callbacks = callbacks,
+            verbose=verbose_fit,
+            validation_data = validation_data,
+            *args, **kwargs
+        )
+        
+        if plot_history:
+            self.plot_history(history,plot_title)
+            
+        if verbose_weights:
+            print(f"Fitted Weights Hash: {hash_weights(self.model_train)}")
+
+        # Update Weights for Prediction Model
+        w_fitted = self.model_train.get_weights()
+        self.model_predict.set_weights(w_fitted)
+
+        if return_epochs:
+            # Epoch counting starts at 0, adding 1 for the count
+            return early_stop.best_epoch + 1
+
+    def predict(self, X_test, verbose=True):
+        if verbose:
+            print("Predicting test data")
+        preds = self.model_predict.predict(X_test)
+        
+        return preds
+
+    def run_model(self, data, reproducibility_run=False, plot_period='all', return_epochs=False):
+
+        # Set up print statements with verbose args
+        verbose_fit = self.params['verbose_fit']
+        verbose_weights = self.params['verbose_weights']
+        if verbose_weights:
+            data.print_hashes()      
+
+        # Set up name for run, used for plotting
+        case_id = "Spatial Training Set" if data.spatial else data.id
+        print(f"Running {case_id}")
+
+        # Extract Datasets
+        X_train, y_train, X_test, y_test = data.X_train, data.y_train, data.X_test, data.y_test
+        X_val, y_val = data.get('X_val', None), data.get('y_val', None)
+        validation_data = (X_val, y_val) if X_val is not None and y_val is not None else None
+        
+        # Fit model, assign epochs to object, will just asign None if return_epochs is false
+        # NOTE: when using early stopping, number of epochs much be extracted here at the fit call
+        eps = self.fit(X_train, y_train, validation_data=validation_data, plot_title=case_id, return_epochs=return_epochs, verbose_fit=verbose_fit)
+
+        # Generate Predictions
+        m = self.predict(X_test)
+        errs = rmse_3d(m, y_test)
+
+        if reproducibility_run:
+            print("Checking Reproducibility")
+            check_reproducibility(data, self.params, hash_ndarray(m), hash_weights(self.model_predict))
+
+        return m, errs
+
+
+def rmse_3d(preds, y_test):
+    """
+    Calculate RMSE for ndarrays structured as (batch_size, timesteps, features). 
+    The first dimension, batch_size, could denote distinct locations. The second, timesteps, is length of sequence
+    """
+    squared_diff = np.square(preds - y_test)
+    
+    # Mean squared error along the timesteps and dimensions (axis 1 and 2)
+    mse = np.mean(squared_diff, axis=(1, 2))
+    
+    # Root mean squared error (RMSE) for each timeseries
+    rmses = np.mean(np.sqrt(mse))
+    
+    return rmses
+
+
+
+class RNNParams(dict):
+    """
+    A custom dictionary class for handling RNN parameters. Automatically calculates certain params based on others. Overwrites the update method to protect from incompatible parameter choices. Inherits from dict
+    """    
+    def __init__(self, input_dict):
+        """
+        Initializes the RNNParams instance and runs checks and shape calculations.
+
+        Parameters:
+        -----------
+        input_dict : dict,
+            A dictionary containing RNN parameters.
+        """
+        super().__init__(input_dict)
+        # Automatically run checks on initialization
+        self._run_checks()           
+        # Automatically calculate shapes on initialization
+        self.calc_param_shapes()        
+    def _run_checks(self, verbose=True):
+        """
+        Validates that required keys exist and are of the correct type.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """
+        print("Checking params...")
+
+        ### Check required keys and data types
+        # Keys must exist and be integers
+        int_keys = ['batch_size', 'timesteps', 'epochs', 'output_dimension']
+        # Keys must exist and be lists
+        list_keys = ['hidden_layers', 'hidden_units', 'hidden_activation', 'time_fracs']
+        # Keys must exist and be floats
+        float_keys = ['learning_rate']   
+        # Keys must exist and be strings
+        str_keys = ['output_layer', 'output_activation']
+        
+        for key in int_keys:
+            assert key in self, f"Missing required key: {key}"
+            assert isinstance(self[key], int), f"Key '{key}' must be an integer"      
+
+        for key in list_keys:
+            assert key in self, f"Missing required key: {key}"
+            assert isinstance(self[key], list), f"Key '{key}' must be a list" 
+
+        for key in float_keys:
+            assert key in self, f"Missing required key: {key}"
+            assert isinstance(self[key], float), f"Key '{key}' must be a float"  
+        
+        for key in str_keys:
+            assert key in self, f"Missing required key: {key}"
+            assert isinstance(self[key], str), f"Key '{key}' must be a float" 
+
+        ### Check Hidden layer lists
+        hidden_keys = ['hidden_layers', 'hidden_units', 'hidden_activation']
+        # Check same lengths and proper data types
+        lengths = [len(self[key]) for key in hidden_keys]
+        assert all(length == lengths[0] for length in lengths), "Keys 'hidden_layers', 'hidden_units', 'hidden_activation' must have the same length"
+        # Check that 'hidden_units' must be integers and 'hidden_activation' must be strings,
+        # unless 'hidden_layers' is set to 'attention', in which case both should be None.
+        for i, layer in enumerate(self['hidden_layers']):
+            if layer == 'attention' or layer == 'dropout':
+                assert self['hidden_units'][i] is None, f"hidden_units[{i}] must be None for 'attention' layer"
+                assert self['hidden_activation'][i] is None, f"hidden_activation[{i}] must be None for 'attention' layer"
+            else:
+                assert isinstance(self['hidden_units'][i], int), f"hidden_units[{i}] must be an integer for non-'attention' layers"
+                assert isinstance(self['hidden_activation'][i], str), f"hidden_activation[{i}] must be a string for non-'attention' layers"        
+                print("Input dictionary passed all checks.")
+    
+    def calc_param_shapes(self, verbose=True):
+        """
+        Calculates and updates the shapes of certain parameters based on input data.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """
+        if verbose:
+            print("Calculating shape params based on features list, timesteps, and batch size")
+            print(f"Input Feature List: {self['features_list']}")
+            print(f"Input Timesteps: {self['timesteps']}")
+            print(f"Input Batch Size: {self['batch_size']}")
+            
+        n_features = len(self['features_list'])
+        batch_shape = (self["batch_size"], self["timesteps"], n_features)
+        if verbose:
+            print("Calculated params:")
+            print(f"Number of features: {n_features}")
+            print(f"Batch Shape: {batch_shape}")
+            
+        # Update the dictionary
+        super().update({
+            'n_features': n_features,
+            'batch_shape': batch_shape
+        })
+        if verbose:
+            print(self)   
+            
+    def update(self, *args, verbose=True, **kwargs):
+        """
+        Overwrites the standard update functon from dict. This is to prevent certain keys from being modified directly and to automatically update keys to be compatible with each other. The keys handled relate to the shape of the input data to the RNN.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """
+        # Prevent updating n_features and batch_shape
+        restricted_keys = {'n_features', 'batch_shape'}
+        keys_to_check = {'features_list', 'timesteps', 'batch_size'}
+        
+        # Check for restricted keys in args
+        if args:
+            if isinstance(args[0], dict):
+                if restricted_keys & args[0].keys():
+                    raise KeyError(f"Cannot directly update keys: {restricted_keys & args[0].keys()}, \n Instead update one of: {keys_to_check}")
+            elif isinstance(args[0], (tuple, list)) and all(isinstance(i, tuple) and len(i) == 2 for i in args[0]):
+                if restricted_keys & {k for k, v in args[0]}:
+                    raise KeyError(f"Cannot directly update keys: {restricted_keys & {k for k, v in args[0]}}, \n Instead update one of: {keys_to_check}")
+
+        # Check for restricted keys in kwargs
+        if restricted_keys & kwargs.keys():
+            raise KeyError(f"Cannot update restricted keys: {restricted_keys & kwargs.keys()}")
+
+        
+        # Track if specific keys are updated
+        keys_updated = set()
+
+        # Update using the standard dict update method
+        if args:
+            if isinstance(args[0], dict):
+                keys_updated.update(args[0].keys() & keys_to_check)
+            elif isinstance(args[0], (tuple, list)) and all(isinstance(i, tuple) and len(i) == 2 for i in args[0]):
+                keys_updated.update(k for k, v in args[0] if k in keys_to_check)
+        
+        if kwargs:
+            keys_updated.update(kwargs.keys() & keys_to_check)
+
+        # Call the parent update method
+        super().update(*args, **kwargs)
+
+        # Recalculate shapes if necessary
+        if keys_updated:
+            self.calc_param_shapes(verbose=verbose)
+
 
