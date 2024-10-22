@@ -26,7 +26,7 @@ def rmse_3d(preds, y_test):
     mse = np.mean(squared_diff, axis=(1, 2))
     
     # Root mean squared error (RMSE) for each timeseries
-    rmses = np.mean(np.sqrt(mse))
+    rmses = np.sqrt(mse)
     
     return rmses
     
