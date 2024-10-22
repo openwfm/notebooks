@@ -2186,7 +2186,7 @@ class RNNParams(dict):
         # Keys must exist and be integers
         int_keys = ['batch_size', 'timesteps', 'epochs', 'output_dimension']
         # Keys must exist and be lists
-        list_keys = ['hidden_layers', 'hidden_units', 'hidden_activation', 'time_fracs']
+        list_keys = ['hidden_layers', 'hidden_units', 'hidden_activation', 'time_fracs', 'features_list']
         # Keys must exist and be floats
         float_keys = ['learning_rate']   
         # Keys must exist and be strings
@@ -2222,7 +2222,8 @@ class RNNParams(dict):
             else:
                 assert isinstance(self['hidden_units'][i], int), f"hidden_units[{i}] must be an integer for non-'attention' layers"
                 assert isinstance(self['hidden_activation'][i], str), f"hidden_activation[{i}] must be a string for non-'attention' layers"        
-                print("Input dictionary passed all checks.")
+        
+        print("Input dictionary passed all checks.")
     
     def calc_param_shapes(self, verbose=True):
         """
