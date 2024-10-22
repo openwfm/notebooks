@@ -17,7 +17,7 @@ from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
 import reproducibility
 # from utils import print_dict_summary
 from abc import ABC, abstractmethod
-from utils import hash2, all_items_exist, hash_ndarray, hash_weights
+from utils import hash2, all_items_exist, hash_ndarray, hash_weights, rmse_3d
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
 # import yaml
@@ -928,13 +928,11 @@ class RNNData(dict):
         attrs_to_check : list, optional
             A list of attribute names to hash and print. Default includes 'X', 'y', and split data.
         """
+        
         for attr in attrs_to_check:
             if hasattr(self, attr):
                 value = getattr(self, attr)
-                if self.spatial:
-                    pass
-                else:
-                    print(f"Hash of {attr}: {hash_ndarray(value)}")        
+                print(f"Hash of {attr}: {hash_ndarray(value)}")        
     def __getattr__(self, key):
         """
         Allows attribute-style access to dictionary keys, a.k.a. enables the "." operator for get elements
@@ -2120,7 +2118,7 @@ class RNN():
         
         # Fit model, assign epochs to object, will just asign None if return_epochs is false
         # NOTE: when using early stopping, number of epochs much be extracted here at the fit call
-        eps = self.fit(X_train, y_train, validation_data=validation_data, plot_title=case_id, return_epochs=return_epochs, verbose_fit=verbose_fit)
+        eps = self.fit(X_train, y_train, validation_data=validation_data, plot_title=case_id, return_epochs=return_epochs, verbose_fit=verbose_fit, verbose_weights=verbose_weights)
 
         # Generate Predictions
         m = self.predict(X_test)
@@ -2135,21 +2133,6 @@ class RNN():
         else:
             return m, errs
 
-
-def rmse_3d(preds, y_test):
-    """
-    Calculate RMSE for ndarrays structured as (batch_size, timesteps, features). 
-    The first dimension, batch_size, could denote distinct locations. The second, timesteps, is length of sequence
-    """
-    squared_diff = np.square(preds - y_test)
-    
-    # Mean squared error along the timesteps and dimensions (axis 1 and 2)
-    mse = np.mean(squared_diff, axis=(1, 2))
-    
-    # Root mean squared error (RMSE) for each timeseries
-    rmses = np.mean(np.sqrt(mse))
-    
-    return rmses
 
 
 
