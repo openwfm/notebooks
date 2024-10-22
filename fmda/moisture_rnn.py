@@ -1984,8 +1984,10 @@ class RNN():
             print("Using EarlyStoppingCallback")
             early_stop = EarlyStoppingCallback(patience = self.params['early_stopping_patience'])
             callbacks=callbacks+[early_stop]
+        else:
+            early_stop = None
         
-        return callbacks
+        return callbacks, early_stop
 
     def is_stateful(self):
         """
@@ -2065,7 +2067,7 @@ class RNN():
         
         # Check if validation data exists to modify callbacks
         val = validation_data is not None
-        callbacks = self._setup_callbacks(val)
+        callbacks, early_stop = self._setup_callbacks(val)
         
         # if validation_data is not None:
         history = self.model_train.fit(
@@ -2128,7 +2130,10 @@ class RNN():
             print("Checking Reproducibility")
             check_reproducibility(data, self.params, hash_ndarray(m), hash_weights(self.model_predict))
 
-        return m, errs
+        if return_epochs:
+            return m, errs, eps
+        else:
+            return m, errs
 
 
 def rmse_3d(preds, y_test):
