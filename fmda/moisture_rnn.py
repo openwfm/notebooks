@@ -1926,6 +1926,12 @@ class RNN():
             elif layer_type == 'attention':
                 # Self-attention mechanism
                 x = layers.Attention()([x, x])
+            elif layer_type == 'conv1d':
+                kernel_size = params.get('kernel_size', 3)  # Check for kernel size, use 3 if missing
+                x = layers.Conv1D(filters=units, kernel_size=kernel_size, activation=activation, padding='same')(x)
+            else:
+                raise ValueError(f"Unrecognized layer type: {layer_type}, skipping")
+        
         return x
             
     def _build_model_train(self):
