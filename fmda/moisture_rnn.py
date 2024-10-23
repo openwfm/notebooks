@@ -2291,4 +2291,9 @@ class RNNParams(dict):
         if keys_updated:
             self.calc_param_shapes(verbose=verbose)
 
+        # Run checks again to make sure nothing changed to incompatible
+        self._run_checks(verbose=False)   
+
+
+
 
