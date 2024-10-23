@@ -17,7 +17,7 @@ from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
 import reproducibility
 # from utils import print_dict_summary
 from abc import ABC, abstractmethod
-from utils import hash2, all_items_exist, hash_ndarray, hash_weights
+from utils import hash2, all_items_exist, hash_ndarray, hash_weights, rmse_3d
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
 # import yaml
@@ -928,13 +928,11 @@ class RNNData(dict):
         attrs_to_check : list, optional
             A list of attribute names to hash and print. Default includes 'X', 'y', and split data.
         """
+        
         for attr in attrs_to_check:
             if hasattr(self, attr):
                 value = getattr(self, attr)
-                if self.spatial:
-                    pass
-                else:
-                    print(f"Hash of {attr}: {hash_ndarray(value)}")        
+                print(f"Hash of {attr}: {hash_ndarray(value)}")        
     def __getattr__(self, key):
         """
         Allows attribute-style access to dictionary keys, a.k.a. enables the "." operator for get elements
@@ -1890,7 +1888,7 @@ class RNN():
     def _build_hidden_layers(self, x, stateful=True, return_sequences=True):
         params = self.params
         last_recurrent = None
-
+        
         # Identify the last RNN/LSTM layer, unless an Attention layer follows it
         for i, layer_type in enumerate(params['hidden_layers']):
             if layer_type in ['rnn', 'lstm']:
@@ -1928,6 +1926,12 @@ class RNN():
             elif layer_type == 'attention':
                 # Self-attention mechanism
                 x = layers.Attention()([x, x])
+            elif layer_type == 'conv1d':
+                kernel_size = params.get('kernel_size', 3)  # Check for kernel size, use 3 if missing
+                x = layers.Conv1D(filters=units, kernel_size=kernel_size, activation=activation, padding='same')(x)
+            else:
+                raise ValueError(f"Unrecognized layer type: {layer_type}, skipping")
+        
         return x
             
     def _build_model_train(self):
@@ -2120,7 +2124,7 @@ class RNN():
         
         # Fit model, assign epochs to object, will just asign None if return_epochs is false
         # NOTE: when using early stopping, number of epochs much be extracted here at the fit call
-        eps = self.fit(X_train, y_train, validation_data=validation_data, plot_title=case_id, return_epochs=return_epochs, verbose_fit=verbose_fit)
+        eps = self.fit(X_train, y_train, validation_data=validation_data, plot_title=case_id, return_epochs=return_epochs, verbose_fit=verbose_fit, verbose_weights=verbose_weights)
 
         # Generate Predictions
         m = self.predict(X_test)
@@ -2135,21 +2139,6 @@ class RNN():
         else:
             return m, errs
 
-
-def rmse_3d(preds, y_test):
-    """
-    Calculate RMSE for ndarrays structured as (batch_size, timesteps, features). 
-    The first dimension, batch_size, could denote distinct locations. The second, timesteps, is length of sequence
-    """
-    squared_diff = np.square(preds - y_test)
-    
-    # Mean squared error along the timesteps and dimensions (axis 1 and 2)
-    mse = np.mean(squared_diff, axis=(1, 2))
-    
-    # Root mean squared error (RMSE) for each timeseries
-    rmses = np.mean(np.sqrt(mse))
-    
-    return rmses
 
 
 
@@ -2180,13 +2169,14 @@ class RNNParams(dict):
         verbose : bool, optional
             If True, prints status messages. Default is True.
         """
-        print("Checking params...")
+        if verbose:
+            print("Checking params...")
 
         ### Check required keys and data types
         # Keys must exist and be integers
         int_keys = ['batch_size', 'timesteps', 'epochs', 'output_dimension']
         # Keys must exist and be lists
-        list_keys = ['hidden_layers', 'hidden_units', 'hidden_activation', 'time_fracs']
+        list_keys = ['hidden_layers', 'hidden_units', 'hidden_activation', 'time_fracs', 'features_list']
         # Keys must exist and be floats
         float_keys = ['learning_rate']   
         # Keys must exist and be strings
@@ -2222,7 +2212,9 @@ class RNNParams(dict):
             else:
                 assert isinstance(self['hidden_units'][i], int), f"hidden_units[{i}] must be an integer for non-'attention' layers"
                 assert isinstance(self['hidden_activation'][i], str), f"hidden_activation[{i}] must be a string for non-'attention' layers"        
-                print("Input dictionary passed all checks.")
+
+        if verbose:
+            print("Input dictionary passed all checks.")
     
     def calc_param_shapes(self, verbose=True):
         """
@@ -2300,5 +2292,10 @@ class RNNParams(dict):
         # Recalculate shapes if necessary
         if keys_updated:
             self.calc_param_shapes(verbose=verbose)
+
+        # Run checks again to make sure nothing changed to incompatible
+        self._run_checks(verbose=False)   
+
+
 
 

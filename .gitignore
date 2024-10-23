@@ -13,3 +13,4 @@ __pycache__
 fmda/data/*.csv
 **/*.keras
 **/*.nc
+**/*.gif

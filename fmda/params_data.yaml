@@ -19,7 +19,7 @@ min_solar: 0 # minimum wind threshold value
 max_solar: 1400 # maximum solar threshold value
 min_soilm: 0 # minimum soil moisture threshold value
 # max_soilm: 0 # minimum soil moisture threshold value, TODO: look up
-features_all: ['Ed', 'Ew', 'solar', 'wind', 'elev', 'lon', 'lat', 'soilm', 'canopyw', 'groundflux', 'rain'] # list of all features to try to process
+# features_all: ['Ed', 'Ew', 'solar', 'wind', 'elev', 'lon', 'lat', 'soilm', 'canopyw', 'groundflux', 'rain'] # list of all features to try to process
 
 
 

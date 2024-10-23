@@ -812,9 +812,9 @@ def rmse_data_str(dat, predict=True, hours = None, test_ind = None):
     
     if 'm' in dat and 'y' in dat:
         if predict and hours is not None and test_ind is not None:
-            return rmse_str(dat['m'][test_ind:hours],dat['y'].flatten()[test_ind:hours])
+            return rmse_str(dat['m'].flatten()[test_ind:hours],dat['y'].flatten()[test_ind:hours])
         else: 
-            return rmse_str(dat['m'],dat['y'].flatten())
+            return rmse_str(dat['m'].flatten(),dat['y'].flatten())
     else:
         return ''
                     

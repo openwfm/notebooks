@@ -15,6 +15,22 @@ import subprocess
 
 from itertools import islice
 
+def rmse_3d(preds, y_test):
+    """
+    Calculate RMSE for ndarrays structured as (batch_size, timesteps, features). 
+    The first dimension, batch_size, could denote distinct locations. The second, timesteps, is length of sequence
+    """
+    squared_diff = np.square(preds - y_test)
+    
+    # Mean squared error along the timesteps and dimensions (axis 1 and 2)
+    mse = np.mean(squared_diff, axis=(1, 2))
+    
+    # Root mean squared error (RMSE) for each timeseries
+    rmses = np.sqrt(mse)
+    
+    return rmses
+    
+
 class Dict(dict):
     """
     A dictionary that allows member access to its keys.
