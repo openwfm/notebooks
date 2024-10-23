@@ -1888,7 +1888,7 @@ class RNN():
     def _build_hidden_layers(self, x, stateful=True, return_sequences=True):
         params = self.params
         last_recurrent = None
-
+        
         # Identify the last RNN/LSTM layer, unless an Attention layer follows it
         for i, layer_type in enumerate(params['hidden_layers']):
             if layer_type in ['rnn', 'lstm']:
@@ -2169,7 +2169,8 @@ class RNNParams(dict):
         verbose : bool, optional
             If True, prints status messages. Default is True.
         """
-        print("Checking params...")
+        if verbose:
+            print("Checking params...")
 
         ### Check required keys and data types
         # Keys must exist and be integers
@@ -2211,8 +2212,9 @@ class RNNParams(dict):
             else:
                 assert isinstance(self['hidden_units'][i], int), f"hidden_units[{i}] must be an integer for non-'attention' layers"
                 assert isinstance(self['hidden_activation'][i], str), f"hidden_activation[{i}] must be a string for non-'attention' layers"        
-        
-        print("Input dictionary passed all checks.")
+
+        if verbose:
+            print("Input dictionary passed all checks.")
     
     def calc_param_shapes(self, verbose=True):
         """
