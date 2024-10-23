@@ -7,9 +7,9 @@
 rnn:
     timesteps: 12 # number of time steps that constistutes one single input sample
     batch_size: 32 # number of sequences of length `timesteps` that are processed independently in an iteration of weight updates
-    hidden_layers: [lstm, dense, dense] # Sequential order of neural network hidden layers, one of 'dense', 'rnn', 'lstm', 'attention', 'dropout'
-    hidden_units: [32, 32, 16] # Corresponding number of units for layers, attention & dropout layers should have None for this
-    hidden_activation: [tanh, relu, relu] # Corresponding activation func for layers, attention & dropout layers should have None for this
+    hidden_layers: [lstm, attention, dense, dense] # Sequential order of neural network hidden layers, one of 'dense', 'rnn', 'lstm', 'attention', 'dropout'
+    hidden_units: [32, null, 32, 16] # Corresponding number of units for layers, attention & dropout layers should have None for this
+    hidden_activation: [tanh, null, relu, relu] # Corresponding activation func for layers, attention & dropout layers should have None for this
     dropout: 0.2 # Used automatically internally in LSTM and RNN layers, used for value if entire dropout layer is specified (typically after a dense)
     recurrent_dropout: 0.2 # Used internally in recurrent layers
     output_layer: dense # Output specifications should not be changed unless input data is restructured. Currently outputing single scalar at each input time step
