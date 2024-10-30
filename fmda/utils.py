@@ -9,6 +9,7 @@ import inspect
 import yaml
 import hashlib
 import pickle
+import os
 import os.path as osp
 from urllib.parse import urlparse
 import subprocess
@@ -120,9 +121,19 @@ def retrieve_url(url, dest_path, force_download=False):
         url_extension = osp.splitext(urlparse(url).path)[1]
         if target_extension != url_extension:
             print("Warning: file extension from url does not match destination file extension")
-        subprocess.call(f"wget -O {dest_path}  {url}", shell=True)
-        assert osp.exists(dest_path)
-        print(f"Successfully downloaded {url} to {dest_path}")
+        # Execute wget command and check the exit status
+        result = subprocess.run(
+            f"wget -q --show-progress --no-clobber -O {dest_path} {url}",
+            shell=True
+        )
+
+        # Check if the download was successful and file exists
+        if result.returncode == 0 and osp.getsize(dest_path) > 0:
+            print(f"Successfully downloaded {url} to {dest_path}")
+        else:
+            print(f"Failed to download {url}. Deleting the empty file.")
+            if osp.exists(dest_path):
+                os.remove(dest_path)
     else:
         print(f"Target data already exists at {dest_path}")
 
