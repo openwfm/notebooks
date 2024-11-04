@@ -7,6 +7,8 @@ import pandas as pd
 import re
 from pyproj import Transformer
 from datetime import datetime
+import warnings
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Dataframe used to organize HRRR metadata
@@ -98,6 +100,11 @@ def preprocess(ds, add_xy = True):
 
 def calc_eqs(ds):
 
+    # Check whether Eqs exist and exit if so
+    if any(name in ds.band for name in ["Ed", "Ew"]):
+        warnings.warn("Equilibria already detected in xarray, exiting function")
+        return ds 
+    
     # Calculate Ed based on temp and rh
     temp = ds.sel(band="temp")
     rh = ds.sel(band="rh")
@@ -121,7 +128,7 @@ def calc_eqs(ds):
 
 def calc_rain(ds, ds_prev):
     # Check times are the same
-    assert np.all(data.time.values == data_prev.time.values), "Time dimension not the same between input xarrays"
+    assert np.all(ds.time.values == ds_prev.time.values), "Time dimension not the same between input xarrays"
     
     rain = ds.sel(band="precip_accum") - ds_prev.sel(band="precip_accum")
     rain = rain.expand_dims(dim="band").assign_coords(band=["rain"])
