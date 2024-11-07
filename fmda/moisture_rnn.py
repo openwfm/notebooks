@@ -17,7 +17,7 @@ from tensorflow.keras.layers import LSTM, SimpleRNN, Input, Dropout, Dense
 import reproducibility
 # from utils import print_dict_summary
 from abc import ABC, abstractmethod
-from utils import hash2, all_items_exist, hash_ndarray, hash_weights, rmse_3d
+from utils import hash2, all_items_exist, hash_ndarray, hash_weights, rmse_3d, create_exp_function
 from data_funcs import rmse, plot_data, compare_dicts
 import copy
 # import yaml
@@ -2072,6 +2072,12 @@ class RNN():
         # Check if validation data exists to modify callbacks
         val = validation_data is not None
         callbacks, early_stop = self._setup_callbacks(val)
+
+        # Set up sample weights, if param missing or None weights will all be 1
+        alpha = self.params.get('w_alpha') or 0.0
+        weight_func = create_exp_function(w=alpha)
+        weights = weight_func(y_train)
+        
         
         # if validation_data is not None:
         history = self.model_train.fit(
@@ -2081,6 +2087,7 @@ class RNN():
             callbacks = callbacks,
             verbose=verbose_fit,
             validation_data = validation_data,
+            sample_weight = weights,
             *args, **kwargs
         )
         

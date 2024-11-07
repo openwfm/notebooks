@@ -13,8 +13,21 @@ import os
 import os.path as osp
 from urllib.parse import urlparse
 import subprocess
-
+import tensorflow as tf
 from itertools import islice
+
+
+def create_exp_function(w):
+    """
+    Creates negative exponential function exp(-w*y_train). Need to create the exp function then call with y_train
+    Example Usage:
+    weight_func = create_exp_function(w=alpha)
+    weights = weight_func(rnn_dat.y_train)
+    """
+    def exp_function(y_train):
+        return tf.exp(tf.multiply(-w, y_train))
+    return exp_function
+
 
 def rmse_3d(preds, y_test):
     """
