@@ -2,13 +2,16 @@ name: fmda_ml2
 channels:
   - conda-forge
 dependencies:
-  - python>=3.12
+  - python=3.12.6
   - pandas
+  - matplotlib
   - scikit-learn
   - jupyterlab
+  - xarray=2023
+  - rioxarray
   - pip
   - pip:
-      - tensorflow>=2.16
+      - tensorflow==2.17
       - synopticpy
       - xgboost
 
