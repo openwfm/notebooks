@@ -14,6 +14,7 @@ import os.path as osp
 from urllib.parse import urlparse
 import subprocess
 import tensorflow as tf
+import shutil
 from itertools import islice
 
 
@@ -94,10 +95,12 @@ def load(file):
         returnitem = dill.load(input)
         return returnitem
 
+
+
 # Utility to retrieve files from URL
 def retrieve_url(url, dest_path, force_download=False):
     """
-    Downloads a file from a specified URL to a destination path.
+    Downloads a file from a specified URL to a destination path, using `curl` or `wget`.
 
     Parameters:
     -----------
@@ -128,25 +131,31 @@ def retrieve_url(url, dest_path, force_download=False):
     A message indicating whether the file was downloaded or if it already exists at the 
     destination path.
     """    
+    # Determine which command is available (curl preferred)
+    download_cmd = None
+    if shutil.which("curl"):
+        download_cmd = "curl"
+    elif shutil.which("wget"):
+        download_cmd = "wget"
+    else:
+        raise EnvironmentError("Neither curl nor wget is installed on the system.")
+    
     if not osp.exists(dest_path) or force_download:
-        print(f"Attempting to downloaded {url} to {dest_path}")
+        print(f"Attempting to downloaded {url} to {dest_path} using {download_cmd}")
         target_extension = osp.splitext(dest_path)[1]
         url_extension = osp.splitext(urlparse(url).path)[1]
         if target_extension != url_extension:
             print("Warning: file extension from url does not match destination file extension")
-        # Execute wget command and check the exit status
-        result = subprocess.run(
-            f"wget -q --show-progress --no-clobber -O {dest_path} {url}",
-            shell=True
-        )
-
-        # Check if the download was successful and file exists
-        if result.returncode == 0 and osp.getsize(dest_path) > 0:
-            print(f"Successfully downloaded {url} to {dest_path}")
-        else:
-            print(f"Failed to download {url}. Deleting the empty file.")
-            if osp.exists(dest_path):
-                os.remove(dest_path)
+        # Construct download command
+        if download_cmd == "curl":
+            command = f"curl -L -o {dest_path} {url}"
+        elif download_cmd == "wget":
+            command = f"wget -O {dest_path} {url}"
+        
+        
+        subprocess.run(command, shell=True, check=True)
+        assert osp.exists(dest_path)
+        print(f"Successfully downloaded {url} to {dest_path}")
     else:
         print(f"Target data already exists at {dest_path}")
 
