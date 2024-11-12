@@ -9,10 +9,10 @@ import pandas as pd
 x = np.array([0, 5, 10, 15, 20, 25, 30, 35])
 y = np.array([7.5, 4.3, 3.1, 2.6, 2.1, 1.4, 0, 0])*10**-3
 xvals = np.linspace(start=0, stop=35, num=100)
-ros_f = CubicSpline(x, y)
+ros_f0 = CubicSpline(x, y)
 
 def ros_0wind(fm):
-    r = ros_f(fm)
+    r = ros_f0(fm)
     r[fm>30]=0
     return r
 
@@ -34,8 +34,8 @@ y = np.array([
 
 xvals = np.linspace(start=0, stop=35, num=100)
 
-ros_f = CubicSpline(x, y)
+ros_f3 = CubicSpline(x, y)
 def ros_3wind(fm):
-    r = ros_f(fm)
+    r = ros_f3(fm)
     r[fm>30]=0
     return r
