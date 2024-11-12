@@ -10,8 +10,9 @@ Clone repository:
 Build and activate environment:
 
 * cd ./fmda/install
-* conda env create -f fmda_ml.yml
+* conda env create -f fmda_ml2.yml
 * conda activate fmda_ml
+* conda install dask --force-reinstall
 
 
 ## Main Notebooks
