@@ -3,13 +3,15 @@ import math
 import matplotlib.pyplot as plt
 import copy
 from abc import ABC, abstractmethod
-# import xgboost as xg
-# from xgboost import XGBRegressor
+import xgboost as xg
+from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from utils import Dict
+from utils import Dict, all_items_exist
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import random
 
 # ODE + Augmented Kalman Filter Code
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -264,8 +266,291 @@ class LM(MLModel):
 
 
 
+# Dictionary of scalers, used to avoid multiple object creation and to avoid multiple if statements
+scalers = {
+    'minmax': MinMaxScaler(),
+    'standard': StandardScaler() 
+}
+
+## Class for handling input data
+class MLData(dict):
+    """
+    A custom dictionary class for managing data, with validation, scaling, and train-test splitting functionality. Simplified as opposed to RNNData custom class since static models have simpler data shaping. 
+
+    Assumes input dict is the result of combine_nested(...), so it is a spatial combination
+    """    
+    required_keys = {"loc", "time", "X", "y", "features_list"}  
+    def __init__(self, input_dict, scaler=None, features_list=None):
+        """
+        Initializes the RNNData instance, performs checks, and prepares data.
+
+        Parameters:
+        -----------
+        input_dict : dict
+            A dictionary containing the initial data.
+        scaler : str, optional
+            The name of the scaler to be used (e.g., 'minmax', 'standard'). Default is None.
+        features_list : list, optional
+            A subset of features to be used. Default is None which means all features.
+        """
+
+        # Copy to avoid changing external input
+        input_data = input_dict.copy()
+        # Initialize inherited dict class
+        super().__init__(input_data)
+        
+        
+        # Set up Data Scaling
+        self.scaler = None
+        if scaler is not None:
+            self.set_scaler(scaler)
+        
+        # Rename and define other stuff.
+        self['hours'] = min(arr.shape[0] for arr in self.y)
+        
+        self['all_features_list'] = self.pop('features_list')
+        if features_list is None:
+            print("Using all input features.")
+            self.features_list = self.all_features_list
+        else:
+            self.features_list = features_list
+
+        print(f"Setting features_list to {features_list}. \n  NOTE: not subsetting features yet. That happens in train_test_split.")
+        
+        self._run_checks()
+        self.__dict__.update(self)
+        
+        
+    # TODO: Fix checks for multilocation
+    def _run_checks(self, verbose=True):
+        """
+        Validates that required keys are present and checks the integrity of data shapes.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """        
+        missing_keys = self.required_keys - self.keys()
+        if missing_keys:
+            raise KeyError(f"Missing required keys: {missing_keys}")
+        
+        # # Check if 'hours' is provided and matches len(y)
+        # if 'hours' in self:
+        #     if self.hours != len(self.y):
+        #         raise ValueError(f"Provided 'hours' value {self.hours} does not match the length of 'y', which is {len(self.y)}.")
+        # Check desired subset of features is in all input features
+        if not all_items_exist(self.features_list, self.all_features_list):
+            raise ValueError(f"Provided 'features_list' {self.features_list} has elements not in input features.")
+    def set_scaler(self, scaler):
+        """
+        Sets the scaler to be used for data normalization.
+
+        Parameters:
+        -----------
+        scaler : str
+            The name of the scaler (e.g., 'minmax', 'standard').
+        """        
+        recognized_scalers = ['minmax', 'standard']
+        if scaler in recognized_scalers:
+            print(f"Setting data scaler: {scaler}")
+            self.scaler = scalers[scaler]
+        else:
+            raise ValueError(f"Unrecognized scaler '{scaler}'. Recognized scalers are: {recognized_scalers}.")
+    def train_test_split(self, time_fracs=[1.,0.,0.], space_fracs=[1.,0.,0.], subset_features=True, features_list=None, verbose=True):
+        # Set up 
+        assert np.sum(time_fracs) == np.sum(space_fracs) == 1., f"Provided cross validation params don't sum to 1"
+        if (len(time_fracs) != 3) or (len(space_fracs) != 3):
+            raise ValueError("Cross-validation params `time_fracs` and `space_fracs` must be lists of length 3, representing (train/validation/test)")
+        train_frac = time_fracs[0]
+        val_frac = time_fracs[1]
+        test_frac = time_fracs[2]        
+        
+        # Setup train/val/test in time
+        train_ind = int(np.floor(self.hours * train_frac)); self.train_ind = train_ind
+        test_ind= int(train_ind + round(self.hours * val_frac)); self.test_ind = test_ind
+        # Check for any potential issues with indices
+        if test_ind > self.hours:
+            print(f"Setting test index to {self.hours}")
+            test_ind = self.hours
+        if train_ind > test_ind:
+            raise ValueError("Train index must be less than test index.")        
+
+        # Setup train/val/test in space
+        train_frac_sp = space_fracs[0]
+        val_frac_sp = space_fracs[1]
+        locs = np.arange(len(self.loc['STID'])) # indices of locations
+        train_size = int(len(locs) * train_frac_sp)
+        val_size = int(len(locs) * val_frac_sp)
+        random.shuffle(locs)
+        train_locs = locs[:train_size]
+        val_locs = locs[train_size:train_size + val_size]
+        test_locs = locs[train_size + val_size:]
+        # Store Lists of IDs in loc subdirectory
+        self.loc['train_locs'] = [self.case[i] for i in train_locs]
+        self.loc['val_locs'] = [self.case[i] for i in val_locs]
+        self.loc['test_locs'] = [self.case[i] for i in test_locs]        
+
+        X = self.X.copy()
+        y = self.y.copy()        
+        if subset_features:
+            if verbose and self.features_list != self.all_features_list:
+                print(f"Subsetting input data to features_list: {self.features_list}")
+            # Indices to subset all features with based on params features
+            indices = []
+            for item in self.features_list:
+                if item in self.all_features_list:
+                    indices.append(self.all_features_list.index(item))
+                else:
+                    print(f"Warning: feature name '{item}' not found in list of all features from input data. Removing from internal features list")
+                    # self.features_list.remove(item)
+            
+            X = [Xi[:, indices] for Xi in X]
+
+            # Split by space
+            X_train = [X[i] for i in train_locs]
+            X_val = [X[i] for i in val_locs]
+            X_test = [X[i] for i in test_locs]
+            y_train = [y[i] for i in train_locs]
+            y_val = [y[i] for i in val_locs]
+            y_test = [y[i] for i in test_locs]
+
+        # Split by time
+        self.X_train = [Xi[:train_ind] for Xi in X_train]
+        self.y_train = [yi[:train_ind].reshape(-1,1) for yi in y_train]
+        if (val_frac >0) and (val_frac_sp)>0:
+            self.X_val = [Xi[train_ind:test_ind] for Xi in X_val]
+            self.y_val = [yi[train_ind:test_ind].reshape(-1,1) for yi in y_val]
+        self.X_test = [Xi[test_ind:] for Xi in X_test]
+        self.y_test = [yi[test_ind:].reshape(-1,1) for yi in y_test]
 
 
+        # Combine List
+        print("Combining locations")
+        self.X_train = np.vstack(self.X_train)
+        self.y_train = np.vstack(self.y_train)
+        self.X_test = np.vstack(self.X_test)
+        self.y_test = np.vstack(self.y_test)
+        if hasattr(self, "X_val"):
+            self.X_val = np.vstack(self.X_val)
+            self.y_val = np.vstack(self.y_val)
+            
+        # Print statements if verbose
+        if verbose:
+            print(f"Train index: 0 to {train_ind}")
+            print(f"Validation index: {train_ind} to {test_ind}")
+            print(f"Test index: {test_ind} to {self.hours}")
+
+            print("Subsetting locations into train/val/test")
+            print(f"Total Locations: {len(locs)}")
+            print(f"Train Locations: {len(train_locs)}")
+            print(f"Val. Locations: {len(val_locs)}")
+            print(f"Test Locations: {len(test_locs)}")
+            print(f"X_train shape: {self.X_train.shape}, y_train shape: {self.y_train.shape}")
+            if hasattr(self, "X_val"):
+                print(f"X_val shape: {self.X_val.shape}, y_val shape: {self.y_val.shape}")
+                print(f"X_test shape: {self.X_test.shape}, y_test shape: {self.y_test.shape}")            
+
+    def scale_data(self, verbose=True):
+        """
+        Scales the training data using the set scaler.
+
+        Parameters:
+        -----------
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """        
+
+        if self.scaler is None:
+            raise ValueError("Scaler is not set. Use 'set_scaler' method to set a scaler before scaling data.")
+        # if hasattr(self.scaler, 'n_features_in_'):
+        #     warnings.warn("Scale_data has already been called. Exiting to prevent issues.")
+        #     return            
+        if not hasattr(self, "X_train"):
+            raise AttributeError("No X_train within object. Run train_test_split first. This is to avoid fitting the scaler with prediction data.")
+        if verbose:
+            print(f"Scaling training data with scaler {self.scaler}, fitting on X_train")
+
+        # Fit scaler on row-joined training data
+        self.scaler.fit(self.X_train)
+        # Transform data using fitted scaler
+        self.X_train = self.scaler.transform(self.X_train)
+        if hasattr(self, 'X_val'):
+            if self.X_val is not None:
+                self.X_val = self.scaler.transform(self.X_val)
+        if self.X_test is not None:
+            self.X_test = self.scaler.transform(self.X_test)
+
+    def inverse_scale(self, return_X = 'all_hours', save_changes=False, verbose=True):
+        """
+        Inversely scales the data to its original form.
+
+        Parameters:
+        -----------
+        return_X : str, optional
+            Specifies what data to return after inverse scaling. Default is 'all_hours'.
+        save_changes : bool, optional
+            If True, updates the internal data with the inversely scaled values. Default is False.
+        verbose : bool, optional
+            If True, prints status messages. Default is True.
+        """        
+        if verbose:
+            print("Inverse scaling data...")
+        X_train = self.scaler.inverse_transform(self.X_train)
+        X_val = self.scaler.inverse_transform(self.X_val)
+        X_test = self.scaler.inverse_transform(self.X_test)
+
+        if save_changes:
+            print("Inverse transformed data saved")
+            self.X_train = X_train
+            self.X_val = X_val
+            self.X_test = X_test
+        else:
+            if verbose:
+                print("Inverse scaled, but internal data not changed.")
+        if verbose:
+            print(f"Attempting to return {return_X}")
+        if return_X == "all_hours":
+            return np.concatenate((X_train, X_val, X_test), axis=0)
+        else:
+            print(f"Unrecognized or unimplemented return value {return_X}")
+
+    def print_hashes(self, attrs_to_check = ['X', 'y', 'X_train', 'y_train', 'X_val', 'y_val', 'X_test', 'y_test']):
+        """
+        Prints the hash of specified data attributes.
+
+        Parameters:
+        -----------
+        attrs_to_check : list, optional
+            A list of attribute names to hash and print. Default includes 'X', 'y', and split data.
+        """
+        
+        for attr in attrs_to_check:
+            if hasattr(self, attr):
+                value = getattr(self, attr)
+                print(f"Hash of {attr}: {hash_ndarray(value)}")        
+    def __getattr__(self, key):
+        """
+        Allows attribute-style access to dictionary keys, a.k.a. enables the "." operator for get elements
+        """        
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(f"'MLData' object has no attribute '{key}'")
+
+    def __setitem__(self, key, value):
+        """
+        Ensures dictionary and attribute updates stay in sync for required keys.
+        """        
+        super().__setitem__(key, value)  # Update the dictionary
+        if key in self.required_keys:
+            super().__setattr__(key, value)  # Ensure the attribute is updated as well
+
+    def __setattr__(self, key, value):
+        """
+        Ensures dictionary keys are updated when setting attributes.
+        """
+        self[key] = value    
 
 
 
