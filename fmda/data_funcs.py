@@ -18,6 +18,7 @@ import subprocess
 import os.path as osp
 from utils import Dict, str2time, check_increment, time_intp, read_pkl
 import warnings
+import pandas as pd
 
 
 # New Dict Functions as of 2024-10-2, needs more testing
@@ -857,4 +858,40 @@ def get_file(filename, data_dir='data'):
         base_url = "https://demo.openwfm.org/web/data/fmda/dicts/"
         print(f"Retrieving data {osp.join(base_url, filename)}")
         subprocess.call(f"wget -P {data_dir} {osp.join(base_url, filename)}", shell=True)
+
+
+
+def dict_to_df(data_dict, keys=None):
+    """
+    Convert specified keys from a dictionary to a pandas DataFrame.
+
+    Parameters:
+        data_dict (dict): Dictionary containing numpy arrays.
+        keys (list, optional): List of keys to be converted into DataFrame columns.
+                               If None, all keys in the dictionary will be used.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the specified keys as columns.
+
+    Raises:
+        ValueError: If the keys are not in the dictionary or the arrays have inconsistent lengths.
+    """
+    # Use all keys in the dictionary if keys is None
+    if keys is None:
+        keys = list(data_dict.keys())
+
+    # Check if all keys are present in the dictionary
+    missing_keys = [key for key in keys if key not in data_dict]
+    if missing_keys:
+        raise ValueError(f"The following keys are missing from the dictionary: {missing_keys}")
+
+    # Check if all arrays corresponding to the keys have the same length
+    lengths = [len(data_dict[key]) for key in keys]
+    if len(set(lengths)) > 1:
+        raise ValueError(f"Inconsistent array lengths for keys: {dict(zip(keys, lengths))}")
+
+    # Create the DataFrame
+    df = pd.DataFrame({key: data_dict[key] for key in keys})
+    return df
+
 

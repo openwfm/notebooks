@@ -8,6 +8,7 @@ import re
 from pyproj import Transformer
 from datetime import datetime
 import warnings
+import pandas as pd
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -37,7 +38,7 @@ band_df_hrrr = pd.DataFrame({
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def bands_to_names(bands):
-    # Get the bands from band list, assumes band_df_hrrr exists in memory
+    # Get the variable string names from band number list, assumes band_df_hrrr exists in memory
     # Find matching dict_name values in the dataframe
     dict_names = [
         band_df_hrrr.loc[band_df_hrrr['Band'] == band, 'dict_name'].iloc[0]
@@ -56,6 +57,21 @@ def names_to_bands(names):
     
     return bands  
 
+def features_to_bands(feat_list):
+    # Given list of features used in a model, return band numbers and variable names needed from HRRR
+
+    bands = names_to_bands(feat_list)
+    bnames = bands_to_names(bands)
+    
+    # Variable "rain" is engineered from precip_accum
+    if 'rain' in bnames:
+        bands.remove(628)
+        bnames.remove("rain")
+        bands.append(629)
+        bnames.append("precip_accum")
+
+    return bands, bnames
+
 def extract_timestamp(file_path):
     # Extract date (parent directory) and hour from the file path
     date_str = re.search(r'(\d{8})', file_path).group(1)  # Matches YYYYMMDD
@@ -66,6 +82,8 @@ def extract_timestamp(file_path):
     return timestamp
 
 def get_file_list(start_time, end_time, fstep, bands_list, base_path = "."):
+    # Given start time, end time, and list of HRRR bands, return a nested list of files to be read with xr open_mfdataset
+    
     # Set up time
     t0 = datetime.strptime(str(start_time), "%Y%m%d%H")
     t1 = datetime.strptime(str(end_time), "%Y%m%d%H")  
@@ -86,8 +104,8 @@ def get_file_list(start_time, end_time, fstep, bands_list, base_path = "."):
 # Computational Functions used to transform xarray objects
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Preprocess function to extract time information from filename and set it as a coordinate
 def preprocess(ds, add_xy = True):
+    # Preprocess function to extract time information from filename and set it as a coordinate. Used within xr open_mfdataset
     # Extract time and assign as coord
     time = extract_timestamp(ds.encoding['source'])
     ds = ds.assign_coords(time=time)  # Add time coordinate
@@ -102,7 +120,7 @@ def calc_eqs(ds):
 
     # Check whether Eqs exist and exit if so
     if any(name in ds.band for name in ["Ed", "Ew"]):
-        warnings.warn("Equilibria already detected in xarray, exiting function")
+        warnings.warn("Equilibria data already detected in xarray, exiting function")
         return ds 
     
     # Calculate Ed based on temp and rh
@@ -127,6 +145,12 @@ def calc_eqs(ds):
 
 
 def calc_rain(ds, ds_prev):
+    
+    # Check whether rain exist and exit if so
+    if any(name in ds.band for name in ["rain"]):
+        warnings.warn("Rain data already detected in xarray, exiting function")
+        return ds 
+    
     # Check times are the same
     assert np.all(ds.time.values == ds_prev.time.values), "Time dimension not the same between input xarrays"
     
@@ -145,5 +169,82 @@ def bbox_to_xy(bbox, crs, epsg = 4326):
     return minx, miny, maxx, maxy
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Computational to Perform transformations between coordinate systems
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+def xy_to_grid(x, y, xarray_obj):
+    """
+    Converts projected x and y coordinates to grid coordinates (fractional indices) 
+    based on the affine transform of an xarray object.
+
+    Parameters:
+        x (array-like): Array of x coordinates in the projection units.
+        y (array-like): Array of y coordinates in the projection units.
+        xarray_obj (xarray.Dataset or xarray.DataArray): The xarray object with raster data.
+
+    Returns:
+        tuple: A tuple (grid_x, grid_y) where grid_x and grid_y are arrays of fractional indices.
+    """
+    # Extract the affine transformation from the xarray object
+    transform = xarray_obj.rio.transform()
+
+    # Compute grid indices from projected coordinates
+    inv_transform = ~transform  # Inverse the affine transform
+    grid_x, grid_y = inv_transform * (x, y)  # Apply inverse transform
+    
+    return grid_x, grid_y
+
+
+def lonlat_to_xy(latitudes, longitudes, crs):
+    """
+    Converts latitude and longitude to x and y coordinates based on the given CRS.
+    
+    Parameters:
+        latitudes (array-like): Array or list of latitude values.
+        longitudes (array-like): Array or list of longitude values.
+        crs: Target CRS (Coordinate Reference System) in pyproj or rasterio format.
+    
+    Returns:
+        tuple: A tuple (x, y) where x and y are arrays of projected coordinates.
+    """
+    # Define the transformer for converting lat/lon to x/y
+    transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+    
+    # Transform lat/lon to x/y
+    x, y = transformer.transform(longitudes, latitudes)
+    
+    return x, y
+
+def xr_to_lonlat(xarray_obj):
+    """
+    Converts the x and y coordinates of an xarray object to longitude and latitude.
+    
+    Parameters:
+        xarray_obj (xarray.Dataset or xarray.DataArray): The xarray object with 'x' and 'y' dimensions.
+        
+    Returns:
+        numpy.ndarray: A 2D array of shape (2, n_y, n_x), where the first layer is longitude 
+                       and the second layer is latitude.
+    """
+    # Extract the CRS from the xarray object
+    crs_xarray = xarray_obj.rio.crs
+    
+    # Define the transformer for converting x/y to lat/lon
+    transformer = Transformer.from_crs(crs_xarray, "EPSG:4326", always_xy=True)
+    
+    # Extract x and y coordinate arrays
+    x_coords = xarray_obj['x'].values
+    y_coords = xarray_obj['y'].values
+    
+    # Create a meshgrid of x and y coordinates
+    xx, yy = np.meshgrid(x_coords, y_coords)
+    
+    # Transform x/y to lon/lat
+    lon, lat = transformer.transform(xx, yy)
+    
+    # Stack lon and lat into a single array
+    lonlat_array = np.stack([lon, lat], axis=0)  # Shape (2, n_y, n_x)
+    
+    return lonlat_array
