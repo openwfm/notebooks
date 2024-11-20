@@ -197,7 +197,7 @@ def xy_to_grid(x, y, xarray_obj):
     return grid_x, grid_y
 
 
-def lonlat_to_xy(latitudes, longitudes, crs):
+def lonlat_to_xy(longitudes, latitudes, crs):
     """
     Converts latitude and longitude to x and y coordinates based on the given CRS.
     
