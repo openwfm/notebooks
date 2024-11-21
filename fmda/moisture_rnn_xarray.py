@@ -248,3 +248,7 @@ def xr_to_lonlat(xarray_obj):
     lonlat_array = np.stack([lon, lat], axis=0)  # Shape (2, n_y, n_x)
     
     return lonlat_array
+
+
+
+
