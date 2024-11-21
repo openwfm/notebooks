@@ -56,7 +56,10 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
     hours = params_data['hours']
     if forecast_step > 0  and drop_na and hours is not None:
         hours = int(hours - forecast_step)
-    
+
+    # Some Print Messages
+    if drop_na:
+        print(f"Shifting time based on forecast step {forecast_step}. Dropping NA at beginning of feature data and corresponding times of output data")    
     # Loop over input dictionary cases, extract and calculate features, then run data filters
     new_dict = {}
     for input_file_path in input_file_paths:
@@ -89,7 +92,6 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
                 # Shift indices to future in time to line up forecast with desired time
                 X = shift_time(X, indices, forecast_step)
                 if drop_na:
-                    print(f"Shifted time based on forecast step {forecast_step}. Dropping NA at beginning of feature data and corresponding times of output data")
                     X = X[forecast_step:, :]
                     y = y[forecast_step:]
                     time = time[forecast_step:]
@@ -123,6 +125,9 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
     cases = list([*new_dict.keys()])
     flagged_cases = [element for element, flag in zip(cases, flags) if flag == 1]
     remove_key_list(new_dict, flagged_cases, verbose=verbose)
+
+    print("~"*50)
+    print(f"Resulting number of training cases: {len(new_dict)}")
     
     if spatial:
         if atm_source == "HRRR":
@@ -130,7 +135,7 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
         elif atm_source == "RAWS":
             new_dict = subset_by_features(new_dict, features_subset)
             new_dict = combine_nested(new_dict)
-        
+    
     return Dict(new_dict)
 
 def int2fstep(forecast_step, max_hour=5):
