@@ -25,7 +25,7 @@ import json
 
 if __name__ == '__main__':
 
-    print("Training RNN model using config file rnn_model_config.json")
+    print("Building training dataset using config file rnn_model_config.json")
 
     # Start timer for code 
     code_start_time = time.time()
@@ -39,28 +39,26 @@ if __name__ == '__main__':
     # Read Params
     params = read_yml(config["model_params_path"], subkey="rnn")
     params = RNNParams(params) # creates custom params class that runs checks, auto generates some fields, and constrains certain output
-    params.update({'plot_history': False}) # Turn off plotting since this is intended to be called from command line
+    params_data = read_yml(config["data_params_path"])
 
+    # Process training dictionary
+    file_paths = [config['input_dict_path']]
+    train = build_train_dict(file_paths, atm_source="HRRR", params_data = params_data, spatial=False, verbose=True,forecast_step = 3)
 
-    # Read RNNData and Train Model
-    train_path = osp.join(config.get("model_output_path"), config.get("training_data_filename"))
-    rnn_dat = read_pkl(train_path)
+    # Create RNNData and Train Model
     reproducibility.set_seed()
-    rnn = RNN(params)
-    m, errs = rnn.run_model(rnn_dat)
-    print(f"Mean Prediction RMSE: {errs.mean()}")
+    rnn_dat = rnn_data_wrap(combine_nested(train), params) # wrapper for custom class that runs data scaling and batch reshaping 
 
-    # Save Model and training data object
-    model_filename = config.get("model_output_filename")
     outpath = config.get("model_output_path")
-    print(f"Saving trained prediction model to {osp.join(outpath, model_filename)}")
-    rnn.model_predict.save(osp.join(outpath, model_filename)) # save prediction model only
-
+    data_filename = config.get('training_data_filename')
+    print(f"Saving model training data to {osp.join(outpath, data_filename)}")
+    with open(f"{osp.join(outpath, data_filename)}", 'wb') as file:
+        pickle.dump(rnn_dat, file)
 
     # End Timer
     code_end_time = time.time()
     code_elapsed_time = code_end_time - code_start_time
         
     if config.get("time_code"):
-        print(f"Model Training Elapsed time: {code_elapsed_time:.4f} seconds")
+        print(f"Data Processing Elapsed time: {code_elapsed_time:.4f} seconds")
     
