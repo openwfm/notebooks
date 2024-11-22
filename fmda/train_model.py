@@ -11,7 +11,7 @@ from moisture_rnn import RNNParams, RNNData, RNN, rnn_data_wrap
 from utils import hash2, read_yml, read_pkl, retrieve_url, Dict
 from moisture_rnn import RNN
 import reproducibility
-from data_funcs import rmse, to_json, combine_nested, build_train_dict
+from data_funcs import rmse, to_json, combine_nested
 from moisture_models import run_augmented_kf, XGB
 import copy
 import pandas as pd

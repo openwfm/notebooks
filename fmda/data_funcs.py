@@ -33,7 +33,7 @@ feature_types = {
     'engineered': ['doy', 'hod', 'rain']
 }
 
-def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HRRR", forecast_step=3, verbose=True, features_subset=None, drop_na=True):    
+def read_and_clean(input_file_paths, params_data, atm_source="HRRR", forecast_step=3, verbose=True, drop_na=True):    
     # TODO: process involves multiple loops over dictionary keys. Inefficient, but functionality are isolated in separate functions that call for loops so will be tedious to fix 
 
     # Define Forecast Step for atmospheric data
@@ -43,8 +43,8 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
         print("Atmospheric data source is RAWS, so forecast_step is not used")  
         forecast_step = 0 # set to 0 for future compatibility
         fstep=fprev=None
-        if spatial:
-            assert features_subset is not None, "For RAWS atmospheric data as source for spatial training set, argument features_subset cannot be None. Provide a list of features to subset the RAWS locations otherwise there will be errors when trying to build models with certain features."
+        # if spatial:
+        #     assert features_subset is not None, "For RAWS atmospheric data as source for spatial training set, argument features_subset cannot be None. Provide a list of features to subset the RAWS locations otherwise there will be errors when trying to build models with certain features."
     elif atm_source == "HRRR":
         fstep = int2fstep(forecast_step)
         if forecast_step > 0:
@@ -129,12 +129,12 @@ def build_train_dict(input_file_paths, params_data, spatial=True, atm_source="HR
     print("~"*50)
     print(f"Resulting number of training cases: {len(new_dict)}")
     
-    if spatial:
-        if atm_source == "HRRR":
-            new_dict = combine_nested(new_dict)
-        elif atm_source == "RAWS":
-            new_dict = subset_by_features(new_dict, features_subset)
-            new_dict = combine_nested(new_dict)
+    # if spatial:
+    #     if atm_source == "HRRR":
+    #         new_dict = combine_nested(new_dict)
+    #     elif atm_source == "RAWS":
+    #         new_dict = subset_by_features(new_dict, features_subset)
+    #         new_dict = combine_nested(new_dict)
     
     return Dict(new_dict)
 
