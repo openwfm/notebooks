@@ -44,7 +44,9 @@ if __name__ == '__main__':
 
     # Read RNNData and Train Model
     train_path = osp.join(config.get("model_output_path"), config.get("training_data_filename"))
-    rnn_dat = read_pkl(train_path)
+    train = read_pkl(train_path)
+    reproducibility.set_seed()
+    rnn_dat = rnn_data_wrap(combine_nested(train), params) # wrapper for custom class that runs data scaling and batch reshaping 
     reproducibility.set_seed()
     rnn = RNN(params)
     m, errs = rnn.run_model(rnn_dat)
