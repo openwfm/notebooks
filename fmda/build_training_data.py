@@ -45,15 +45,11 @@ if __name__ == '__main__':
     file_paths = [config['input_dict_path']]
     train = read_and_clean(file_paths, atm_source="HRRR", params_data = params_data, verbose=True,forecast_step = 3)
 
-    # Create RNNData and Train Model
-    reproducibility.set_seed()
-    rnn_dat = rnn_data_wrap(combine_nested(train), params) # wrapper for custom class that runs data scaling and batch reshaping 
-
     outpath = config.get("model_output_path")
     data_filename = config.get('training_data_filename')
     print(f"Saving model training data to {osp.join(outpath, data_filename)}")
     with open(f"{osp.join(outpath, data_filename)}", 'wb') as file:
-        pickle.dump(rnn_dat, file)
+        pickle.dump(train, file)
 
     # End Timer
     code_end_time = time.time()
